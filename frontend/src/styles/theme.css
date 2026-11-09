@@ -1,0 +1,102 @@
+:root {
+  /* Brand — from Medora Software CC.pdf */
+  --color-brand-deep: #015b2d;
+  --color-brand-emphasis: #075b35;
+  --color-primary: #168447;
+  --color-primary-soft: #62b947;
+  --color-leaf: #628947;
+  --color-leaf-light: #a7e879;
+
+  --color-bg: #f5faf7;
+  --color-surface: #ffffff;
+  --color-selected: #e9f6ed;
+  --color-hover: #f0f8f2;
+  --color-border: #e3eee8;
+
+  --color-heading: #14251c;
+  --color-text: #26352d;
+  --color-text-secondary: #64748b;
+  --color-text-muted: #94a3b8;
+  --color-inverse: #ffffff;
+
+  --color-error: #ef4444;
+  --color-error-bg: #fee2e2;
+  --color-warning: #ea8308;
+  --color-warning-bg: #fef9c3;
+  --color-info: #3b82f6;
+  --color-info-bg: #dbeafe;
+  --color-success: #168447;
+  --color-success-bg: #e9f6ed;
+
+  --gradient-primary: linear-gradient(135deg, #62b947 0%, #168447 100%);
+  --gradient-brand: linear-gradient(145deg, #015b2d 0%, #168447 55%, #62b947 100%);
+  --gradient-login: linear-gradient(160deg, #013f1f 0%, #015b2d 42%, #0a7a3d 100%);
+
+  --shadow-sm: 0 1px 2px rgba(1, 91, 45, 0.06);
+  --shadow-md: 0 8px 24px rgba(1, 91, 45, 0.1);
+  --shadow-lg: 0 18px 48px rgba(1, 91, 45, 0.16);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-full: 999px;
+
+  --font-display: 'Manrope', sans-serif;
+  --font-body: 'Source Sans 3', sans-serif;
+
+  --sidebar-width: 260px;
+  --header-height: 72px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-display);
+  color: var(--color-heading);
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  cursor: pointer;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
