@@ -53,39 +53,25 @@
   animation: fadeRise 650ms ease both;
 }
 
-.login-card__brand {
-  display: grid;
-  justify-items: center;
-  text-align: center;
-  gap: 0.35rem;
-  margin-bottom: 0.5rem;
+.login-card__header {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin-bottom: 0.35rem;
 }
 
-.login-card__brand img {
-  width: 72px;
-  height: 72px;
+.login-card__header img {
+  width: 56px;
+  height: 56px;
   object-fit: contain;
-  margin-bottom: 0.25rem;
 }
 
-.login-card__brand h1 {
-  font-size: 1.55rem;
-  letter-spacing: 0.12em;
-  color: var(--color-brand-deep);
+.login-card__header h2 {
+  font-size: 1.45rem;
 }
 
-.login-card__slogan {
-  margin: 0;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--color-primary);
-}
-
-.login-card__tagline {
-  margin: 0.15rem 0 0;
-  font-size: 0.95rem;
+.login-card__header p {
+  margin: 0.2rem 0 0;
   color: var(--color-text-secondary);
 }
 
