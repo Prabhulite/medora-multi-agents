@@ -16,7 +16,11 @@ export const userController = {
   },
 
   async create(req: Request, res: Response) {
-    const user = await userService.create(req.body as CreateUserInput);
+    if (!req.user) {
+      throw new UnauthorizedError();
+    }
+
+    const user = await userService.create(req.body as CreateUserInput, req.user.id);
     return sendCreated(res, user, 'User created');
   },
 

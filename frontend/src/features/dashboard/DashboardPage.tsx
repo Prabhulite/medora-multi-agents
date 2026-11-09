@@ -20,6 +20,12 @@ export function DashboardPage() {
       to: '/roles',
       permission: 'roles.view',
     },
+    {
+      title: 'Menu Management',
+      description: 'Manage sidebar menus, routes, and access from the database.',
+      to: '/menus',
+      permission: 'menus.view',
+    },
   ].filter((card) => hasPermission(user, card.permission));
 
   return (

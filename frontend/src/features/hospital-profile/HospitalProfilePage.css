@@ -1,0 +1,205 @@
+.hp-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-family: var(--font);
+}
+
+.hp-loading {
+  padding: 48px 16px;
+  text-align: center;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.hp-header h1 {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+.hp-header p {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748b;
+  max-width: 720px;
+}
+
+.hp-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  overflow: visible;
+}
+
+.hp-card__head {
+  padding: 14px 18px;
+  border-bottom: 1px solid #eef0f4;
+  background: #f8fafc;
+}
+
+.hp-card__head h2 {
+  margin: 0 0 2px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #015b2d;
+}
+
+.hp-card__head p {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.hp-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px;
+  padding: 16px 18px 18px;
+}
+
+.hp-grid--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.hp-grid--full {
+  grid-column: 1 / -1;
+}
+
+.hp-card .ui-field__label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+
+.hp-logo__control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: var(--input-height);
+  min-height: var(--input-height);
+  max-height: var(--input-height);
+  padding: 0 8px 0 6px;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-control);
+  background: #fff;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.hp-logo.ui-field--error .hp-logo__control {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+}
+
+.hp-logo__thumb {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #94a3b8;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.hp-logo__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hp-logo__name,
+.hp-logo__placeholder {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-ui-size, 13px);
+  font-weight: 500;
+  line-height: 1;
+}
+
+.hp-logo__name {
+  color: #111827;
+}
+
+.hp-logo__placeholder {
+  color: #9ca3af;
+}
+
+.hp-logo__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.hp-logo__btn {
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  color: #015b2d;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.hp-logo__btn:hover {
+  background: #f0f8f2;
+  border-color: #168447;
+}
+
+.hp-logo__btn--ghost {
+  color: #64748b;
+  border-color: transparent;
+  background: transparent;
+}
+
+.hp-logo__btn--ghost:hover {
+  color: #dc2626;
+  background: #fef2f2;
+  border-color: transparent;
+}
+
+.hp-logo__file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hp-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+@media (max-width: 960px) {
+  .hp-grid,
+  .hp-grid--2 {
+    grid-template-columns: 1fr;
+  }
+}

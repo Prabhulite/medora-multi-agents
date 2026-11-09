@@ -19,7 +19,7 @@ medora/
 ├── backend/
 │   └── src/
 │       ├── config/              # env + TypeORM DataSource
-│       ├── database/entities|migrations|seed
+│       ├── database/entities|migrations|ensure-db|seed
 │       ├── middleware/          # authenticate, authorize, validate, errors
 │       ├── modules/auth|users|roles|permissions
 │       └── shared/
@@ -60,45 +60,41 @@ npm run dev
 
 Optional single-app scripts: `npm run dev:backend`, `npm run dev:frontend`
 
-## Super admin credentials
+## Super admin
 
-Configured in `backend/.env`:
-
-```env
-SUPER_ADMIN_USERNAME=superadmin
-SUPER_ADMIN_PASSWORD=SuperAdmin@123
-```
-
-These are seeded by `npm run db:seed`.
+Set `SUPER_ADMIN_*` values in `backend/.env` (see `.env.example`). They are seeded by `npm run db:seed`. Do not commit real credentials.
 
 ## Database migrations (production approach)
 
-Schema changes are versioned TypeORM migrations. Runtime `synchronize` is disabled.
+Schema changes are versioned TypeORM CLI migrations. Runtime `synchronize` is disabled. Production databases are provisioned externally; local first-run uses `db:ensure`.
 
 ```bash
 cd backend
 
-# After editing entities, create a migration
-npm run makemigration -- AddSomethingUseful
+# After editing entities: generate + apply automatically
+npm run migration:generate
 
-# Apply pending migrations
-npm run migrate
+# Optional custom name
+npm run migration:generate -- AddUserPhone
 
-# Fresh local setup (migrate + seed)
+# Fresh local setup (create DB + migrate + seed)
 npm run db:setup
 
+# Apply pending only (new machine / deploy — no generate)
+npm run migration:run
+
 # Optional
-npm run migrate:revert
-npm run migrate:show
+npm run migration:revert
+npm run migration:show
+npm run db:ensure
 npm run db:seed
 ```
 
 Workflow:
-1. Update entities
-2. `npm run makemigration -- Name`
-3. Review SQL
-4. `npm run migrate`
-5. Seed only when needed
+1. Update entities (the design)
+2. `npm run migration:generate` — auto-names if omitted, then auto-runs
+3. Commit the new file under `src/database/migrations/`
+4. Others / deploy only need `npm run migration:run` or `npm run db:setup`
 
 ## Theme
 

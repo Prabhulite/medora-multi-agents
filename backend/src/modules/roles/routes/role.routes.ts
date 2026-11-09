@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../../../middleware/authenticate.js';
-import { authorize } from '../../../middleware/authorize.js';
+import { authorize, authorizeAny } from '../../../middleware/authorize.js';
 import { validate } from '../../../middleware/validate.js';
 import { asyncHandler } from '../../../shared/utils/asyncHandler.js';
 import { roleController } from '../controllers/role.controller.js';
@@ -16,7 +16,7 @@ router.use(authenticate);
 
 router.get(
   '/permissions',
-  authorize('permissions.view'),
+  authorizeAny('permissions.view', 'roles.view', 'roles.create', 'roles.update'),
   asyncHandler(roleController.listPermissions),
 );
 

@@ -1,9 +1,22 @@
 import 'reflect-metadata';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import mysql from 'mysql2/promise';
 import { DataSource } from 'typeorm';
-import { Permission, Role, User } from '../database/entities/index.js';
+import {
+  Department,
+  Doctor,
+  DoctorConsultationFee,
+  DoctorDocument,
+  DoctorLeave,
+  DoctorSchedule,
+  HospitalDocument,
+  HospitalProfile,
+  Menu,
+  Permission,
+  Role,
+  Specialization,
+  User,
+} from '../database/entities/index.js';
 import { env } from './env.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -16,7 +29,21 @@ export const AppDataSource = new DataSource({
   username: env.DB_USER,
   password: env.DB_PASSWORD,
   database: env.DB_NAME,
-  entities: [User, Role, Permission],
+  entities: [
+    User,
+    Role,
+    Permission,
+    Menu,
+    Department,
+    HospitalProfile,
+    HospitalDocument,
+    Specialization,
+    Doctor,
+    DoctorConsultationFee,
+    DoctorSchedule,
+    DoctorLeave,
+    DoctorDocument,
+  ],
   migrations: [path.join(__dirname, '../database/migrations/*.{ts,js}')],
   migrationsTableName: 'migrations',
   synchronize: false,
@@ -24,23 +51,7 @@ export const AppDataSource = new DataSource({
   timezone: 'Z',
 });
 
-export async function ensureDatabaseExists(): Promise<void> {
-  const connection = await mysql.createConnection({
-    host: env.DB_HOST,
-    port: env.DB_PORT,
-    user: env.DB_USER,
-    password: env.DB_PASSWORD,
-  });
-
-  await connection.query(
-    `CREATE DATABASE IF NOT EXISTS \`${env.DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
-  );
-  await connection.end();
-}
-
 export async function initializeDataSource(): Promise<DataSource> {
-  await ensureDatabaseExists();
-
   if (!AppDataSource.isInitialized) {
     await AppDataSource.initialize();
   }

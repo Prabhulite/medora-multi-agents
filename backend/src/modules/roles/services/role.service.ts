@@ -16,6 +16,8 @@ function toPublicRole(role: NonNullable<Awaited<ReturnType<typeof roleRepository
     description: role.description,
     isSystem: role.isSystem,
     isActive: role.isActive,
+    createdById: role.createdById,
+    createdByName: role.createdByName,
     createdAt: role.createdAt,
     updatedAt: role.updatedAt,
     permissionIds: role.permissionIds,
@@ -48,7 +50,7 @@ export const roleService = {
     return permissionRepository.findAll();
   },
 
-  async create(input: CreateRoleInput) {
+  async create(input: CreateRoleInput, actorId: number) {
     if (await roleRepository.existsByCode(input.code)) {
       throw new ConflictError('Role code already exists');
     }
@@ -64,6 +66,7 @@ export const roleService = {
       name: input.name,
       description: input.description,
       isActive: input.isActive,
+      createdById: actorId,
       permissionIds: input.permissionIds,
     });
 

@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import { UnauthorizedError } from '../../../shared/errors/AppError.js';
 import { sendCreated, sendSuccess } from '../../../shared/utils/response.js';
 import { roleService } from '../services/role.service.js';
 import type { CreateRoleInput, UpdateRoleInput } from '../validators/role.validators.js';
@@ -20,7 +21,11 @@ export const roleController = {
   },
 
   async create(req: Request, res: Response) {
-    const role = await roleService.create(req.body as CreateRoleInput);
+    if (!req.user) {
+      throw new UnauthorizedError();
+    }
+
+    const role = await roleService.create(req.body as CreateRoleInput, req.user.id);
     return sendCreated(res, role, 'Role created');
   },
 

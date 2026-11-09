@@ -1,15 +1,24 @@
 import { In, Not } from 'typeorm';
 import { AppDataSource } from '../../../config/data-source.js';
-import { Role, User } from '../../../database/entities/index.js';
+import { Role, User, type UserGender } from '../../../database/entities/index.js';
 
 export interface UserView {
   id: number;
+  employeeId: string | null;
   username: string;
-  email: string;
+  email: string | null;
   fullName: string;
+  mobileNumber: string | null;
+  gender: UserGender;
+  designation: string | null;
+  departmentId: number | null;
+  departmentName: string | null;
+  departmentCode: string | null;
   isActive: boolean;
   isSuperAdmin: boolean;
   lastLoginAt: Date | null;
+  createdById: number | null;
+  createdByName: string | null;
   createdAt: Date;
   updatedAt: Date;
   passwordHash?: string;
@@ -21,7 +30,7 @@ export interface UserView {
 export interface AuthContextRecord {
   id: number;
   username: string;
-  email: string;
+  email: string | null;
   fullName: string;
   isActive: boolean;
   isSuperAdmin: boolean;
@@ -30,18 +39,29 @@ export interface AuthContextRecord {
   permissions: string[];
 }
 
-export interface CreateUserInput {
+export interface CreateUserRepoInput {
+  employeeId: string;
   username: string;
-  email: string;
+  email: string | null;
   passwordHash: string;
   fullName: string;
+  mobileNumber: string;
+  gender: UserGender;
+  designation: string | null;
+  departmentId: number;
   isActive: boolean;
+  createdById?: number | null;
   roleIds: number[];
 }
 
-export interface UpdateUserInput {
-  email?: string;
+export interface UpdateUserRepoInput {
+  employeeId?: string;
+  email?: string | null;
   fullName?: string;
+  mobileNumber?: string;
+  gender?: UserGender;
+  designation?: string | null;
+  departmentId?: number | null;
   isActive?: boolean;
   passwordHash?: string;
   roleIds?: number[];
@@ -51,12 +71,21 @@ function toUserView(user: User, includePassword = false): UserView {
   const roles = user.roles ?? [];
   return {
     id: user.id,
+    employeeId: user.employeeId,
     username: user.username,
     email: user.email,
     fullName: user.fullName,
+    mobileNumber: user.mobileNumber,
+    gender: user.gender,
+    designation: user.designation,
+    departmentId: user.departmentId,
+    departmentName: user.department?.name ?? null,
+    departmentCode: user.department?.code ?? null,
     isActive: user.isActive,
     isSuperAdmin: user.isSuperAdmin,
     lastLoginAt: user.lastLoginAt,
+    createdById: user.createdById,
+    createdByName: user.createdBy?.fullName ?? null,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
     passwordHash: includePassword ? user.passwordHash : undefined,
@@ -77,7 +106,7 @@ export const userRepository = {
 
   async findAll(): Promise<UserView[]> {
     const users = await this.repo().find({
-      relations: { roles: true },
+      relations: { roles: true, department: true, createdBy: true },
       order: { createdAt: 'DESC' },
     });
     return users.map((user) => toUserView(user));
@@ -86,7 +115,7 @@ export const userRepository = {
   async findById(id: number): Promise<UserView | null> {
     const user = await this.repo().findOne({
       where: { id },
-      relations: { roles: true },
+      relations: { roles: true, department: true, createdBy: true },
     });
     return user ? toUserView(user) : null;
   },
@@ -94,7 +123,7 @@ export const userRepository = {
   async findByUsername(username: string): Promise<UserView | null> {
     const user = await this.repo().findOne({
       where: { username },
-      relations: { roles: true },
+      relations: { roles: true, department: true, createdBy: true },
     });
     return user ? toUserView(user, true) : null;
   },
@@ -133,15 +162,21 @@ export const userRepository = {
     };
   },
 
-  async create(input: CreateUserInput): Promise<UserView> {
+  async create(input: CreateUserRepoInput): Promise<UserView> {
     const roles = await this.roleRepo().findBy({ id: In(input.roleIds) });
 
     const user = this.repo().create({
+      employeeId: input.employeeId,
       username: input.username,
       email: input.email,
       passwordHash: input.passwordHash,
       fullName: input.fullName,
+      mobileNumber: input.mobileNumber,
+      gender: input.gender,
+      designation: input.designation,
+      departmentId: input.departmentId,
       isActive: input.isActive,
+      createdById: input.createdById ?? null,
       isSuperAdmin: false,
       roles,
     });
@@ -150,15 +185,20 @@ export const userRepository = {
     return this.findById(saved.id) as Promise<UserView>;
   },
 
-  async update(id: number, input: UpdateUserInput): Promise<UserView | null> {
+  async update(id: number, input: UpdateUserRepoInput): Promise<UserView | null> {
     const user = await this.repo().findOne({
       where: { id },
-      relations: { roles: true },
+      relations: { roles: true, department: true },
     });
     if (!user) return null;
 
+    if (input.employeeId !== undefined) user.employeeId = input.employeeId;
     if (input.email !== undefined) user.email = input.email;
     if (input.fullName !== undefined) user.fullName = input.fullName;
+    if (input.mobileNumber !== undefined) user.mobileNumber = input.mobileNumber;
+    if (input.gender !== undefined) user.gender = input.gender;
+    if (input.designation !== undefined) user.designation = input.designation;
+    if (input.departmentId !== undefined) user.departmentId = input.departmentId;
     if (input.isActive !== undefined) user.isActive = input.isActive;
     if (input.passwordHash !== undefined) user.passwordHash = input.passwordHash;
 
@@ -189,6 +229,13 @@ export const userRepository = {
   async existsByEmail(email: string, excludeId?: number): Promise<boolean> {
     const count = await this.repo().count({
       where: excludeId ? { email, id: Not(excludeId) } : { email },
+    });
+    return count > 0;
+  },
+
+  async existsByEmployeeId(employeeId: string, excludeId?: number): Promise<boolean> {
+    const count = await this.repo().count({
+      where: excludeId ? { employeeId, id: Not(excludeId) } : { employeeId },
     });
     return count > 0;
   },

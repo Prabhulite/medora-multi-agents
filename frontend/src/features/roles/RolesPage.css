@@ -1,57 +1,12 @@
-.role-form {
-  display: grid;
-  gap: 1rem;
-}
-
-.permission-picker__label {
-  display: block;
-  margin-bottom: 0.75rem;
-  font-family: var(--font-display);
-  font-weight: 600;
-}
-
-.permission-group {
-  margin-bottom: 0.85rem;
-  padding: 0.85rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg);
-}
-
-.permission-group h4 {
-  margin-bottom: 0.65rem;
-  text-transform: capitalize;
-  font-size: 0.95rem;
-  color: var(--color-brand-deep);
-}
-
-.permission-group__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 0.55rem;
-}
-
-.permission-group__grid small {
-  display: block;
-  color: var(--color-text-secondary);
-  font-weight: 500;
-}
-
 .chip-row,
 .action-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
+  gap: var(--control-gap);
 }
 
 .muted {
   color: var(--color-text-secondary);
-  font-size: 0.85rem;
-}
-
-.checkbox-row {
-  display: inline-flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
 }

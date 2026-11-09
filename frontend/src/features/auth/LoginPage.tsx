@@ -4,15 +4,18 @@ import medoraLogo from '../../assets/medora/medora-stacked.png';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { useFieldErrors } from '../../hooks/useFieldErrors';
 import { useAuth } from './AuthContext';
 import './LoginPage.css';
+
+type LoginField = 'username' | 'password';
 
 export function LoginPage() {
   const { user, loading, login } = useAuth();
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [errors, setErrors] = useState<{ username?: string; password?: string }>({});
+  const { errors, setFieldErrors, clearError, clearAllErrors } = useFieldErrors<LoginField>();
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -20,18 +23,18 @@ export function LoginPage() {
     return <Navigate to="/" replace />;
   }
 
-  const validate = () => {
-    const next: { username?: string; password?: string } = {};
-    if (!username.trim()) next.username = 'Username is required';
-    if (!password) next.password = 'Password is required';
-    setErrors(next);
-    return Object.keys(next).length === 0;
-  };
-
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setFormError('');
-    if (!validate()) return;
+    clearAllErrors();
+
+    const nextErrors: Partial<Record<LoginField, string>> = {};
+    if (!username.trim()) nextErrors.username = 'Username is required';
+    if (!password) nextErrors.password = 'Password is required';
+    if (Object.keys(nextErrors).length) {
+      setFieldErrors(nextErrors);
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -66,9 +69,13 @@ export function LoginPage() {
             <Input
               label="Username"
               name="username"
+              fieldKey="username"
               autoComplete="username"
               value={username}
-              onChange={(event) => setUsername(event.target.value)}
+              onChange={(event) => {
+                setUsername(event.target.value);
+                clearError('username');
+              }}
               error={errors.username}
               placeholder="Enter username"
             />
@@ -76,11 +83,15 @@ export function LoginPage() {
             <Input
               label="Password"
               name="password"
+              fieldKey="password"
               type="password"
               passwordToggle
               autoComplete="current-password"
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={(event) => {
+                setPassword(event.target.value);
+                clearError('password');
+              }}
               error={errors.password}
               placeholder="Enter password"
             />

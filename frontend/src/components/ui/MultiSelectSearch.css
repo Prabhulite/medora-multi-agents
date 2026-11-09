@@ -1,0 +1,217 @@
+/* Modern searchable multi-select — select-field pattern */
+
+.ui-ms.is-disabled {
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.ui-ms__control.ui-field__input {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--input-height) !important;
+  min-height: var(--input-height) !important;
+  max-height: var(--input-height) !important;
+  padding: 0 32px 0 12px !important;
+  margin: 0;
+  line-height: var(--input-height);
+  cursor: pointer;
+  text-align: left;
+  appearance: none;
+  -webkit-appearance: none;
+  overflow: hidden;
+  vertical-align: top;
+}
+
+.ui-ms.is-open .ui-ms__control.ui-field__input,
+.ui-ms__control.ui-field__input:focus {
+  border-color: var(--color-primary, #168447);
+  box-shadow: 0 0 0 3px rgba(22, 132, 71, 0.12);
+  outline: none;
+}
+
+.ui-field--error.ui-ms.is-open .ui-ms__control.ui-field__input,
+.ui-field--error .ui-ms__control.ui-field__input:focus {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
+}
+
+.ui-ms__value,
+.ui-ms__placeholder {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-ui-size, 13px);
+  font-weight: 500;
+  line-height: 1;
+}
+
+.ui-ms__value {
+  color: #111827;
+}
+
+.ui-ms__placeholder {
+  color: #9ca3af;
+}
+
+.ui-ms__caret {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #64748b;
+  pointer-events: none;
+  transition: transform 0.15s ease;
+}
+
+.ui-ms {
+  position: relative;
+}
+
+.ui-ms .ui-ms__control {
+  position: relative;
+}
+
+.ui-ms.is-open .ui-ms__caret {
+  transform: translateY(-50%) rotate(180deg);
+}
+
+.ui-ms__dropdown {
+  position: fixed;
+  z-index: 1400;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-primary, #168447);
+  background: #fff;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
+  overflow: hidden;
+}
+
+.ui-ms__dropdown.is-below {
+  border-radius: 0 0 var(--radius-control, 8px) var(--radius-control, 8px);
+  border-top-color: #e5e7eb;
+}
+
+.ui-ms__dropdown.is-above {
+  border-radius: var(--radius-control, 8px) var(--radius-control, 8px) 0 0;
+  border-bottom-color: #e5e7eb;
+}
+
+.ui-ms.is-open .ui-ms__control.ui-field__input {
+  border-color: var(--color-primary, #168447);
+  box-shadow: none;
+  position: relative;
+  z-index: 1401;
+}
+
+.ui-ms.is-open-below .ui-ms__control.ui-field__input {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.ui-ms.is-open-above .ui-ms__control.ui-field__input {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.ui-ms__search {
+  flex-shrink: 0;
+  padding: 10px 10px 8px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.ui-ms__search input {
+  width: 100%;
+  height: 34px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0 10px;
+  font-family: var(--font);
+  font-size: var(--font-ui-size, 13px);
+  font-weight: 500;
+  color: #111827;
+  outline: none;
+  box-sizing: border-box;
+  background: #fff;
+}
+
+.ui-ms__search input::placeholder {
+  color: #9ca3af;
+}
+
+.ui-ms__search input:focus {
+  border-color: var(--color-primary, #168447);
+  box-shadow: 0 0 0 3px rgba(22, 132, 71, 0.12);
+}
+
+.ui-ms__options {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 0;
+}
+
+.ui-ms__options::-webkit-scrollbar {
+  width: 8px;
+}
+
+.ui-ms__options::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 8px;
+}
+
+.ui-ms__options::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ui-ms__option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ui-ms__option:hover {
+  background: #f8fafc;
+}
+
+.ui-ms__option.is-selected {
+  background: #f0f8f2;
+}
+
+.ui-ms__option input[type='checkbox'] {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: var(--color-primary, #168447);
+  cursor: pointer;
+}
+
+.ui-ms__option-label {
+  min-width: 0;
+  font-family: var(--font);
+  font-size: var(--font-ui-size, 13px);
+  font-weight: 500;
+  color: #111827;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-ms__empty {
+  padding: 16px 12px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 500;
+}

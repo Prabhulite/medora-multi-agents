@@ -1,0 +1,126 @@
+.doc-upload {
+  display: grid;
+  gap: 10px;
+}
+
+.doc-upload__composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.doc-upload__composer > .ui-field {
+  padding-bottom: 0;
+}
+
+.doc-upload__composer .ui-btn {
+  width: 100%;
+  height: var(--input-height);
+  min-height: var(--input-height);
+  max-height: var(--input-height);
+}
+
+.doc-upload__file-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: var(--input-height);
+  min-height: var(--input-height);
+  max-height: var(--input-height);
+  padding: 0 14px;
+  border: 1px solid #d1d5db;
+  border-radius: var(--radius-control);
+  background: #fff;
+  color: #015b2d;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.doc-upload__file-btn:hover {
+  background: #f0f8f2;
+  border-color: #168447;
+}
+
+.doc-upload__file-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.doc-upload__hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.doc-upload__list {
+  display: grid;
+  gap: 8px;
+}
+
+.doc-upload__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--input-height);
+  padding: 0 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-control);
+  background: #fff;
+}
+
+.doc-upload__meta {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 2px;
+}
+
+.doc-upload__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-upload__sub {
+  font-size: 11px;
+  font-weight: 500;
+  color: #94a3b8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-upload__actions {
+  display: inline-flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.doc-upload__empty {
+  padding: 12px;
+  border: 1px dashed #d1d5db;
+  border-radius: var(--radius-control);
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+}
+
+@media (max-width: 960px) {
+  .doc-upload__composer {
+    grid-template-columns: 1fr;
+  }
+}

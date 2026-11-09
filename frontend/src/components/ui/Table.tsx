@@ -1,49 +1,180 @@
-import type { ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import './Table.css';
 
-interface Column<T> {
+export interface TableColumn<T> {
   key: string;
   header: string;
-  render: (row: T) => ReactNode;
+  width?: string;
+  render: (row: T, index: number) => ReactNode;
 }
 
 interface TableProps<T> {
-  columns: Column<T>[];
+  columns: TableColumn<T>[];
   rows: T[];
   rowKey: (row: T) => string | number;
   emptyMessage?: string;
+  searchPlaceholder?: string;
+  searchText?: (row: T) => string;
+  onRefresh?: () => void;
+  showIndex?: boolean;
+  loading?: boolean;
 }
+
+const PAGE_SIZES = [10, 25, 50, 100];
 
 export function Table<T>({
   columns,
   rows,
   rowKey,
   emptyMessage = 'No records found',
+  searchPlaceholder = 'Search...',
+  searchText,
+  onRefresh,
+  showIndex = true,
+  loading = false,
 }: TableProps<T>) {
-  if (rows.length === 0) {
-    return <div className="ui-table__empty">{emptyMessage}</div>;
-  }
+  const [query, setQuery] = useState('');
+  const [pageSize, setPageSize] = useState(25);
+  const [page, setPage] = useState(1);
+
+  const filteredRows = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized || !searchText) return rows;
+    return rows.filter((row) => searchText(row).toLowerCase().includes(normalized));
+  }, [query, rows, searchText]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, pageSize, rows]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  const pageRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredRows.slice(start, start + pageSize);
+  }, [filteredRows, page, pageSize]);
+
+  const rangeStart = filteredRows.length === 0 ? 0 : (page - 1) * pageSize + 1;
+  const rangeEnd = Math.min(page * pageSize, filteredRows.length);
 
   return (
-    <div className="ui-table__wrap">
-      <table className="ui-table">
-        <thead>
-          <tr>
-            {columns.map((column) => (
-              <th key={column.key}>{column.header}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={rowKey(row)}>
-              {columns.map((column) => (
-                <td key={column.key}>{column.render(row)}</td>
+    <div className="ui-table-panel">
+      <div className="ui-table-toolbar">
+        <div className="ui-table-toolbar__left">
+          <label className="ui-table-toolbar__entries">
+            Show
+            <select
+              value={pageSize}
+              onChange={(event) => setPageSize(Number(event.target.value))}
+            >
+              {PAGE_SIZES.map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
               ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+            </select>
+            entries
+          </label>
+          <span className="ui-table-toolbar__count">{filteredRows.length} records.</span>
+        </div>
+
+        <div className="ui-table-toolbar__right">
+          {searchText ? (
+            <div className="ui-table-search">
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                <path
+                  fill="currentColor"
+                  d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
+                />
+              </svg>
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={searchPlaceholder}
+                aria-label="Search table"
+              />
+            </div>
+          ) : null}
+
+          {onRefresh ? (
+            <button type="button" className="ui-table-refresh" onClick={onRefresh}>
+              <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+                <path
+                  fill="currentColor"
+                  d="M17.65 6.35A7.95 7.95 0 0 0 12 4V1L7 6l5 5V7a5 5 0 1 1-4.9 6.1l-1.42.7A7 7 0 1 0 17.65 6.35z"
+                />
+              </svg>
+              Refresh
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="ui-table__empty">Loading...</div>
+      ) : filteredRows.length === 0 ? (
+        <div className="ui-table__empty">{emptyMessage}</div>
+      ) : (
+        <>
+          <div className="ui-table__wrap">
+            <table className="ui-table">
+              <thead>
+                <tr>
+                  {showIndex ? <th style={{ width: 64 }}>#</th> : null}
+                  {columns.map((column) => (
+                    <th key={column.key} style={column.width ? { width: column.width } : undefined}>
+                      {column.header}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {pageRows.map((row, rowIndex) => {
+                  const absoluteIndex = (page - 1) * pageSize + rowIndex;
+                  return (
+                    <tr key={rowKey(row)}>
+                      {showIndex ? (
+                        <td>
+                          <div className="ui-table__index">{absoluteIndex + 1}</div>
+                        </td>
+                      ) : null}
+                      {columns.map((column) => (
+                        <td key={column.key}>{column.render(row, absoluteIndex)}</td>
+                      ))}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="ui-table-footer">
+            <span>
+              Showing <strong>{rangeStart}</strong> to <strong>{rangeEnd}</strong> of{' '}
+              <strong>{filteredRows.length}</strong> entries
+            </span>
+            <div className="ui-table-pager">
+              <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+                Prev
+              </button>
+              <button type="button" className="is-active">
+                {page}
+              </button>
+              <button
+                type="button"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

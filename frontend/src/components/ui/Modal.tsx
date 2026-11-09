@@ -7,15 +7,33 @@ interface ModalProps {
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
+  size?: 'sm' | 'md';
+  squared?: boolean;
 }
 
-export function Modal({ open, title, onClose, children, footer }: ModalProps) {
+export function Modal({
+  open,
+  title,
+  onClose,
+  children,
+  footer,
+  size = 'md',
+  squared = false,
+}: ModalProps) {
   if (!open) return null;
+
+  const className = [
+    'ui-modal',
+    size === 'sm' ? 'ui-modal--sm' : '',
+    squared ? 'ui-modal--squared' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <div className="ui-modal__backdrop" role="presentation" onClick={onClose}>
       <div
-        className="ui-modal"
+        className={className}
         role="dialog"
         aria-modal="true"
         aria-label={title}

@@ -10,15 +10,30 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label: string;
   options: Option[];
   error?: string;
+  fieldKey?: string;
 }
 
-export function Select({ label, options, error, id, className = '', ...props }: SelectProps) {
+export function Select({
+  label,
+  options,
+  error,
+  fieldKey,
+  id,
+  className = '',
+  ...props
+}: SelectProps) {
   const selectId = id || props.name || label.toLowerCase().replace(/\s+/g, '-');
 
   return (
     <label className={`ui-field ${error ? 'ui-field--error' : ''} ${className}`} htmlFor={selectId}>
       <span className="ui-field__label">{label}</span>
-      <select id={selectId} className="ui-field__input" {...props}>
+      <select
+        id={selectId}
+        className="ui-field__input"
+        data-field={fieldKey || props.name || selectId}
+        aria-invalid={Boolean(error)}
+        {...props}
+      >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}

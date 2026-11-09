@@ -1,0 +1,107 @@
+.um-form-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-family: var(--font);
+}
+
+.um-form-loading {
+  padding: 48px 16px;
+  text-align: center;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.um-form-header h1 {
+  margin: 0 0 4px;
+  font-family: var(--font);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+.um-form-header p {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748b;
+  max-width: 720px;
+}
+
+.um-form-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  overflow: visible;
+}
+
+.um-form-card__head {
+  padding: 14px 18px;
+  border-bottom: 1px solid #eef0f4;
+  background: #f8fafc;
+}
+
+.um-form-card__head h2 {
+  margin: 0 0 2px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #015b2d;
+}
+
+.um-form-card__head p {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.um-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px 12px;
+  padding: 16px 18px 18px;
+}
+
+.um-form-grid--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.um-form-card .ui-field__label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+
+.um-form-note {
+  display: flex;
+  align-items: flex-end;
+}
+
+.um-form-muted {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.um-form-muted--pad {
+  padding: 0 18px 18px;
+}
+
+.um-form-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+@media (max-width: 960px) {
+  .um-form-grid,
+  .um-form-grid--2 {
+    grid-template-columns: 1fr;
+  }
+}

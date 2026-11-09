@@ -7,12 +7,14 @@
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "build": "tsc -p tsconfig.json",
-    "makemigration": "tsx src/database/makemigration.ts",
-    "migrate": "tsx src/database/migrate.ts",
-    "migrate:revert": "tsx src/database/revert.ts",
-    "migrate:show": "tsx ./node_modules/typeorm/cli.js migration:show -d src/config/data-source.cli.ts",
+    "typeorm": "tsx ./node_modules/typeorm/cli.js",
+    "migration:generate": "tsx src/database/generate-migration.ts",
+    "migration:run": "tsx ./node_modules/typeorm/cli.js migration:run -d src/config/data-source.cli.ts",
+    "migration:revert": "tsx ./node_modules/typeorm/cli.js migration:revert -d src/config/data-source.cli.ts",
+    "migration:show": "tsx ./node_modules/typeorm/cli.js migration:show -d src/config/data-source.cli.ts",
+    "db:ensure": "tsx src/database/ensure-db.ts",
     "db:seed": "tsx src/database/seed.ts",
-    "db:setup": "npm run migrate && npm run db:seed"
+    "db:setup": "npm run db:ensure && npm run migration:run && npm run db:seed"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

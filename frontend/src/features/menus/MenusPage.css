@@ -1,0 +1,44 @@
+.muted {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.chip-row,
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--control-gap);
+}
+
+.menu-form {
+  display: grid;
+  gap: 16px;
+}
+
+.menu-form__row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--control-gap);
+  align-items: start;
+}
+
+.menu-form .ui-field__input {
+  border-radius: var(--radius-control);
+  height: var(--input-height);
+  min-height: var(--input-height);
+}
+
+.checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--control-gap);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .menu-form__row {
+    grid-template-columns: 1fr;
+  }
+}

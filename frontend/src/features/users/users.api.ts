@@ -11,6 +11,10 @@ export const usersApi = {
     const { data } = await api.get<ApiResponse<User[]>>('/users');
     return data.data;
   },
+  getById: async (id: number) => {
+    const { data } = await api.get<ApiResponse<User>>(`/users/${id}`);
+    return data.data;
+  },
   create: async (payload: CreateUserPayload) => {
     const { data } = await api.post<ApiResponse<User>>('/users', payload);
     return data.data;

@@ -9,6 +9,8 @@ export interface RoleView {
   description: string | null;
   isSystem: boolean;
   isActive: boolean;
+  createdById: number | null;
+  createdByName: string | null;
   createdAt: Date;
   updatedAt: Date;
   permissionIds: number[];
@@ -20,6 +22,7 @@ export interface CreateRoleInput {
   name: string;
   description?: string | null;
   isActive: boolean;
+  createdById?: number | null;
   permissionIds: number[];
 }
 
@@ -39,6 +42,8 @@ function toRoleView(role: Role): RoleView {
     description: role.description,
     isSystem: role.isSystem,
     isActive: role.isActive,
+    createdById: role.createdById,
+    createdByName: role.createdBy?.fullName ?? null,
     createdAt: role.createdAt,
     updatedAt: role.updatedAt,
     permissionIds: permissions.map((permission) => permission.id),
@@ -57,7 +62,7 @@ export const roleRepository = {
 
   async findAll(): Promise<RoleView[]> {
     const roles = await this.repo().find({
-      relations: { permissions: true },
+      relations: { permissions: true, createdBy: true },
       order: { name: 'ASC' },
     });
     return roles.map(toRoleView);
@@ -66,7 +71,7 @@ export const roleRepository = {
   async findById(id: number): Promise<RoleView | null> {
     const role = await this.repo().findOne({
       where: { id },
-      relations: { permissions: true },
+      relations: { permissions: true, createdBy: true },
     });
     return role ? toRoleView(role) : null;
   },
@@ -75,7 +80,7 @@ export const roleRepository = {
     if (ids.length === 0) return [];
     const roles = await this.repo().find({
       where: { id: In(ids), isActive: true },
-      relations: { permissions: true },
+      relations: { permissions: true, createdBy: true },
     });
     return roles.map(toRoleView);
   },
@@ -90,6 +95,7 @@ export const roleRepository = {
       name: input.name,
       description: input.description ?? null,
       isActive: input.isActive,
+      createdById: input.createdById ?? null,
       isSystem: false,
       permissions,
     });

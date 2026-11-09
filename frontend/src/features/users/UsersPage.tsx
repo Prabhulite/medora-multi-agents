@@ -1,39 +1,31 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ActionMenu } from '../../components/ui/ActionMenu';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
-import { Modal } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
+import {
+  AlertCircleIcon,
+  BanIcon,
+  CheckCircleIcon,
+  DeleteIcon,
+  EditIcon,
+} from '../../components/ui/statusIcons';
 import { Table } from '../../components/ui/Table';
 import { useAuth } from '../auth/AuthContext';
 import { getErrorMessage } from '../../lib/api';
 import { hasPermission } from '../../lib/permissions';
-import type { Role, User } from '../../types';
-import { rolesApi } from '../roles/roles.api';
+import type { User } from '../../types';
 import { usersApi } from './users.api';
 import './UsersPage.css';
 
-const emptyForm = {
-  username: '',
-  email: '',
-  fullName: '',
-  password: '',
-  isActive: true,
-  roleIds: [] as number[],
-};
-
 export function UsersPage() {
+  const navigate = useNavigate();
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
-  const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<User | null>(null);
-  const [form, setForm] = useState(emptyForm);
-  const [saving, setSaving] = useState(false);
-  const [formError, setFormError] = useState('');
 
   const canCreate = hasPermission(currentUser, 'users.create');
   const canUpdate = hasPermission(currentUser, 'users.update');
@@ -43,9 +35,7 @@ export function UsersPage() {
     setLoading(true);
     setError('');
     try {
-      const [userRows, roleRows] = await Promise.all([usersApi.list(), rolesApi.list()]);
-      setUsers(userRows);
-      setRoles(roleRows.filter((role) => role.isActive));
+      setUsers(await usersApi.list());
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to load users'));
     } finally {
@@ -57,84 +47,6 @@ export function UsersPage() {
     void load();
   }, []);
 
-  const openCreate = () => {
-    setEditing(null);
-    setForm(emptyForm);
-    setFormError('');
-    setModalOpen(true);
-  };
-
-  const openEdit = (user: User) => {
-    setEditing(user);
-    setForm({
-      username: user.username,
-      email: user.email,
-      fullName: user.fullName,
-      password: '',
-      isActive: user.isActive,
-      roleIds: user.roleIds,
-    });
-    setFormError('');
-    setModalOpen(true);
-  };
-
-  const toggleRole = (roleId: number) => {
-    setForm((prev) => ({
-      ...prev,
-      roleIds: prev.roleIds.includes(roleId)
-        ? prev.roleIds.filter((id) => id !== roleId)
-        : [...prev.roleIds, roleId],
-    }));
-  };
-
-  const onSubmit = async (event: FormEvent) => {
-    event.preventDefault();
-    setFormError('');
-
-    if (!form.fullName.trim() || !form.email.trim()) {
-      setFormError('Full name and email are required');
-      return;
-    }
-
-    if (!editing && (!form.username.trim() || !form.password)) {
-      setFormError('Username and password are required');
-      return;
-    }
-
-    if (form.roleIds.length === 0 && !(editing?.isSuperAdmin)) {
-      setFormError('Select at least one role');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      if (editing) {
-        await usersApi.update(editing.id, {
-          email: form.email.trim(),
-          fullName: form.fullName.trim(),
-          isActive: form.isActive,
-          password: form.password || undefined,
-          roleIds: editing.isSuperAdmin ? undefined : form.roleIds,
-        });
-      } else {
-        await usersApi.create({
-          username: form.username.trim(),
-          email: form.email.trim(),
-          fullName: form.fullName.trim(),
-          password: form.password,
-          isActive: form.isActive,
-          roleIds: form.roleIds,
-        });
-      }
-      setModalOpen(false);
-      await load();
-    } catch (err) {
-      setFormError(getErrorMessage(err, 'Unable to save user'));
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const onDelete = async (user: User) => {
     if (!window.confirm(`Delete user "${user.username}"?`)) return;
     try {
@@ -145,22 +57,50 @@ export function UsersPage() {
     }
   };
 
+  const onToggleActive = async (user: User) => {
+    const nextActive = !user.isActive;
+    const actionLabel = nextActive ? 'activate' : 'deactivate';
+    if (!window.confirm(`${nextActive ? 'Activate' : 'Deactivate'} user "${user.fullName}"?`)) {
+      return;
+    }
+    try {
+      await usersApi.update(user.id, { isActive: nextActive });
+      await load();
+    } catch (err) {
+      setError(getErrorMessage(err, `Unable to ${actionLabel} user`));
+    }
+  };
+
   const columns = useMemo(
     () => [
       {
-        key: 'user',
-        header: 'User',
+        key: 'employee',
+        header: 'Employee',
         render: (row: User) => (
           <div>
-            <strong>{row.fullName}</strong>
-            <div className="muted">@{row.username}</div>
+            <div className="ui-table__cell-title">{row.fullName}</div>
+            <div className="ui-table__cell-sub">
+              {row.employeeId || '—'} · @{row.username}
+            </div>
           </div>
         ),
       },
       {
-        key: 'email',
-        header: 'Email',
-        render: (row: User) => row.email,
+        key: 'contact',
+        header: 'Contact',
+        render: (row: User) => (
+          <div>
+            <div className="ui-table__cell-title">{row.mobileNumber || '—'}</div>
+            <div className="ui-table__cell-sub">{row.email || '—'}</div>
+          </div>
+        ),
+      },
+      {
+        key: 'department',
+        header: 'Department',
+        render: (row: User) => (
+          <span className="ui-table__cell-title">{row.departmentName || '—'}</span>
+        ),
       },
       {
         key: 'roles',
@@ -168,16 +108,34 @@ export function UsersPage() {
         render: (row: User) => (
           <div className="chip-row">
             {row.roleNames.length
-              ? row.roleNames.map((name) => <Badge key={name}>{name}</Badge>)
-              : <Badge tone="warning">No roles</Badge>}
+              ? row.roleNames.map((name) => (
+                  <Badge key={name} tone="info" icon={<CheckCircleIcon />}>
+                    {name}
+                  </Badge>
+                ))
+              : (
+                  <Badge tone="warning" icon={<AlertCircleIcon />}>
+                    No roles
+                  </Badge>
+                )}
           </div>
         ),
       },
       {
-        key: 'status',
-        header: 'Status',
+        key: 'createdBy',
+        header: 'Created By',
         render: (row: User) => (
-          <Badge tone={row.isActive ? 'success' : 'danger'}>
+          <span className="ui-table__cell-title">{row.createdByName || '—'}</span>
+        ),
+      },
+      {
+        key: 'status',
+        header: 'Login Status',
+        render: (row: User) => (
+          <Badge
+            tone={row.isActive ? 'success' : 'danger'}
+            icon={row.isActive ? <CheckCircleIcon /> : <AlertCircleIcon />}
+          >
             {row.isActive ? 'Active' : 'Inactive'}
           </Badge>
         ),
@@ -185,117 +143,77 @@ export function UsersPage() {
       {
         key: 'actions',
         header: 'Actions',
-        render: (row: User) => (
-          <div className="action-row">
-            {canUpdate ? (
-              <Button size="sm" variant="secondary" onClick={() => openEdit(row)}>
-                Edit
-              </Button>
-            ) : null}
-            {canDelete && !row.isSuperAdmin ? (
-              <Button size="sm" variant="danger" onClick={() => void onDelete(row)}>
-                Delete
-              </Button>
-            ) : null}
-          </div>
-        ),
+        width: '88px',
+        render: (row: User) => {
+          const items = [
+            ...(canUpdate
+              ? [
+                  {
+                    key: 'edit',
+                    label: 'Edit',
+                    icon: <EditIcon />,
+                    onClick: () => navigate(`/users/${row.id}/edit`),
+                  },
+                  ...(!row.isSuperAdmin
+                    ? [
+                        {
+                          key: 'quick-status',
+                          label: row.isActive ? 'Quick Inactive' : 'Quick Active',
+                          icon: row.isActive ? <BanIcon /> : <CheckCircleIcon />,
+                          danger: row.isActive,
+                          onClick: () => void onToggleActive(row),
+                        },
+                      ]
+                    : []),
+                ]
+              : []),
+            ...(canDelete && !row.isSuperAdmin
+              ? [
+                  {
+                    key: 'delete',
+                    label: 'Delete',
+                    icon: <DeleteIcon />,
+                    danger: true,
+                    onClick: () => void onDelete(row),
+                  },
+                ]
+              : []),
+          ];
+          return items.length ? <ActionMenu items={items} /> : null;
+        },
       },
     ],
-    [canDelete, canUpdate],
+    [canDelete, canUpdate, navigate],
   );
 
   return (
     <div>
       <PageHeader
         title="User Management"
-        subtitle="Create and manage application users with assigned roles."
+        subtitle="Create users with personal details, department, and multi-role access. Menus follow role permissions."
         actions={
           canCreate ? (
-            <Button onClick={openCreate}>Add User</Button>
+            <Button size="sm" onClick={() => navigate('/users/new')}>
+              Add User
+            </Button>
           ) : undefined
         }
       />
 
       {error ? <Alert tone="error">{error}</Alert> : null}
-      {loading ? <p>Loading users...</p> : <Table columns={columns} rows={users} rowKey={(row) => row.id} />}
-
-      <Modal
-        open={modalOpen}
-        title={editing ? 'Edit User' : 'Create User'}
-        onClose={() => setModalOpen(false)}
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button form="user-form" type="submit" loading={saving}>
-              {editing ? 'Save Changes' : 'Create User'}
-            </Button>
-          </>
+      <Table
+        columns={columns}
+        rows={users}
+        rowKey={(row) => row.id}
+        loading={loading}
+        onRefresh={() => void load()}
+        searchPlaceholder="Search employee, mobile, department, role..."
+        searchText={(row) =>
+          `${row.fullName} ${row.username} ${row.employeeId || ''} ${row.email || ''} ${row.mobileNumber || ''} ${row.departmentName || ''} ${row.roleNames.join(' ')} ${row.createdByName || ''}`
         }
-      >
-        <form id="user-form" className="user-form" onSubmit={onSubmit}>
-          {formError ? <Alert tone="error">{formError}</Alert> : null}
-
-          {!editing ? (
-            <Input
-              label="Username"
-              value={form.username}
-              onChange={(e) => setForm((prev) => ({ ...prev, username: e.target.value }))}
-            />
-          ) : (
-            <Input label="Username" value={form.username} disabled />
-          )}
-
-          <Input
-            label="Full Name"
-            value={form.fullName}
-            onChange={(e) => setForm((prev) => ({ ...prev, fullName: e.target.value }))}
-          />
-          <Input
-            label="Email"
-            type="email"
-            value={form.email}
-            onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
-          />
-          <Input
-            label={editing ? 'New Password (optional)' : 'Password'}
-            type="password"
-            value={form.password}
-            onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
-          />
-
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={form.isActive}
-              onChange={(e) => setForm((prev) => ({ ...prev, isActive: e.target.checked }))}
-              disabled={Boolean(editing?.isSuperAdmin)}
-            />
-            Active
-          </label>
-
-          {!editing?.isSuperAdmin ? (
-            <div className="role-picker">
-              <span className="role-picker__label">Roles</span>
-              <div className="role-picker__grid">
-                {roles.map((role) => (
-                  <label key={role.id} className="checkbox-row">
-                    <input
-                      type="checkbox"
-                      checked={form.roleIds.includes(role.id)}
-                      onChange={() => toggleRole(role.id)}
-                    />
-                    {role.name}
-                  </label>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <Alert tone="info">Super admin roles are managed by the system seed.</Alert>
-          )}
-        </form>
-      </Modal>
+      />
     </div>
   );
 }
+
+export default UsersPage;

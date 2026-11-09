@@ -4,6 +4,7 @@ import './Input.css';
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string;
   error?: string;
+  fieldKey?: string;
   passwordToggle?: boolean;
 }
 
@@ -32,6 +33,7 @@ function EyeIcon({ open }: { open: boolean }) {
 export function Input({
   label,
   error,
+  fieldKey,
   id,
   className = '',
   passwordToggle = false,
@@ -47,7 +49,14 @@ export function Input({
     <label className={`ui-field ${error ? 'ui-field--error' : ''} ${className}`} htmlFor={inputId}>
       <span className="ui-field__label">{label}</span>
       <span className={`ui-field__control ${passwordToggle ? 'ui-field__control--toggle' : ''}`}>
-        <input id={inputId} className="ui-field__input" type={inputType} {...props} />
+        <input
+          id={inputId}
+          className="ui-field__input"
+          type={inputType}
+          data-field={fieldKey || props.name || inputId}
+          aria-invalid={Boolean(error)}
+          {...props}
+        />
         {passwordToggle ? (
           <button
             type="button"
