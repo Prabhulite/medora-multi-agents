@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import medoraLogo from '../../assets/medora/medora-stacked.png';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -45,47 +46,51 @@ export function LoginPage() {
 
   return (
     <div className="login-page">
-      <div className="login-page__glow login-page__glow--one" />
-      <div className="login-page__glow login-page__glow--two" />
+      <div className="login-shell">
+        <section className="login-shell__brand">
+          <img src={medoraLogo} alt="Medora" className="login-shell__logo" />
+          <h2>Welcome back!</h2>
+          <p>
+            Healing begins with connection. Sign in to continue seamless care,
+            trusted collaboration, and stronger outcomes across every patient journey.
+          </p>
+        </section>
 
-      <section className="login-page__panel">
-        <form className="login-card" onSubmit={onSubmit} noValidate>
-          <div className="login-card__header">
-            <img src="/assets/logos/medora-icon.png" alt="Medora" />
-            <div>
-              <h2>Welcome back</h2>
-              <p>Enter your credentials to continue</p>
-            </div>
-          </div>
+        <section className="login-shell__form">
+          <form className="login-form" onSubmit={onSubmit} noValidate>
+            <h1>Sign in</h1>
+            <p className="login-form__subtitle">Enter your credentials to continue</p>
 
-          {formError ? <Alert tone="error">{formError}</Alert> : null}
+            {formError ? <Alert tone="error">{formError}</Alert> : null}
 
-          <Input
-            label="Username"
-            name="username"
-            autoComplete="username"
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
-            error={errors.username}
-            placeholder="Enter username"
-          />
+            <Input
+              label="Username"
+              name="username"
+              autoComplete="username"
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              error={errors.username}
+              placeholder="Enter username"
+            />
 
-          <Input
-            label="Password"
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            error={errors.password}
-            placeholder="Enter password"
-          />
+            <Input
+              label="Password"
+              name="password"
+              type="password"
+              passwordToggle
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              error={errors.password}
+              placeholder="Enter password"
+            />
 
-          <Button type="submit" size="lg" loading={submitting} className="login-card__submit">
-            Sign in
-          </Button>
-        </form>
-      </section>
+            <Button type="submit" size="lg" loading={submitting} className="login-form__submit">
+              Sign in
+            </Button>
+          </form>
+        </section>
+      </div>
     </div>
   );
 }
