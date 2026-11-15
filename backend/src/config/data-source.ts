@@ -3,16 +3,31 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DataSource } from 'typeorm';
 import {
+  Appointment,
+  AppointmentStatusHistory,
   Department,
   Doctor,
   DoctorConsultationFee,
   DoctorDocument,
   DoctorLeave,
   DoctorSchedule,
+  DoctorTimeSlot,
   HospitalDocument,
   HospitalProfile,
   Menu,
+  NumberSequence,
+  Patient,
+  PatientAddress,
+  PatientAllergy,
+  PatientAuditLog,
+  PatientContact,
+  PatientDocument,
+  PatientEmergencyContact,
+  PatientIdentification,
+  PatientMedicalHistory,
+  PatientVisit,
   Permission,
+  RegistrationSource,
   Role,
   Specialization,
   User,
@@ -43,6 +58,21 @@ export const AppDataSource = new DataSource({
     DoctorSchedule,
     DoctorLeave,
     DoctorDocument,
+    NumberSequence,
+    RegistrationSource,
+    Patient,
+    PatientAddress,
+    PatientContact,
+    PatientIdentification,
+    PatientEmergencyContact,
+    PatientDocument,
+    PatientAllergy,
+    PatientMedicalHistory,
+    PatientVisit,
+    PatientAuditLog,
+    Appointment,
+    AppointmentStatusHistory,
+    DoctorTimeSlot,
   ],
   migrations: [path.join(__dirname, '../database/migrations/*.{ts,js}')],
   migrationsTableName: 'migrations',
@@ -54,6 +84,15 @@ export const AppDataSource = new DataSource({
 export async function initializeDataSource(): Promise<DataSource> {
   if (!AppDataSource.isInitialized) {
     await AppDataSource.initialize();
+    try {
+      await AppDataSource.query('SET GLOBAL max_allowed_packet = 67108864');
+    } catch {
+      try {
+        await AppDataSource.query('SET SESSION max_allowed_packet = 67108864');
+      } catch {
+        // Keep startup resilient when MySQL privileges/config block packet-size changes.
+      }
+    }
   }
 
   return AppDataSource;

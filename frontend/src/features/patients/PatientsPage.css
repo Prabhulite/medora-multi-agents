@@ -1,0 +1,101 @@
+.patient-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 180px;
+}
+
+.patient-address-cell {
+  min-width: 160px;
+  max-width: 240px;
+}
+
+.patient-mrd-link {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #015b2d;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.patient-mrd-link:hover {
+  color: #014726;
+}
+
+.patient-receipt {
+  display: grid;
+  gap: 12px;
+}
+
+.patient-receipt__mrd {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #015b2d;
+}
+
+.patient-receipt__name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.patient-receipt__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.patient-receipt__grid > div {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.patient-receipt__grid span {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+
+.patient-receipt__grid strong {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.patient-audit-list {
+  display: grid;
+  gap: 8px;
+}
+
+.patient-audit-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.patient-empty {
+  margin: 0;
+  padding: 12px 4px;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 500;
+}

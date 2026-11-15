@@ -1,0 +1,364 @@
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Alert } from '../../components/ui/Alert';
+import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
+import { PatientAvatar } from '../../components/ui/PatientAvatar';
+import {
+  AlertCircleIcon,
+  CheckCircleIcon,
+} from '../../components/ui/statusIcons';
+import { getErrorMessage } from '../../lib/api';
+import { hasPermission } from '../../lib/permissions';
+import type { Patient } from '../../types';
+import { useAuth } from '../auth/AuthContext';
+import { patientsApi } from './patients.api';
+import './PatientDashboardPage.css';
+
+const TABS = [
+  'Dashboard',
+  'Profile',
+  'Visit',
+  'Bills',
+  'Tests',
+  'Rx',
+  'MRD',
+  'Appointment',
+  'Timeline',
+] as const;
+
+function fmtDate(value?: string | null) {
+  if (!value) return '—';
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString(undefined, {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+function fmtDateTime(value?: string | null) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString(undefined, {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function titleCase(value?: string | null) {
+  if (!value) return '—';
+  return value.replaceAll('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function DetailRow({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="pd-detail-row">
+      <span>{label}</span>
+      <strong>{value || '—'}</strong>
+    </div>
+  );
+}
+
+export function PatientDashboardPage() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const patientId = id ? Number(id) : null;
+
+  const [patient, setPatient] = useState<Patient | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>('Dashboard');
+
+  const canUpdate = hasPermission(user, 'patients.update');
+
+  useEffect(() => {
+    if (!patientId || Number.isNaN(patientId)) {
+      setError('Invalid patient');
+      setLoading(false);
+      return;
+    }
+
+    const load = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        setPatient(await patientsApi.getById(patientId));
+      } catch (err) {
+        setError(getErrorMessage(err, 'Failed to load patient'));
+        setPatient(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void load();
+  }, [patientId]);
+
+  const displayName = useMemo(() => {
+    if (!patient) return '';
+    const name =
+      [patient.title, patient.firstName, patient.middleName, patient.lastName]
+        .filter(Boolean)
+        .join(' ')
+        .trim() || patient.fullName;
+    return name;
+  }, [patient]);
+
+  const addressLine = useMemo(() => {
+    if (!patient?.address) return '—';
+    return [
+      patient.address.addressLine1,
+      patient.address.addressLine2,
+      patient.address.city,
+      patient.address.district,
+      patient.address.state,
+      patient.address.pincode,
+      patient.address.country,
+    ]
+      .filter(Boolean)
+      .join(', ');
+  }, [patient]);
+
+  if (loading) {
+    return <div className="pd-loading">Loading patient dashboard…</div>;
+  }
+
+  if (error || !patient) {
+    return (
+      <div className="pd-page">
+        <Alert tone="error">{error || 'Patient not found'}</Alert>
+        <Button variant="secondary" size="sm" onClick={() => navigate('/patients')}>
+          Back to Patients
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pd-page">
+      <div className="pd-topbar">
+        <div>
+          <h1>Patient Dashboard</h1>
+          <p>Patient master overview for clinical and front-office reference.</p>
+        </div>
+        <div className="pd-topbar__actions">
+          {canUpdate ? (
+            <Button size="sm" onClick={() => navigate(`/patients/${patient.id}/edit`)}>
+              Edit Patient
+            </Button>
+          ) : null}
+          <Button variant="secondary" size="sm" onClick={() => navigate('/patients')}>
+            Back
+          </Button>
+        </div>
+      </div>
+
+      <nav className="pd-tabs" aria-label="Patient sections">
+        {TABS.map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            className={`pd-tabs__item ${activeTab === tab ? 'is-active' : ''}`}
+            onClick={() => setActiveTab(tab)}
+          >
+            {tab}
+          </button>
+        ))}
+      </nav>
+
+      {activeTab !== 'Dashboard' ? (
+        <div className="pd-placeholder">
+          <h2>{activeTab}</h2>
+          <p>
+            {activeTab} module for this patient will be connected here. Dashboard remains the
+            default overview.
+          </p>
+        </div>
+      ) : (
+        <>
+          <section className="pd-hero">
+            <PatientAvatar photo={patient.photoData} name={displayName} size={72} />
+            <div className="pd-hero__main">
+              <h2>{displayName}</h2>
+              <div className="pd-hero__meta">
+                <span className="pd-chip pd-chip--mrd">{patient.mrdNumber}</span>
+                <span className="pd-chip">
+                  {patient.ageYears != null
+                    ? `${patient.ageYears}${patient.ageIsApproximate ? '~' : ''} yrs`
+                    : 'Age —'}
+                </span>
+                <span className="pd-chip">{titleCase(patient.gender)}</span>
+                {patient.bloodGroup ? <span className="pd-chip">{patient.bloodGroup}</span> : null}
+                <Badge
+                  tone={patient.isActive ? 'success' : 'danger'}
+                  icon={patient.isActive ? <CheckCircleIcon /> : <AlertCircleIcon />}
+                >
+                  {patient.isActive ? 'Active' : 'Inactive'}
+                </Badge>
+              </div>
+              <div className="pd-hero__sub">
+                <span>Mobile: {patient.contact?.mobileNumber || '—'}</span>
+                <span>Registered: {fmtDateTime(patient.registrationAt || patient.createdAt)}</span>
+                {patient.createdByName ? <span>By: {patient.createdByName}</span> : null}
+              </div>
+            </div>
+          </section>
+
+          <div className="pd-grid">
+            <section className="pd-card">
+              <div className="pd-card__head">
+                <h3>Personal Details</h3>
+              </div>
+              <div className="pd-card__body">
+                <DetailRow label="Title" value={patient.title || '—'} />
+                <DetailRow label="First Name" value={patient.firstName || '—'} />
+                <DetailRow label="Middle Name" value={patient.middleName || '—'} />
+                <DetailRow label="Last Name" value={patient.lastName || '—'} />
+                <DetailRow label="DOB" value={fmtDate(patient.dateOfBirth)} />
+                <DetailRow
+                  label="Age"
+                  value={
+                    patient.ageYears != null
+                      ? `${patient.ageYears}${patient.ageIsApproximate ? ' (approx)' : ''} yrs`
+                      : '—'
+                  }
+                />
+                <DetailRow label="Gender" value={titleCase(patient.gender)} />
+                <DetailRow label="Blood Group" value={patient.bloodGroup || '—'} />
+                <DetailRow label="Marital Status" value={titleCase(patient.maritalStatus)} />
+                <DetailRow label="Nationality" value={patient.nationality || '—'} />
+                <DetailRow label="Religion" value={patient.religion || '—'} />
+                <DetailRow label="Category" value={titleCase(patient.patientCategory)} />
+              </div>
+            </section>
+
+            <section className="pd-card">
+              <div className="pd-card__head">
+                <h3>Contact</h3>
+              </div>
+              <div className="pd-card__body">
+                <DetailRow label="Mobile" value={patient.contact?.mobileNumber || '—'} />
+                <DetailRow label="Alternate" value={patient.contact?.alternateMobile || '—'} />
+                <DetailRow label="Email" value={patient.contact?.email || '—'} />
+                <DetailRow label="Preferred Language" value={patient.preferredLanguage || '—'} />
+                <DetailRow label="Occupation" value={patient.occupation || '—'} />
+              </div>
+            </section>
+
+            <section className="pd-card">
+              <div className="pd-card__head">
+                <h3>Identification</h3>
+              </div>
+              <div className="pd-card__body">
+                <DetailRow
+                  label="ID Proof Type"
+                  value={titleCase(patient.identification?.idProofType || null)}
+                />
+                <DetailRow
+                  label="ID Proof Number"
+                  value={patient.identification?.idProofNumber || '—'}
+                />
+                <DetailRow label="ABHA Number" value={patient.identification?.abhaNumber || '—'} />
+                <DetailRow
+                  label="ABHA Address"
+                  value={patient.identification?.abhaAddress || '—'}
+                />
+              </div>
+            </section>
+
+            <section className="pd-card">
+              <div className="pd-card__head">
+                <h3>Address</h3>
+              </div>
+              <div className="pd-card__body">
+                <DetailRow label="Full Address" value={addressLine} />
+                <DetailRow label="City / Town" value={patient.address?.city || '—'} />
+                <DetailRow label="District" value={patient.address?.district || '—'} />
+                <DetailRow label="State" value={patient.address?.state || '—'} />
+                <DetailRow label="Pincode" value={patient.address?.pincode || '—'} />
+                <DetailRow label="Country" value={patient.address?.country || '—'} />
+              </div>
+            </section>
+
+            <section className="pd-card">
+              <div className="pd-card__head">
+                <h3>Emergency / Guardian</h3>
+              </div>
+              <div className="pd-card__body">
+                <DetailRow
+                  label="Contact Person"
+                  value={patient.emergencyContact?.contactPersonName || '—'}
+                />
+                <DetailRow
+                  label="Relationship"
+                  value={titleCase(patient.emergencyContact?.relationship || null)}
+                />
+                <DetailRow
+                  label="Contact Number"
+                  value={patient.emergencyContact?.contactNumber || '—'}
+                />
+                <DetailRow
+                  label="Alternate Number"
+                  value={patient.emergencyContact?.alternateNumber || '—'}
+                />
+                <DetailRow label="Address" value={patient.emergencyContact?.address || '—'} />
+              </div>
+            </section>
+
+            <section className="pd-card">
+              <div className="pd-card__head">
+                <h3>Registration & Referral</h3>
+              </div>
+              <div className="pd-card__body">
+                <DetailRow label="MRD Number" value={patient.mrdNumber} />
+                <DetailRow
+                  label="Registration"
+                  value={fmtDateTime(patient.registrationAt || patient.createdAt)}
+                />
+                <DetailRow label="Registered By" value={patient.createdByName || '—'} />
+                <DetailRow label="Referred By" value={patient.referredBy || '—'} />
+                <DetailRow
+                  label="Referral Doctor"
+                  value={patient.referralDoctorName || '—'}
+                />
+                <DetailRow label="Remarks" value={patient.specialRemarks || '—'} />
+              </div>
+            </section>
+
+            <section className="pd-card pd-card--wide">
+              <div className="pd-card__head">
+                <h3>Visit Summary</h3>
+              </div>
+              <div className="pd-card__body pd-visits">
+                {patient.visits?.length ? (
+                  patient.visits.map((visit) => (
+                    <div key={visit.id} className="pd-visit-row">
+                      <div>
+                        <div className="ui-table__cell-title">{visit.visitNumber}</div>
+                        <div className="ui-table__cell-sub">
+                          {visit.opNumber || visit.visitType} · {visit.status}
+                        </div>
+                      </div>
+                      <strong>{fmtDateTime(visit.visitAt)}</strong>
+                    </div>
+                  ))
+                ) : (
+                  <p className="pd-empty">No visits recorded yet.</p>
+                )}
+              </div>
+            </section>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+export default PatientDashboardPage;

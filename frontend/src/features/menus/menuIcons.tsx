@@ -99,6 +99,39 @@ function SpecializationsIcon() {
   );
 }
 
+function FrontOfficeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M3 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v4h4a2 2 0 0 1 2 2v10H3zm2-2h6v-2H5v2zm0-4h6v-2H5v2zm0-4h6V9H5v2zm0-4h6V5H5v2zm10 12h4v-8h-4v8z"
+      />
+    </svg>
+  );
+}
+
+function PatientsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm-7 9v-1.5C5 16.57 8.13 15 12 15s7 1.57 7 4.5V21H5zm13.5-10.5h-2v-2h-2v2h-2v2h2v2h2v-2h2v-2z"
+      />
+    </svg>
+  );
+}
+
+function AppointmentsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M19 4h-1V2h-2v2H8V2H6v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2zM7 12h5v5H7v-5z"
+      />
+    </svg>
+  );
+}
+
 const ICON_MAP: Record<string, ReactNode> = {
   dashboard: <DashboardIcon />,
   master: <MasterIcon />,
@@ -109,6 +142,9 @@ const ICON_MAP: Record<string, ReactNode> = {
   departments: <DepartmentsIcon />,
   doctors: <DoctorsIcon />,
   specializations: <SpecializationsIcon />,
+  front_office: <FrontOfficeIcon />,
+  patients: <PatientsIcon />,
+  appointments: <AppointmentsIcon />,
 };
 
 export const MENU_ICON_OPTIONS = [
@@ -121,6 +157,9 @@ export const MENU_ICON_OPTIONS = [
   { value: 'doctors', label: 'Doctors' },
   { value: 'roles', label: 'Roles' },
   { value: 'menus', label: 'Menus' },
+  { value: 'front_office', label: 'Front Office' },
+  { value: 'patients', label: 'Patients' },
+  { value: 'appointments', label: 'Appointments' },
 ];
 
 export function getMenuIcon(icon: string): ReactNode {

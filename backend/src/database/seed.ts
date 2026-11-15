@@ -2,7 +2,15 @@ import 'reflect-metadata';
 import bcrypt from 'bcryptjs';
 import { env } from '../config/env.js';
 import { closeDataSource, initializeDataSource } from '../config/data-source.js';
-import { Department, Menu, Permission, Role, Specialization, User } from './entities/index.js';
+import {
+  Department,
+  Menu,
+  Permission,
+  RegistrationSource,
+  Role,
+  Specialization,
+  User,
+} from './entities/index.js';
 
 const PERMISSIONS = [
   { code: 'users.view', module: 'users', action: 'view', description: 'View users' },
@@ -57,6 +65,35 @@ const PERMISSIONS = [
   { code: 'doctors.create', module: 'doctors', action: 'create', description: 'Create doctors' },
   { code: 'doctors.update', module: 'doctors', action: 'update', description: 'Update doctors' },
   { code: 'doctors.delete', module: 'doctors', action: 'delete', description: 'Delete doctors' },
+  { code: 'patients.view', module: 'patients', action: 'view', description: 'View patients' },
+  { code: 'patients.create', module: 'patients', action: 'create', description: 'Register patients' },
+  { code: 'patients.update', module: 'patients', action: 'update', description: 'Update patients' },
+  { code: 'patients.delete', module: 'patients', action: 'delete', description: 'Deactivate patients' },
+  { code: 'patients.merge', module: 'patients', action: 'merge', description: 'Merge duplicate patients' },
+  {
+    code: 'appointments.view',
+    module: 'appointments',
+    action: 'view',
+    description: 'View appointments',
+  },
+  {
+    code: 'appointments.create',
+    module: 'appointments',
+    action: 'create',
+    description: 'Book appointments',
+  },
+  {
+    code: 'appointments.update',
+    module: 'appointments',
+    action: 'update',
+    description: 'Update appointment status and check-in',
+  },
+  {
+    code: 'appointments.delete',
+    module: 'appointments',
+    action: 'delete',
+    description: 'Cancel appointments',
+  },
   { code: 'permissions.view', module: 'permissions', action: 'view', description: 'View permissions' },
   { code: 'menus.view', module: 'menus', action: 'view', description: 'View menus' },
   { code: 'menus.create', module: 'menus', action: 'create', description: 'Create menus' },
@@ -168,6 +205,40 @@ const MENUS = [
     parentCode: 'master',
     sortOrder: 27,
   },
+  {
+    code: 'front_office',
+    label: 'Front Office',
+    route: '/front-office',
+    icon: 'front_office',
+    permissionCode: null as string | null,
+    parentCode: null as string | null,
+    sortOrder: 30,
+  },
+  {
+    code: 'patient_registration',
+    label: 'Patient Registration',
+    route: '/patients',
+    icon: 'patients',
+    permissionCode: 'patients.view',
+    parentCode: 'front_office',
+    sortOrder: 31,
+  },
+  {
+    code: 'appointments',
+    label: 'Appointments',
+    route: '/appointments',
+    icon: 'appointments',
+    permissionCode: 'appointments.view',
+    parentCode: 'front_office',
+    sortOrder: 32,
+  },
+] as const;
+
+const REGISTRATION_SOURCES = [
+  { code: 'walk_in', name: 'Walk-in' },
+  { code: 'referral', name: 'Referral' },
+  { code: 'online', name: 'Online' },
+  { code: 'camp', name: 'Medical Camp' },
 ] as const;
 
 async function seed(): Promise<void> {
@@ -178,6 +249,7 @@ async function seed(): Promise<void> {
   const menuRepo = dataSource.getRepository(Menu);
   const departmentRepo = dataSource.getRepository(Department);
   const specializationRepo = dataSource.getRepository(Specialization);
+  const registrationSourceRepo = dataSource.getRepository(RegistrationSource);
 
   for (const permission of PERMISSIONS) {
     const existing = await permissionRepo.findOne({ where: { code: permission.code } });
@@ -217,6 +289,22 @@ async function seed(): Promise<void> {
       await specializationRepo.save(
         specializationRepo.create({
           ...specialization,
+          isActive: true,
+        }),
+      );
+    }
+  }
+
+  for (const source of REGISTRATION_SOURCES) {
+    const existing = await registrationSourceRepo.findOne({ where: { code: source.code } });
+    if (existing) {
+      existing.name = source.name;
+      existing.isActive = true;
+      await registrationSourceRepo.save(existing);
+    } else {
+      await registrationSourceRepo.save(
+        registrationSourceRepo.create({
+          ...source,
           isActive: true,
         }),
       );

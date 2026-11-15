@@ -1,0 +1,139 @@
+.appointment-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  margin-bottom: 12px;
+}
+
+.appointment-filters .ui-field {
+  min-width: 160px;
+  flex: 1;
+}
+
+.appointment-status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.appointment-op {
+  font-size: 12px;
+  font-weight: 700;
+  color: #015b2d;
+}
+
+.appointment-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: 8px;
+}
+
+.appointment-slot {
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #0f172a;
+  border-radius: 8px;
+  padding: 10px 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.appointment-slot:hover:not(:disabled) {
+  border-color: #015b2d;
+  color: #015b2d;
+}
+
+.appointment-slot--selected {
+  border-color: #015b2d;
+  background: #015b2d;
+  color: #fff;
+}
+
+.appointment-slot:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
+.appointment-patient-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.appointment-patient-card__meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.appointment-patient-card__meta span {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+
+.appointment-patient-card__meta strong {
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.appointment-search-results {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.appointment-search-result {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.appointment-search-result:hover {
+  border-color: #015b2d;
+}
+
+.appointment-search-result strong {
+  display: block;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.appointment-search-result span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.appointment-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 16px 18px;
+}
+
+.appointment-form-grid .ui-field--full,
+.appointment-form-grid .appointment-full {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 800px) {
+  .appointment-form-grid {
+    grid-template-columns: 1fr;
+  }
+}

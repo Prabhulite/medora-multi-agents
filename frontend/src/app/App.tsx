@@ -11,6 +11,11 @@ import { DepartmentsPage } from '../features/departments/DepartmentsPage';
 import { DoctorFormPage } from '../features/doctors/DoctorFormPage';
 import { DoctorsPage } from '../features/doctors/DoctorsPage';
 import { HospitalProfilePage } from '../features/hospital-profile/HospitalProfilePage';
+import { AppointmentFormPage } from '../features/appointments/AppointmentFormPage';
+import { AppointmentsPage } from '../features/appointments/AppointmentsPage';
+import { PatientDashboardPage } from '../features/patients/PatientDashboardPage';
+import { PatientFormPage } from '../features/patients/PatientFormPage';
+import { PatientsPage } from '../features/patients/PatientsPage';
 import { SpecializationFormPage } from '../features/specializations/SpecializationFormPage';
 import { SpecializationsPage } from '../features/specializations/SpecializationsPage';
 import { UserFormPage } from '../features/users/UserFormPage';
@@ -65,6 +70,27 @@ export default function App() {
               </Route>
               <Route element={<ProtectedRoute permission="doctors.update" />}>
                 <Route path="doctors/:id/edit" element={<DoctorFormPage />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="patients.view" />}>
+                <Route path="patients" element={<PatientsPage />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="patients.create" />}>
+                <Route path="patients/new" element={<PatientFormPage />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="patients.update" />}>
+                <Route path="patients/:id/edit" element={<PatientFormPage />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="patients.view" />}>
+                <Route path="patients/:id" element={<PatientDashboardPage />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="appointments.view" />}>
+                <Route path="appointments" element={<AppointmentsPage />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="appointments.create" />}>
+                <Route path="appointments/new" element={<AppointmentFormPage />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="appointments.update" />}>
+                <Route path="appointments/:id/reschedule" element={<AppointmentFormPage />} />
               </Route>
               <Route element={<ProtectedRoute permission="roles.view" />}>
                 <Route path="roles" element={<RolesPage />} />

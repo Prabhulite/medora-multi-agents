@@ -364,3 +364,257 @@ export interface UpdateMenuPayload {
   sortOrder?: number;
   isActive?: boolean;
 }
+
+export type PatientGender = 'male' | 'female' | 'transgender' | 'other';
+export type PatientCategory =
+  | 'general'
+  | 'corporate'
+  | 'insurance'
+  | 'government_scheme'
+  | 'staff'
+  | 'vip';
+export type IdProofType = 'aadhaar' | 'passport' | 'voter_id' | 'driving_licence' | 'other';
+export type EmergencyRelationship =
+  | 'father'
+  | 'mother'
+  | 'husband'
+  | 'wife'
+  | 'son'
+  | 'daughter'
+  | 'brother'
+  | 'sister'
+  | 'guardian'
+  | 'other';
+
+export interface Patient {
+  id: number;
+  mrdNumber: string;
+  registrationAt: string;
+  fullName: string;
+  gender: PatientGender;
+  dateOfBirth: string | null;
+  ageYears: number | null;
+  ageIsApproximate: boolean;
+  bloodGroup: string | null;
+  photoData: string | null;
+  mobileNumber: string | null;
+  city: string | null;
+  addressLine: string | null;
+  district: string | null;
+  state: string | null;
+  patientCategory: PatientCategory | null;
+  latestVisitNumber: string | null;
+  latestOpNumber: string | null;
+  latestVisitAt: string | null;
+  mergedIntoPatientId: number | null;
+  createdById: number | null;
+  createdByName: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  title?: string | null;
+  firstName?: string;
+  middleName?: string | null;
+  lastName?: string | null;
+  maritalStatus?: string | null;
+  nationality?: string | null;
+  religion?: string | null;
+  occupation?: string | null;
+  referredBy?: string | null;
+  referralDoctorId?: number | null;
+  referralDoctorName?: string | null;
+  preferredLanguage?: string | null;
+  specialRemarks?: string | null;
+  contact?: {
+    mobileNumber: string;
+    alternateMobile: string | null;
+    email: string | null;
+  } | null;
+  address?: {
+    addressLine1: string;
+    addressLine2: string | null;
+    country: string;
+    state: string;
+    district: string;
+    city: string;
+    pincode: string;
+  } | null;
+  identification?: {
+    idProofType: IdProofType | null;
+    idProofNumber: string | null;
+    idProofDocumentName: string | null;
+    idProofDocumentFileName: string | null;
+    idProofDocumentMimeType: string | null;
+    idProofDocumentData: string | null;
+    abhaNumber: string | null;
+    abhaAddress: string | null;
+  } | null;
+  emergencyContact?: {
+    contactPersonName: string | null;
+    relationship: EmergencyRelationship | null;
+    contactNumber: string | null;
+    alternateNumber: string | null;
+    address: string | null;
+  } | null;
+  visits?: Array<{
+    id: number;
+    visitNumber: string;
+    opNumber: string | null;
+    visitType: string;
+    visitAt: string;
+    status: string;
+  }>;
+  updatedById?: number | null;
+  updatedByName?: string | null;
+}
+
+export interface UpsertPatientPayload {
+  title?: string | null;
+  firstName: string;
+  middleName?: string | null;
+  lastName?: string | null;
+  gender: PatientGender;
+  dateOfBirth?: string | null;
+  ageYears?: number | null;
+  ageIsApproximate?: boolean;
+  bloodGroup?: string | null;
+  maritalStatus?: string | null;
+  nationality?: string | null;
+  religion?: string | null;
+  photoData?: string | null;
+  occupation?: string | null;
+  patientCategory?: PatientCategory | null;
+  referredBy?: string | null;
+  referralDoctorId?: number | null;
+  preferredLanguage?: string | null;
+  specialRemarks?: string | null;
+  isActive?: boolean;
+  createVisit?: boolean;
+  contact: {
+    mobileNumber: string;
+    alternateMobile?: string | null;
+    email?: string | null;
+  };
+  address: {
+    addressLine1: string;
+    addressLine2?: string | null;
+    country: string;
+    state: string;
+    district: string;
+    city: string;
+    pincode: string;
+  };
+  identification?: {
+    idProofType?: IdProofType | null;
+    idProofNumber?: string | null;
+    idProofDocument?: MasterDocument | null;
+    abhaNumber?: string | null;
+    abhaAddress?: string | null;
+  } | null;
+  emergencyContact?: {
+    contactPersonName?: string | null;
+    relationship?: EmergencyRelationship | null;
+    contactNumber?: string | null;
+    alternateNumber?: string | null;
+    address?: string | null;
+  } | null;
+}
+
+export interface PatientAuditLog {
+  id: number;
+  action: string;
+  changeSummary: string | null;
+  changedByName: string | null;
+  createdAt: string;
+}
+
+export type AppointmentType = 'new_consultation' | 'follow_up' | 'review';
+export type AppointmentStatus =
+  | 'booked'
+  | 'confirmed'
+  | 'checked_in'
+  | 'completed'
+  | 'cancelled'
+  | 'no_show'
+  | 'rescheduled';
+
+export interface AppointmentStatusHistoryItem {
+  id: number;
+  fromStatus: AppointmentStatus | null;
+  toStatus: AppointmentStatus;
+  notes: string | null;
+  changedById: number | null;
+  changedByName: string | null;
+  createdAt: string;
+}
+
+export interface Appointment {
+  id: number;
+  appointmentNumber: string;
+  patientId: number;
+  patientMrdNumber: string | null;
+  patientName: string;
+  patientAgeYears: number | null;
+  patientGender: PatientGender | null;
+  patientMobile: string | null;
+  doctorId: number;
+  doctorName: string | null;
+  departmentId: number;
+  departmentName: string | null;
+  appointmentDate: string;
+  appointmentTime: string | null;
+  appointmentType: AppointmentType;
+  reason: string | null;
+  remarks: string | null;
+  status: AppointmentStatus;
+  visitId: number | null;
+  visitNumber: string | null;
+  opNumber: string | null;
+  createdById: number | null;
+  createdByName: string | null;
+  createdAt: string;
+  updatedAt: string;
+  statusHistory?: AppointmentStatusHistoryItem[];
+}
+
+export interface AppointmentSlot {
+  time: string;
+  available: boolean;
+}
+
+export interface AppointmentSlotsResponse {
+  doctorId: number;
+  date: string;
+  slots: AppointmentSlot[];
+  message: string | null;
+}
+
+export interface AvailableDoctor {
+  id: number;
+  doctorCode: string;
+  name: string;
+  departmentId: number;
+  departmentName: string | null;
+  consultationDurationMinutes: number;
+}
+
+export interface CreateAppointmentPayload {
+  patientId: number;
+  doctorId: number;
+  departmentId: number;
+  appointmentDate: string;
+  appointmentTime: string;
+  appointmentType: AppointmentType;
+  reason?: string | null;
+  remarks?: string | null;
+  forceDuplicate?: boolean;
+}
+
+export interface UpdateAppointmentStatusPayload {
+  status: AppointmentStatus;
+  notes?: string | null;
+  appointmentDate?: string;
+  appointmentTime?: string;
+  doctorId?: number;
+  departmentId?: number;
+}

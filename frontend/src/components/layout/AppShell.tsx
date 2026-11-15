@@ -21,6 +21,7 @@ export function AppShell() {
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [navMenus, setNavMenus] = useState<MenuItem[]>([]);
   const [openGroups, setOpenGroups] = useState<Record<number, boolean>>({});
+  const [menuSearch, setMenuSearch] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -39,10 +40,7 @@ export function AppShell() {
     };
   }, [user?.id]);
 
-  const rootMenus = useMemo(
-    () => navMenus.filter((menu) => !menu.parentId),
-    [navMenus],
-  );
+  const searchQuery = menuSearch.trim().toLowerCase();
 
   const childrenByParent = useMemo(() => {
     const map = new Map<number, MenuItem[]>();
@@ -55,15 +53,45 @@ export function AppShell() {
     return map;
   }, [navMenus]);
 
+  const rootMenus = useMemo(() => {
+    const roots = navMenus.filter((menu) => !menu.parentId);
+    if (!searchQuery) return roots;
+
+    return roots.filter((parent) => {
+      const children = childrenByParent.get(parent.id) || [];
+      if (parent.label.toLowerCase().includes(searchQuery)) return true;
+      return children.some((child) => child.label.toLowerCase().includes(searchQuery));
+    });
+  }, [childrenByParent, navMenus, searchQuery]);
+
+  const visibleChildrenByParent = useMemo(() => {
+    if (!searchQuery) return childrenByParent;
+
+    const map = new Map<number, MenuItem[]>();
+    for (const [parentId, children] of childrenByParent.entries()) {
+      const parent = navMenus.find((menu) => menu.id === parentId);
+      const parentMatches = Boolean(parent?.label.toLowerCase().includes(searchQuery));
+      const filtered = parentMatches
+        ? children
+        : children.filter((child) => child.label.toLowerCase().includes(searchQuery));
+      if (filtered.length) map.set(parentId, filtered);
+    }
+    return map;
+  }, [childrenByParent, navMenus, searchQuery]);
+
   useEffect(() => {
     const next: Record<number, boolean> = {};
     for (const parent of rootMenus) {
-      const children = childrenByParent.get(parent.id) || [];
+      const children = visibleChildrenByParent.get(parent.id) || [];
       if (!children.length) continue;
+      if (searchQuery) {
+        next[parent.id] = true;
+        continue;
+      }
       next[parent.id] = children.some((child) => isRouteActive(location.pathname, child.route));
     }
     setOpenGroups((prev) => ({ ...prev, ...next }));
-  }, [childrenByParent, location.pathname, rootMenus]);
+  }, [location.pathname, rootMenus, searchQuery, visibleChildrenByParent]);
 
   const confirmLogout = () => {
     setLogoutConfirmOpen(false);
@@ -83,11 +111,45 @@ export function AppShell() {
           <div className="app-shell__sidebar-mark" title="Medora">
             <img src="/assets/logos/medora-icon.png" alt="" />
           </div>
+          {sidebarExpanded ? (
+            <label className="app-shell__menu-search">
+              <span className="app-shell__menu-search-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="16" height="16">
+                  <path
+                    fill="currentColor"
+                    d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
+                  />
+                </svg>
+              </span>
+              <input
+                type="search"
+                value={menuSearch}
+                onChange={(event) => setMenuSearch(event.target.value)}
+                placeholder="Search menu..."
+                aria-label="Search menu"
+              />
+            </label>
+          ) : (
+            <button
+              type="button"
+              className="app-shell__menu-search-btn"
+              title="Search menu"
+              aria-label="Search menu"
+              onClick={() => setSidebarExpanded(true)}
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <path
+                  fill="currentColor"
+                  d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
+                />
+              </svg>
+            </button>
+          )}
         </div>
 
         <nav className="app-shell__nav" aria-label="Main">
           {rootMenus.map((item) => {
-            const children = childrenByParent.get(item.id) || [];
+            const children = visibleChildrenByParent.get(item.id) || [];
             if (!children.length) {
               return (
                 <NavLink
@@ -146,6 +208,9 @@ export function AppShell() {
               </div>
             );
           })}
+          {searchQuery && !rootMenus.length ? (
+            <p className="app-shell__menu-empty">No menu found</p>
+          ) : null}
         </nav>
 
         <div className="app-shell__sidebar-footer">
