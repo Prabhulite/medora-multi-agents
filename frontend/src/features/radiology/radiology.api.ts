@@ -1,0 +1,118 @@
+import { api } from '../../lib/api';
+
+export interface RadiologyModality {
+  id: number;
+  code: string;
+  name: string;
+  description?: string | null;
+  isActive?: boolean;
+}
+
+export type RadiologyOrderStatus = 'ordered' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | string;
+
+export interface RadiologyOrder {
+  id: number;
+  orderNumber: string;
+  patientId: number;
+  patientName?: string | null;
+  patientMrdNumber?: string | null;
+  modalityId: number;
+  modalityName: string;
+  modalityCode?: string | null;
+  studyName: string;
+  priority?: 'routine' | 'urgent' | 'stat' | string;
+  status: RadiologyOrderStatus;
+  clinicalNotes?: string | null;
+  orderedAt?: string | null;
+  scheduledAt?: string | null;
+  completedAt?: string | null;
+  report?: string | null;
+  findings?: string | null;
+  impression?: string | null;
+  reportedAt?: string | null;
+  orderedBy?: string | null;
+  reportedBy?: string | null;
+}
+
+export interface CreateRadiologyOrderPayload {
+  patientId: number;
+  modalityId: number;
+  studyName: string;
+  priority?: 'routine' | 'urgent' | 'stat';
+  clinicalNotes?: string | null;
+}
+
+export interface UpdateRadiologyReportPayload {
+  report: string;
+  findings?: string | null;
+  impression?: string | null;
+  status?: 'completed' | 'in_progress';
+}
+
+interface ApiEnvelope<T> { data: T; }
+
+function unwrap<T>(value: ApiEnvelope<T> | T): T {
+  return value && typeof value === 'object' && 'data' in value
+    ? (value as ApiEnvelope<T>).data
+    : value;
+}
+
+function mapModality(row: any): RadiologyModality {
+  return {
+    id: Number(row.id),
+    code: row.code || row.modalityCode || row.modality_code || '',
+    name: row.name || row.modalityName || row.modality_name || 'Imaging modality',
+    description: row.description || null,
+    isActive: row.isActive ?? row.is_active ?? true,
+  };
+}
+
+function mapOrder(row: any): RadiologyOrder {
+  const patient = row.patient || {};
+  const modality = row.modality || row.radiologyModality || {};
+  return {
+    id: Number(row.id),
+    orderNumber: row.orderNumber || row.order_number || row.number || `RAD-${row.id}`,
+    patientId: Number(row.patientId ?? patient.id),
+    patientName: patient.fullName || patient.name || row.patientName || null,
+    patientMrdNumber: patient.mrdNumber || patient.mrd_number || row.patientMrdNumber || null,
+    modalityId: Number(row.modalityId ?? modality.id),
+    modalityName: modality.name || modality.modalityName || row.modalityName || row.modality_name || 'Imaging study',
+    modalityCode: modality.code || modality.modalityCode || row.modalityCode || row.modality_code || null,
+    studyName: row.studyName || row.study_name || row.investigation || row.procedureName || modality.modalityName || 'Imaging study',
+    priority: row.priority || 'routine',
+    status: row.status || 'ordered',
+    clinicalNotes: row.clinicalNotes || row.clinical_notes || row.notes || null,
+    orderedAt: row.orderedAt || row.ordered_at || row.createdAt || null,
+    scheduledAt: row.scheduledAt || row.scheduled_at || null,
+    completedAt: row.completedAt || row.completed_at || null,
+    report: row.report ?? row.reportText ?? row.report_text ?? null,
+    findings: row.findings ?? null,
+    impression: row.impression ?? null,
+    reportedAt: row.reportedAt || row.reported_at || null,
+    orderedBy: row.orderedBy?.fullName || row.orderedByName || row.orderedBy || null,
+    reportedBy: row.reportedBy?.fullName || row.reportedByName || row.reportedBy || null,
+  };
+}
+
+export const radiologyApi = {
+  async listModalities(): Promise<RadiologyModality[]> {
+    const response = await api.get<ApiEnvelope<any[]> | any[]>('/radiology/modalities');
+    return (unwrap(response.data) || []).map(mapModality).filter((modality) => modality.isActive !== false);
+  },
+
+  async listOrders(patientId?: number): Promise<RadiologyOrder[]> {
+    const response = await api.get<ApiEnvelope<any[]> | any[]>('/radiology/orders', { params: patientId ? { patientId } : undefined });
+    return (unwrap(response.data) || []).map(mapOrder);
+  },
+
+  async createOrder(payload: CreateRadiologyOrderPayload): Promise<RadiologyOrder> {
+    const response = await api.post<ApiEnvelope<any> | any>('/radiology/orders', payload);
+    return mapOrder(unwrap(response.data));
+  },
+
+  async updateReport(orderId: number, payload: UpdateRadiologyReportPayload): Promise<RadiologyOrder> {
+    const response = await api.patch<ApiEnvelope<any> | any>(`/radiology/orders/${orderId}/report`, { status: payload.status === 'in_progress' ? 'performed' : 'reported', reportText: payload.report, impression: payload.impression || payload.findings || null });
+    return mapOrder(unwrap(response.data));
+  },
+};

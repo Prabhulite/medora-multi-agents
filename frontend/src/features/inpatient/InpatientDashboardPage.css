@@ -1,0 +1,29 @@
+.inpatient-page { display: grid; gap: 18px; }
+.inpatient-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.inpatient-kpi { display: grid; gap: 5px; padding: 16px 18px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); box-shadow: var(--shadow-sm); }
+.inpatient-kpi span, .inpatient-kpi small { color: var(--color-text-secondary); }
+.inpatient-kpi span { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.inpatient-kpi strong { color: var(--color-heading); font-size: 28px; line-height: 1; }
+.inpatient-kpi small { font-size: 12px; }
+.inpatient-kpi--green strong { color: var(--color-success); }.inpatient-kpi--amber strong { color: var(--color-warning); }.inpatient-kpi--slate strong { color: #475569; }
+.inpatient-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--color-border); }
+.inpatient-tabs button { border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--color-text-secondary); padding: 10px 14px; font-weight: 700; cursor: pointer; }
+.inpatient-tabs button:hover, .inpatient-tabs button.is-active { color: var(--color-brand-deep); border-bottom-color: var(--color-primary); }
+.inpatient-section { display: grid; gap: 16px; }
+.inpatient-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.inpatient-section-heading h2 { font-size: 18px; }.inpatient-section-heading p { margin: 4px 0 0; color: var(--color-text-secondary); }
+.ward-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.ward-card { display: grid; gap: 15px; padding: 18px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); }
+.ward-card__top { display: flex; justify-content: space-between; gap: 12px; }.ward-card__code, .inpatient-eyebrow { color: var(--color-primary); font-size: 11px; font-weight: 800; letter-spacing: .08em; }.ward-card h3 { margin-top: 4px; font-size: 17px; }.ward-card p { margin: 4px 0 0; color: var(--color-text-secondary); font-size: 12px; }
+.ward-card__meter { height: 8px; overflow: hidden; background: #e8f1eb; border-radius: 999px; }.ward-card__meter span { display: block; height: 100%; background: var(--gradient-primary); border-radius: inherit; }
+.ward-card__stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }.ward-card__stats div { display: grid; gap: 2px; }.ward-card__stats strong { font-size: 20px; color: var(--color-heading); }.ward-card__stats span { color: var(--color-text-secondary); font-size: 11px; }
+.ward-card__link { padding: 0; border: 0; background: transparent; color: var(--color-brand-deep); text-align: left; font-weight: 700; cursor: pointer; }.ward-card__link span { margin-left: 4px; }
+.inpatient-empty { padding: 28px; border: 1px dashed var(--color-border); border-radius: var(--radius-md); text-align: center; color: var(--color-text-secondary); }
+.inpatient-capitalize { text-transform: capitalize; }.inpatient-muted { color: var(--color-text-muted); }
+.inpatient-modal-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 20px; background: rgba(15, 23, 42, .46); }.inpatient-modal { width: min(720px, 100%); max-height: calc(100vh - 40px); overflow: auto; background: var(--color-surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); }.inpatient-modal__header { display: flex; justify-content: space-between; gap: 16px; padding: 22px 24px 14px; border-bottom: 1px solid var(--color-border); }.inpatient-modal__header h2 { margin-top: 3px; font-size: 22px; }.inpatient-modal__header p { margin: 4px 0 0; color: var(--color-text-secondary); }.inpatient-modal__header > button { align-self: flex-start; border: 0; background: transparent; color: var(--color-text-secondary); font-size: 28px; line-height: 1; cursor: pointer; }.inpatient-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding: 20px 24px; }.inpatient-textarea { display: grid; gap: 6px; grid-column: 1 / -1; }.inpatient-textarea span { color: var(--color-text); font-size: 12px; font-weight: 700; }.inpatient-textarea textarea { width: 100%; resize: vertical; padding: 10px 12px; border: 1px solid #d9e5de; border-radius: var(--radius-sm); color: var(--color-text); background: #fff; }.inpatient-modal__footer { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 24px 20px; border-top: 1px solid var(--color-border); }
+@media (max-width: 1000px) { .inpatient-kpis { grid-template-columns: repeat(2, 1fr); }.ward-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 680px) { .inpatient-kpis, .ward-grid, .inpatient-form-grid { grid-template-columns: 1fr; }.inpatient-section-heading { align-items: flex-start; flex-direction: column; }.inpatient-tabs { overflow-x: auto; }.inpatient-tabs button { white-space: nowrap; }.inpatient-textarea { grid-column: auto; } }
+.inpatient-row-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+.inpatient-observations { padding: 1rem; max-height: 18rem; overflow: auto; }
+.inpatient-observations article { border-top: 1px solid #e5e7eb; padding: .75rem 0; display: grid; gap: .25rem; }
+.inpatient-observations article p { margin: 0; }

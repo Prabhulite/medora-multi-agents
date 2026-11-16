@@ -1,0 +1,14 @@
+import { Router } from 'express';
+import { authenticate } from '../../../middleware/authenticate.js';
+import { authorize } from '../../../middleware/authorize.js';
+import { validate } from '../../../middleware/validate.js';
+import { asyncHandler } from '../../../shared/utils/asyncHandler.js';
+import { procurementController } from '../controllers/procurement.controller.js';
+import { createPurchaseOrderSchema, createSupplierSchema, purchaseOrderIdParamSchema, receivePurchaseOrderSchema } from '../validators/procurement.validators.js';
+const router = Router(); router.use(authenticate);
+router.get('/suppliers', authorize('pharmacy.procurement.view'), asyncHandler(procurementController.listSuppliers));
+router.post('/suppliers', authorize('pharmacy.procurement.create'), validate(createSupplierSchema), asyncHandler(procurementController.createSupplier));
+router.get('/purchase-orders', authorize('pharmacy.procurement.view'), asyncHandler(procurementController.listOrders));
+router.post('/purchase-orders', authorize('pharmacy.procurement.create'), validate(createPurchaseOrderSchema), asyncHandler(procurementController.createOrder));
+router.post('/purchase-orders/:id/receive', authorize('pharmacy.procurement.update'), validate(purchaseOrderIdParamSchema, 'params'), validate(receivePurchaseOrderSchema), asyncHandler(procurementController.receiveOrder));
+export default router;

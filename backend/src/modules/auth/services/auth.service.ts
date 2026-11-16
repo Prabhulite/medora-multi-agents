@@ -1,10 +1,12 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { env } from '../../../config/env.js';
+import { AppDataSource } from '../../../config/data-source.js';
+import { User } from '../../../database/entities/index.js';
 import { UnauthorizedError } from '../../../shared/errors/AppError.js';
 import type { AuthUser, JwtPayload } from '../../../shared/types/auth.js';
 import { userRepository } from '../../users/repositories/user.repository.js';
-import type { LoginInput } from '../validators/auth.validators.js';
+import type { ChangePasswordInput, LoginInput } from '../validators/auth.validators.js';
 
 function toPublicUser(authUser: NonNullable<Awaited<ReturnType<typeof userRepository.findAuthContextById>>>): AuthUser {
   return {
@@ -45,6 +47,7 @@ export const authService = {
     const payload: JwtPayload = {
       sub: user.id,
       username: user.username,
+      sessionVersion: authContext.sessionVersion,
     };
 
     const token = jwt.sign(payload, env.JWT_SECRET, {
@@ -64,5 +67,16 @@ export const authService = {
     }
 
     return toPublicUser(authContext);
+  },
+  async changePassword(userId: number, input: ChangePasswordInput) {
+    return AppDataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(User);
+      const user = await repo.createQueryBuilder('user').setLock('pessimistic_write').where('user.id = :id', { id: userId }).getOne();
+      if (!user || !user.isActive || !(await bcrypt.compare(input.currentPassword, user.passwordHash))) throw new UnauthorizedError('Current password is incorrect');
+      if (await bcrypt.compare(input.newPassword, user.passwordHash)) throw new UnauthorizedError('New password must be different');
+      user.passwordHash = await bcrypt.hash(input.newPassword, 12);
+      user.sessionVersion += 1;
+      await repo.save(user);
+    });
   },
 };

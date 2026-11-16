@@ -1,0 +1,25 @@
+import { Router } from 'express';
+import { authenticate } from '../../../middleware/authenticate.js';
+import { authorize } from '../../../middleware/authorize.js';
+import { validate } from '../../../middleware/validate.js';
+import { asyncHandler } from '../../../shared/utils/asyncHandler.js';
+import { inpatientController } from '../controllers/inpatient.controller.js';
+import { admissionIdParamSchema, admissionListQuerySchema, carePlanIdParamSchema, closeCarePlanSchema, createAdmissionSchema, createCarePlanSchema, dischargeSummarySchema, medicationAdministrationSchema, nursingObservationSchema, transferBedSchema } from '../validators/inpatient.validators.js';
+
+const router = Router(); router.use(authenticate);
+router.get('/wards', authorize('inpatient.view'), asyncHandler(inpatientController.wards));
+router.get('/beds', authorize('inpatient.view'), asyncHandler(inpatientController.beds));
+router.get('/admissions', authorize('inpatient.view'), validate(admissionListQuerySchema, 'query'), asyncHandler(inpatientController.admissions));
+router.post('/admissions', authorize('inpatient.create'), validate(createAdmissionSchema), asyncHandler(inpatientController.admit));
+router.get('/admissions/:id/care-plans', authorize('inpatient.view'), validate(admissionIdParamSchema, 'params'), asyncHandler(inpatientController.carePlans));
+router.post('/admissions/:id/care-plans', authorize('inpatient.update'), validate(admissionIdParamSchema, 'params'), validate(createCarePlanSchema), asyncHandler(inpatientController.addCarePlan));
+router.patch('/admissions/:id/care-plans/:planId/close', authorize('inpatient.update'), validate(carePlanIdParamSchema, 'params'), validate(closeCarePlanSchema), asyncHandler(inpatientController.closeCarePlan));
+router.get('/admissions/:id/medication-orders', authorize('inpatient.view'), validate(admissionIdParamSchema, 'params'), asyncHandler(inpatientController.medicationOrders));
+router.get('/admissions/:id/medication-administrations', authorize('inpatient.view'), validate(admissionIdParamSchema, 'params'), asyncHandler(inpatientController.medicationAdministrations));
+router.post('/admissions/:id/medication-administrations', authorize('inpatient.update'), validate(admissionIdParamSchema, 'params'), validate(medicationAdministrationSchema), asyncHandler(inpatientController.addMedicationAdministration));
+router.get('/admissions/:id/transfers', authorize('inpatient.view'), validate(admissionIdParamSchema, 'params'), asyncHandler(inpatientController.transfers));
+router.post('/admissions/:id/transfers', authorize('inpatient.update'), validate(admissionIdParamSchema, 'params'), validate(transferBedSchema), asyncHandler(inpatientController.transfer));
+router.get('/admissions/:id/observations', authorize('inpatient.view'), validate(admissionIdParamSchema, 'params'), asyncHandler(inpatientController.observations));
+router.post('/admissions/:id/observations', authorize('inpatient.update'), validate(admissionIdParamSchema, 'params'), validate(nursingObservationSchema), asyncHandler(inpatientController.addObservation));
+router.patch('/admissions/:id/discharge', authorize('inpatient.update'), validate(admissionIdParamSchema, 'params'), validate(dischargeSummarySchema), asyncHandler(inpatientController.discharge));
+export default router;

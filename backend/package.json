@@ -10,11 +10,20 @@
     "typeorm": "tsx ./node_modules/typeorm/cli.js",
     "migration:generate": "tsx src/database/generate-migration.ts",
     "migration:run": "tsx ./node_modules/typeorm/cli.js migration:run -d src/config/data-source.cli.ts",
+    "migration:run:prod": "node ./node_modules/typeorm/cli.js migration:run -d dist/config/data-source.cli.js",
     "migration:revert": "tsx ./node_modules/typeorm/cli.js migration:revert -d src/config/data-source.cli.ts",
     "migration:show": "tsx ./node_modules/typeorm/cli.js migration:show -d src/config/data-source.cli.ts",
     "db:ensure": "tsx src/database/ensure-db.ts",
     "db:seed": "tsx src/database/seed.ts",
-    "db:setup": "npm run db:ensure && npm run migration:run && npm run db:seed"
+    "db:seed:prod": "node dist/database/seed.js",
+    "db:setup": "npm run db:ensure && npm run migration:run && npm run db:seed",
+    "db:backup": "tsx src/database/backup.ts",
+    "db:backup:prod": "node dist/database/backup.js",
+    "db:restore": "tsx src/database/restore.ts",
+    "db:restore:prod": "node dist/database/restore.js",
+    "db:backup-check": "npm run build && tsx src/database/backup-restore-check.ts",
+    "smoke": "tsx src/smoke.ts",
+    "test:integration": "tsx src/integration-check.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

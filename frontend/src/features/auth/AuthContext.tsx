@@ -23,26 +23,15 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [token, setToken] = useState<string | null>(
-    () => localStorage.getItem('medora_token'),
-  );
+  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const refreshProfile = useCallback(async () => {
-    const stored = localStorage.getItem('medora_token');
-    if (!stored) {
-      setUser(null);
-      setToken(null);
-      setLoading(false);
-      return;
-    }
-
     try {
       const { data } = await api.get<ApiResponse<AuthUser>>('/auth/me');
       setUser(data.data);
-      setToken(stored);
+      setToken('cookie');
     } catch {
-      localStorage.removeItem('medora_token');
       setUser(null);
       setToken(null);
     } finally {
@@ -60,8 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ApiResponse<{ token: string; user: AuthUser }>
       >('/auth/login', payload);
 
-      localStorage.setItem('medora_token', data.data.token);
-      setToken(data.data.token);
+      setToken('cookie');
       setUser(data.data.user);
     } catch (error) {
       throw new Error(getErrorMessage(error, 'Login failed'));
@@ -69,7 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem('medora_token');
+    void api.post('/auth/logout').catch(() => undefined);
     setToken(null);
     setUser(null);
   }, []);

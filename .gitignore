@@ -9,3 +9,5 @@ coverage/
 .vite/
 _pdf_*.png
 *.tsbuildinfo
+backups/
+.superdesign/tmp/

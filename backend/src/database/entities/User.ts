@@ -31,6 +31,9 @@ export class User {
   @Column({ name: 'password_hash', type: 'varchar', length: 255 })
   passwordHash!: string;
 
+  @Column({ name: 'session_version', type: 'int', unsigned: true, default: 1 })
+  sessionVersion!: number;
+
   @Column({ name: 'full_name', type: 'varchar', length: 160 })
   fullName!: string;
 
@@ -85,4 +88,9 @@ export class User {
     inverseJoinColumn: { name: 'role_id', referencedColumnName: 'id' },
   })
   roles!: Role[];
+
+  toJSON() {
+    const { passwordHash: _passwordHash, sessionVersion: _sessionVersion, ...publicFields } = this;
+    return publicFields;
+  }
 }

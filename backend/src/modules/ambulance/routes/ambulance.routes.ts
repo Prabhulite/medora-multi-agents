@@ -1,0 +1,20 @@
+import { Router } from 'express';
+import { authenticate } from '../../../middleware/authenticate.js';
+import { authorize } from '../../../middleware/authorize.js';
+import { validate } from '../../../middleware/validate.js';
+import { asyncHandler } from '../../../shared/utils/asyncHandler.js';
+import { ambulanceController } from '../controllers/ambulance.controller.js';
+import { createTripSchema, driverIdParamSchema, registerDriverSchema, tripIdParamSchema, tripListQuerySchema, tripStatusSchema, updateDriverSchema, vehicleIdParamSchema, vehicleSchema, vehicleUpdateSchema } from '../validators/ambulance.validators.js';
+
+const router = Router(); router.use(authenticate);
+router.get('/vehicles', authorize('ambulance.view'), asyncHandler(ambulanceController.vehicles));
+router.post('/vehicles', authorize('ambulance.manage'), validate(vehicleSchema), asyncHandler(ambulanceController.createVehicle));
+router.patch('/vehicles/:id', authorize('ambulance.manage'), validate(vehicleIdParamSchema, 'params'), validate(vehicleUpdateSchema), asyncHandler(ambulanceController.updateVehicle));
+router.get('/drivers', authorize('ambulance.view'), asyncHandler(ambulanceController.drivers));
+router.get('/staff', authorize('ambulance.manage'), asyncHandler(ambulanceController.staffCandidates));
+router.post('/drivers', authorize('ambulance.manage'), validate(registerDriverSchema), asyncHandler(ambulanceController.registerDriver));
+router.patch('/drivers/:id', authorize('ambulance.manage'), validate(driverIdParamSchema, 'params'), validate(updateDriverSchema), asyncHandler(ambulanceController.updateDriver));
+router.get('/trips', authorize('ambulance.view'), validate(tripListQuerySchema, 'query'), asyncHandler(ambulanceController.trips));
+router.post('/trips', authorize('ambulance.dispatch'), validate(createTripSchema), asyncHandler(ambulanceController.dispatch));
+router.patch('/trips/:id/status', authorize('ambulance.dispatch'), validate(tripIdParamSchema, 'params'), validate(tripStatusSchema), asyncHandler(ambulanceController.status));
+export default router;

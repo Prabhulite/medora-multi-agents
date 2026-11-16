@@ -7,6 +7,22 @@ import type {
 } from '../../types';
 
 export const patientsApi = {
+  communications: async (patientId: number) => {
+    const { data } = await api.get<ApiResponse<Array<{ id: number; channel: string; direction: string; subject: string; summary: string; occurredAt: string; followUpDueAt: string | null; followUpCompletedAt: string | null; followUpCompletionNote: string | null }>>>(`/patients/${patientId}/communications`);
+    return data.data;
+  },
+  recordCommunication: async (patientId: number, payload: { channel: string; direction: string; subject: string; summary: string; occurredAt: string; followUpDueAt: string | null }) => {
+    const { data } = await api.post<ApiResponse<unknown>>(`/patients/${patientId}/communications`, payload);
+    return data.data;
+  },
+  followUps: async (status: 'open' | 'overdue' = 'open') => {
+    const { data } = await api.get<ApiResponse<Array<{ id: number; patientId: number; patientName: string; patientMrdNumber: string; channel: string; subject: string; followUpDueAt: string; overdue: boolean }>>>('/patients/follow-ups', { params: { status } });
+    return data.data;
+  },
+  completeFollowUp: async (patientId: number, communicationId: number, note: string) => {
+    const { data } = await api.post<ApiResponse<unknown>>(`/patients/${patientId}/communications/${communicationId}/complete`, { note });
+    return data.data;
+  },
   list: async (includeInactive = false) => {
     const { data } = await api.get<ApiResponse<Patient[]>>('/patients', {
       params: { includeInactive: includeInactive ? 'true' : 'false' },

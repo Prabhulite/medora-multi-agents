@@ -189,6 +189,50 @@
   padding: 12px 16px 16px;
 }
 
+.clinical-encounter-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 0 18px 18px;
+}
+
+.clinical-encounter-form .ui-field:nth-child(7),
+.clinical-encounter-form .ui-field:nth-child(8),
+.clinical-encounter-form .ui-field:nth-child(9) {
+  grid-column: 1 / -1;
+}
+
+.clinical-encounter-textarea {
+  min-height: 78px;
+  resize: vertical;
+}
+
+.clinical-prescription-section {
+  border-top: 1px solid rgba(1, 91, 45, 0.12);
+  padding: 18px;
+}
+
+.clinical-prescription-section h4 {
+  margin: 0 0 12px;
+  color: #015b2d;
+}
+
+.clinical-prescription-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 760px) {
+  .clinical-encounter-form {
+    grid-template-columns: 1fr;
+  }
+  .clinical-prescription-form {
+    grid-template-columns: 1fr;
+  }
+}
+
 .pd-visit-row {
   display: flex;
   align-items: center;

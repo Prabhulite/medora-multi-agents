@@ -4,6 +4,7 @@ import { authorize } from '../../../middleware/authorize.js';
 import { validate } from '../../../middleware/validate.js';
 import { asyncHandler } from '../../../shared/utils/asyncHandler.js';
 import { patientController } from '../controllers/patient.controller.js';
+import { communicationParamSchema, completeFollowUpSchema, createCommunicationSchema, followUpQuerySchema } from '../validators/communication.validators.js';
 import {
   createPatientSchema,
   duplicateCheckSchema,
@@ -39,6 +40,12 @@ router.post(
   validate(mergePatientSchema),
   asyncHandler(patientController.merge),
 );
+
+router.get('/follow-ups', authorize('patients.view'), validate(followUpQuerySchema, 'query'), asyncHandler(patientController.followUps));
+router.post('/:id/communications/:communicationId/complete', authorize('patients.update'), validate(communicationParamSchema, 'params'), validate(completeFollowUpSchema), asyncHandler(patientController.completeFollowUp));
+
+router.get('/:id/communications', authorize('patients.view'), validate(patientIdParamSchema, 'params'), asyncHandler(patientController.communications));
+router.post('/:id/communications', authorize('patients.update'), validate(patientIdParamSchema, 'params'), validate(createCommunicationSchema), asyncHandler(patientController.recordCommunication));
 
 router.get(
   '/:id/audit-logs',

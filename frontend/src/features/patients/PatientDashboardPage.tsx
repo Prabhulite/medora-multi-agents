@@ -12,7 +12,13 @@ import { getErrorMessage } from '../../lib/api';
 import { hasPermission } from '../../lib/permissions';
 import type { Patient } from '../../types';
 import { useAuth } from '../auth/AuthContext';
+import { ClinicalEncountersPanel } from '../clinical/ClinicalEncountersPanel';
+import { PatientTimeline } from '../clinical/PatientTimeline';
+import { AllergyBanner } from '../clinical/AllergyBanner';
 import { patientsApi } from './patients.api';
+import { PatientCommunicationsPanel } from './PatientCommunicationsPanel';
+import { PatientRecordsTab } from './PatientRecordsTab';
+import { PatientMrdTab } from './PatientMrdTab';
 import './PatientDashboardPage.css';
 
 const TABS = [
@@ -75,6 +81,7 @@ export function PatientDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>('Dashboard');
+  const [allergyRevision, setAllergyRevision] = useState(0);
 
   const canUpdate = hasPermission(user, 'patients.update');
 
@@ -173,14 +180,25 @@ export function PatientDashboardPage() {
         ))}
       </nav>
 
-      {activeTab !== 'Dashboard' ? (
-        <div className="pd-placeholder">
-          <h2>{activeTab}</h2>
-          <p>
-            {activeTab} module for this patient will be connected here. Dashboard remains the
-            default overview.
-          </p>
-        </div>
+      {activeTab === 'Timeline' ? (
+        hasPermission(user, 'clinical.view') ? <PatientTimeline patientId={patient.id} /> : <Alert tone="error">Clinical view permission is required to see this timeline.</Alert>
+      ) : activeTab === 'Profile' ? (
+        <section className="pd-card pd-card--wide"><div className="pd-card__head"><h3>Patient profile</h3></div><div className="pd-card__body">
+          <DetailRow label="Name" value={displayName} />
+          <DetailRow label="MRD number" value={patient.mrdNumber} />
+          <DetailRow label="Date of birth" value={fmtDate(patient.dateOfBirth)} />
+          <DetailRow label="Gender" value={titleCase(patient.gender)} />
+          <DetailRow label="Blood group" value={patient.bloodGroup || '—'} />
+          <DetailRow label="Mobile" value={patient.contact?.mobileNumber || '—'} />
+          <DetailRow label="Email" value={patient.contact?.email || '—'} />
+          <DetailRow label="Address" value={addressLine} />
+          <DetailRow label="Emergency contact" value={patient.emergencyContact?.contactPersonName || '—'} />
+          <DetailRow label="Emergency number" value={patient.emergencyContact?.contactNumber || '—'} />
+        </div></section>
+      ) : activeTab === 'MRD' ? (
+        <PatientMrdTab patient={patient} />
+      ) : activeTab === 'Visit' || activeTab === 'Bills' || activeTab === 'Tests' || activeTab === 'Rx' || activeTab === 'Appointment' ? (
+        <PatientRecordsTab patient={patient} mode={activeTab} />
       ) : (
         <>
           <section className="pd-hero">
@@ -210,6 +228,8 @@ export function PatientDashboardPage() {
               </div>
             </div>
           </section>
+
+          {hasPermission(user, 'clinical.view') ? <AllergyBanner key={`${patient.id}-${allergyRevision}`} patientId={patient.id} /> : null}
 
           <div className="pd-grid">
             <section className="pd-card">
@@ -354,6 +374,10 @@ export function PatientDashboardPage() {
                 )}
               </div>
             </section>
+
+            <PatientCommunicationsPanel patientId={patient.id} canRecord={canUpdate} />
+
+            {hasPermission(user, 'clinical.view') ? <ClinicalEncountersPanel patientId={patient.id} onAllergiesChanged={() => setAllergyRevision((value) => value + 1)} /> : null}
           </div>
         </>
       )}

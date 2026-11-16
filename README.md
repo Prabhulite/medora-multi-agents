@@ -1,6 +1,6 @@
 # Medora HMS
 
-Production-oriented Hospital Management System starter with:
+Hospital Management System under active development with:
 
 - React + TypeScript frontend
 - Node.js + TypeScript (tsx) backend
@@ -10,6 +10,7 @@ Production-oriented Hospital Management System starter with:
 - Migration-based DB workflow (`synchronize: false`)
 - JWT auth + permission middleware (RBAC, no hardcoded access checks)
 - Seeded super admin from `.env`
+- Patient registration, OPD/IPD, emergency, surgery, nursing, billing, pharmacy, laboratory, radiology, roster, and ambulance workflows
 - Theme/logo aligned to `Medora Software CC.pdf`
 
 ## Project structure
@@ -95,6 +96,10 @@ Workflow:
 2. `npm run migration:generate` — auto-names if omitted, then auto-runs
 3. Commit the new file under `src/database/migrations/`
 4. Others / deploy only need `npm run migration:run` or `npm run db:setup`
+
+## Backup and recovery
+
+From `backend/`, run `npm run db:backup -- <backup.sql>` to create a SQL dump and checksum manifest. Run `npm run db:restore -- <backup.sql> <medora_restore_new_database>` to restore into a new database. `npm run db:backup-check` verifies a synthetic round trip. See [database backup and restore](docs/DB-BACKUP-RESTORE.md) for requirements and recovery steps.
 
 ## Theme
 

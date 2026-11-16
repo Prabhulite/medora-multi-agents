@@ -420,3 +420,8 @@
     height: 40px;
   }
 }
+.app-shell__loading {
+  padding: 2rem;
+  color: #475569;
+  font-weight: 600;
+}

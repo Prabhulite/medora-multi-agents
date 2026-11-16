@@ -1,26 +1,41 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { lazy } from 'react';
 import { AppShell } from '../components/layout/AppShell';
 import { AuthProvider } from '../features/auth/AuthContext';
 import { LoginPage } from '../features/auth/LoginPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
-import { MenusPage } from '../features/menus/MenusPage';
-import { RoleFormPage } from '../features/roles/RoleFormPage';
-import { RolesPage } from '../features/roles/RolesPage';
-import { DepartmentFormPage } from '../features/departments/DepartmentFormPage';
-import { DepartmentsPage } from '../features/departments/DepartmentsPage';
-import { DoctorFormPage } from '../features/doctors/DoctorFormPage';
-import { DoctorsPage } from '../features/doctors/DoctorsPage';
-import { HospitalProfilePage } from '../features/hospital-profile/HospitalProfilePage';
-import { AppointmentFormPage } from '../features/appointments/AppointmentFormPage';
-import { AppointmentsPage } from '../features/appointments/AppointmentsPage';
-import { PatientDashboardPage } from '../features/patients/PatientDashboardPage';
-import { PatientFormPage } from '../features/patients/PatientFormPage';
-import { PatientsPage } from '../features/patients/PatientsPage';
-import { SpecializationFormPage } from '../features/specializations/SpecializationFormPage';
-import { SpecializationsPage } from '../features/specializations/SpecializationsPage';
-import { UserFormPage } from '../features/users/UserFormPage';
-import UsersPage from '../features/users/UsersPage';
 import { ProtectedRoute } from '../routes/ProtectedRoute';
+
+const AccountSecurityPage = lazy(() => import('../features/auth/AccountSecurityPage').then((module) => ({ default: module.AccountSecurityPage })));
+const MenusPage = lazy(() => import('../features/menus/MenusPage').then((module) => ({ default: module.MenusPage })));
+const RoleFormPage = lazy(() => import('../features/roles/RoleFormPage').then((module) => ({ default: module.RoleFormPage })));
+const RolesPage = lazy(() => import('../features/roles/RolesPage').then((module) => ({ default: module.RolesPage })));
+const DepartmentFormPage = lazy(() => import('../features/departments/DepartmentFormPage').then((module) => ({ default: module.DepartmentFormPage })));
+const DepartmentsPage = lazy(() => import('../features/departments/DepartmentsPage').then((module) => ({ default: module.DepartmentsPage })));
+const DoctorFormPage = lazy(() => import('../features/doctors/DoctorFormPage').then((module) => ({ default: module.DoctorFormPage })));
+const DoctorsPage = lazy(() => import('../features/doctors/DoctorsPage').then((module) => ({ default: module.DoctorsPage })));
+const HospitalProfilePage = lazy(() => import('../features/hospital-profile/HospitalProfilePage').then((module) => ({ default: module.HospitalProfilePage })));
+const AppointmentFormPage = lazy(() => import('../features/appointments/AppointmentFormPage').then((module) => ({ default: module.AppointmentFormPage })));
+const AppointmentsPage = lazy(() => import('../features/appointments/AppointmentsPage').then((module) => ({ default: module.AppointmentsPage })));
+const PatientDashboardPage = lazy(() => import('../features/patients/PatientDashboardPage').then((module) => ({ default: module.PatientDashboardPage })));
+const PatientFormPage = lazy(() => import('../features/patients/PatientFormPage').then((module) => ({ default: module.PatientFormPage })));
+const PatientsPage = lazy(() => import('../features/patients/PatientsPage').then((module) => ({ default: module.PatientsPage })));
+const SpecializationFormPage = lazy(() => import('../features/specializations/SpecializationFormPage').then((module) => ({ default: module.SpecializationFormPage })));
+const SpecializationsPage = lazy(() => import('../features/specializations/SpecializationsPage').then((module) => ({ default: module.SpecializationsPage })));
+const UserFormPage = lazy(() => import('../features/users/UserFormPage').then((module) => ({ default: module.UserFormPage })));
+const UsersPage = lazy(() => import('../features/users/UsersPage'));
+const InpatientDashboardPage = lazy(() => import('../features/inpatient/InpatientDashboardPage').then((module) => ({ default: module.InpatientDashboardPage })));
+const BillingDashboardPage = lazy(() => import('../features/billing/BillingDashboardPage').then((module) => ({ default: module.BillingDashboardPage })));
+const EmergencyPage = lazy(() => import('../features/emergency/EmergencyPage').then((module) => ({ default: module.EmergencyPage })));
+const SurgeryPage = lazy(() => import('../features/surgery/SurgeryPage').then((module) => ({ default: module.SurgeryPage })));
+const RosterPage = lazy(() => import('../features/roster/RosterPage').then((module) => ({ default: module.RosterPage })));
+const AmbulancePage = lazy(() => import('../features/ambulance/AmbulancePage').then((module) => ({ default: module.AmbulancePage })));
+const PharmacyInventoryPage = lazy(() => import('../features/pharmacy/PharmacyInventoryPage').then((module) => ({ default: module.PharmacyInventoryPage })));
+const PharmacyPurchasingPage = lazy(() => import('../features/pharmacy/PharmacyPurchasingPage').then((module) => ({ default: module.PharmacyPurchasingPage })));
+const LaboratoryDiagnosticsPage = lazy(() => import('../features/laboratory/LaboratoryDiagnosticsPage').then((module) => ({ default: module.LaboratoryDiagnosticsPage })));
+const RadiologyDiagnosticsPage = lazy(() => import('../features/radiology/RadiologyDiagnosticsPage').then((module) => ({ default: module.RadiologyDiagnosticsPage })));
+const OperationsDashboardPage = lazy(() => import('../features/operations/OperationsDashboardPage').then((module) => ({ default: module.OperationsDashboardPage })));
+const AuditLogsPage = lazy(() => import('../features/audit/AuditLogsPage').then((module) => ({ default: module.AuditLogsPage })));
 
 export default function App() {
   return (
@@ -32,6 +47,7 @@ export default function App() {
           <Route element={<ProtectedRoute />}>
             <Route element={<AppShell />}>
               <Route index element={<DashboardPage />} />
+              <Route path="account/security" element={<AccountSecurityPage />} />
               <Route element={<ProtectedRoute permission="hospital_profile.view" />}>
                 <Route path="hospital-profile" element={<HospitalProfilePage />} />
               </Route>
@@ -85,6 +101,42 @@ export default function App() {
               </Route>
               <Route element={<ProtectedRoute permission="appointments.view" />}>
                 <Route path="appointments" element={<AppointmentsPage />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="inpatient.view" />}>
+                <Route path="inpatient" element={<InpatientDashboardPage />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="billing.view" />}>
+                <Route path="billing" element={<BillingDashboardPage />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="emergency.view" />}>
+                <Route path="emergency" element={<EmergencyPage />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="surgery.view" />}>
+                <Route path="surgery" element={<SurgeryPage />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="roster.view" />}>
+                <Route path="roster" element={<RosterPage />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="ambulance.view" />}>
+                <Route path="ambulance" element={<AmbulancePage />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="pharmacy.inventory.view" />}>
+                <Route path="pharmacy" element={<PharmacyInventoryPage />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="pharmacy.procurement.view" />}>
+                <Route path="pharmacy/procurement" element={<PharmacyPurchasingPage />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="laboratory.view" />}>
+                <Route path="laboratory" element={<LaboratoryDiagnosticsPage />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="radiology.view" />}>
+                <Route path="radiology" element={<RadiologyDiagnosticsPage />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="operations.view" />}>
+                <Route path="operations" element={<OperationsDashboardPage />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="audit.view" />}>
+                <Route path="audit-logs" element={<AuditLogsPage />} />
               </Route>
               <Route element={<ProtectedRoute permission="appointments.create" />}>
                 <Route path="appointments/new" element={<AppointmentFormPage />} />

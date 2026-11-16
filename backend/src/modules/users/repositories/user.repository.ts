@@ -29,6 +29,7 @@ export interface UserView {
 
 export interface AuthContextRecord {
   id: number;
+  sessionVersion: number;
   username: string;
   email: string | null;
   fullName: string;
@@ -151,6 +152,7 @@ export const userRepository = {
 
     return {
       id: user.id,
+      sessionVersion: user.sessionVersion,
       username: user.username,
       email: user.email,
       fullName: user.fullName,
@@ -200,7 +202,7 @@ export const userRepository = {
     if (input.designation !== undefined) user.designation = input.designation;
     if (input.departmentId !== undefined) user.departmentId = input.departmentId;
     if (input.isActive !== undefined) user.isActive = input.isActive;
-    if (input.passwordHash !== undefined) user.passwordHash = input.passwordHash;
+    if (input.passwordHash !== undefined) { user.passwordHash = input.passwordHash; user.sessionVersion += 1; }
 
     if (input.roleIds !== undefined) {
       user.roles = await this.roleRepo().findBy({ id: In(input.roleIds) });

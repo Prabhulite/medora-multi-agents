@@ -5,11 +5,20 @@ import { closeDataSource, initializeDataSource } from '../config/data-source.js'
 import {
   Department,
   Menu,
+  Medication,
   Permission,
   RegistrationSource,
   Role,
   Specialization,
   User,
+  Ward,
+  Bed,
+  InventoryBatch,
+  StockTransaction,
+  Supplier,
+  LaboratoryTest,
+  RadiologyModality,
+  OperatingRoom,
 } from './entities/index.js';
 
 const PERMISSIONS = [
@@ -94,6 +103,43 @@ const PERMISSIONS = [
     action: 'delete',
     description: 'Cancel appointments',
   },
+  { code: 'clinical.view', module: 'clinical', action: 'view', description: 'View clinical encounters' },
+  { code: 'clinical.create', module: 'clinical', action: 'create', description: 'Create clinical encounters' },
+  { code: 'clinical.update', module: 'clinical', action: 'update', description: 'Update clinical encounters' },
+  { code: 'pharmacy.view', module: 'pharmacy', action: 'view', description: 'View prescriptions and pharmacy data' },
+  { code: 'pharmacy.create', module: 'pharmacy', action: 'create', description: 'Create prescriptions' },
+  { code: 'pharmacy.inventory.view', module: 'pharmacy_inventory', action: 'view', description: 'View pharmacy inventory' },
+  { code: 'pharmacy.inventory.create', module: 'pharmacy_inventory', action: 'create', description: 'Receive pharmacy stock' },
+  { code: 'pharmacy.inventory.update', module: 'pharmacy_inventory', action: 'update', description: 'Dispense pharmacy stock' },
+  { code: 'pharmacy.procurement.view', module: 'pharmacy_procurement', action: 'view', description: 'View pharmacy suppliers and purchase orders' },
+  { code: 'pharmacy.procurement.create', module: 'pharmacy_procurement', action: 'create', description: 'Create pharmacy suppliers and purchase orders' },
+  { code: 'pharmacy.procurement.update', module: 'pharmacy_procurement', action: 'update', description: 'Receive pharmacy purchase orders' },
+  { code: 'laboratory.view', module: 'laboratory', action: 'view', description: 'View laboratory tests and orders' },
+  { code: 'laboratory.create', module: 'laboratory', action: 'create', description: 'Order laboratory tests' },
+  { code: 'laboratory.update', module: 'laboratory', action: 'update', description: 'Enter laboratory results' },
+  { code: 'radiology.view', module: 'radiology', action: 'view', description: 'View radiology modalities and orders' },
+  { code: 'radiology.create', module: 'radiology', action: 'create', description: 'Order radiology studies' },
+  { code: 'radiology.update', module: 'radiology', action: 'update', description: 'Enter radiology reports' },
+  { code: 'operations.view', module: 'operations', action: 'view', description: 'View hospital operations dashboard' },
+  { code: 'audit.view', module: 'audit', action: 'view', description: 'View system audit logs' },
+  { code: 'inpatient.view', module: 'inpatient', action: 'view', description: 'View wards, beds, and admissions' },
+  { code: 'inpatient.create', module: 'inpatient', action: 'create', description: 'Admit patients' },
+  { code: 'inpatient.update', module: 'inpatient', action: 'update', description: 'Update and discharge admissions' },
+  { code: 'billing.view', module: 'billing', action: 'view', description: 'View invoices and balances' },
+  { code: 'billing.create', module: 'billing', action: 'create', description: 'Create invoices' },
+  { code: 'billing.update', module: 'billing', action: 'update', description: 'Record invoice payments' },
+  { code: 'billing.charges.manage', module: 'billing_charges', action: 'manage', description: 'Create and update billing charge prices' },
+  { code: 'emergency.view', module: 'emergency', action: 'view', description: 'View emergency queue and triage records' },
+  { code: 'emergency.create', module: 'emergency', action: 'create', description: 'Create emergency triage records' },
+  { code: 'emergency.update', module: 'emergency', action: 'update', description: 'Update emergency case status and disposition' },
+  { code: 'surgery.view', module: 'surgery', action: 'view', description: 'View operating theatre schedule' },
+  { code: 'surgery.create', module: 'surgery', action: 'create', description: 'Schedule surgery cases' },
+  { code: 'surgery.update', module: 'surgery', action: 'update', description: 'Update surgery case status' },
+  { code: 'roster.view', module: 'roster', action: 'view', description: 'View staff duty shifts' },
+  { code: 'roster.manage', module: 'roster', action: 'manage', description: 'Schedule and close staff duty shifts' },
+  { code: 'ambulance.view', module: 'ambulance', action: 'view', description: 'View ambulance vehicles and dispatch trips' },
+  { code: 'ambulance.dispatch', module: 'ambulance', action: 'dispatch', description: 'Dispatch ambulances and update trips' },
+  { code: 'ambulance.manage', module: 'ambulance', action: 'manage', description: 'Create and update ambulance vehicles' },
   { code: 'permissions.view', module: 'permissions', action: 'view', description: 'View permissions' },
   { code: 'menus.view', module: 'menus', action: 'view', description: 'View menus' },
   { code: 'menus.create', module: 'menus', action: 'create', description: 'Create menus' },
@@ -121,6 +167,23 @@ const SPECIALIZATIONS = [
   { code: 'ent', name: 'ENT' },
   { code: 'neurology', name: 'Neurology' },
   { code: 'ophthalmology', name: 'Ophthalmology' },
+] as const;
+
+const MEDICATIONS = [
+  { medicineCode: 'PARA-500', genericName: 'Paracetamol', brandName: 'Paracetamol 500 mg', form: 'tablet', strength: '500', unit: 'mg' },
+  { medicineCode: 'AMOX-500', genericName: 'Amoxicillin', brandName: 'Amoxicillin 500 mg', form: 'capsule', strength: '500', unit: 'mg' },
+  { medicineCode: 'OMEP-20', genericName: 'Omeprazole', brandName: 'Omeprazole 20 mg', form: 'capsule', strength: '20', unit: 'mg' },
+  { medicineCode: 'ORS-001', genericName: 'Oral rehydration salts', brandName: 'ORS Solution', form: 'sachet', strength: null, unit: null },
+] as const;
+
+const WARDS = [
+  { code: 'GEN', name: 'General Ward', wardType: 'general', floor: 1, beds: ['GEN-01', 'GEN-02', 'GEN-03'] },
+  { code: 'ICU', name: 'Intensive Care Unit', wardType: 'icu', floor: 1, beds: ['ICU-01', 'ICU-02'] },
+] as const;
+
+const OPERATING_ROOMS = [
+  { code: 'OT-1', name: 'Operating Theatre 1' },
+  { code: 'OT-2', name: 'Operating Theatre 2' },
 ] as const;
 
 const MENUS = [
@@ -232,6 +295,58 @@ const MENUS = [
     parentCode: 'front_office',
     sortOrder: 32,
   },
+  {
+    code: 'inpatient',
+    label: 'Inpatient Management',
+    route: '/inpatient',
+    icon: 'hospital_profile',
+    permissionCode: 'inpatient.view',
+    parentCode: 'front_office',
+    sortOrder: 33,
+  },
+  {
+    code: 'billing',
+    label: 'Billing & Payments',
+    route: '/billing',
+    icon: 'menus',
+    permissionCode: 'billing.view',
+    parentCode: 'front_office',
+    sortOrder: 34,
+  },
+  {
+    code: 'pharmacy_inventory',
+    label: 'Pharmacy Inventory',
+    route: '/pharmacy',
+    icon: 'medications',
+    permissionCode: 'pharmacy.inventory.view',
+    parentCode: 'front_office',
+    sortOrder: 35,
+  },
+  {
+    code: 'pharmacy_procurement',
+    label: 'Pharmacy Procurement',
+    route: '/pharmacy/procurement',
+    icon: 'medications',
+    permissionCode: 'pharmacy.procurement.view',
+    parentCode: 'front_office',
+    sortOrder: 36,
+  },
+  {
+    code: 'laboratory',
+    label: 'Laboratory',
+    route: '/laboratory',
+    icon: 'clinical',
+    permissionCode: 'laboratory.view',
+    parentCode: 'front_office',
+    sortOrder: 37,
+  },
+  { code: 'radiology', label: 'Radiology', route: '/radiology', icon: 'clinical', permissionCode: 'radiology.view', parentCode: 'front_office', sortOrder: 38 },
+  { code: 'emergency', label: 'Emergency Triage', route: '/emergency', icon: 'clinical', permissionCode: 'emergency.view', parentCode: 'front_office', sortOrder: 39 },
+  { code: 'surgery', label: 'Operating Theatre', route: '/surgery', icon: 'hospital_profile', permissionCode: 'surgery.view', parentCode: 'front_office', sortOrder: 40 },
+  { code: 'roster', label: 'Duty Roster', route: '/roster', icon: 'users', permissionCode: 'roster.view', parentCode: 'front_office', sortOrder: 41 },
+  { code: 'ambulance', label: 'Ambulance Dispatch', route: '/ambulance', icon: 'hospital_profile', permissionCode: 'ambulance.view', parentCode: 'front_office', sortOrder: 42 },
+  { code: 'operations', label: 'Operations Dashboard', route: '/operations', icon: 'dashboard', permissionCode: 'operations.view', parentCode: null as string | null, sortOrder: 15 },
+  { code: 'audit', label: 'Audit Logs', route: '/audit-logs', icon: 'roles', permissionCode: 'audit.view', parentCode: 'master', sortOrder: 28 },
 ] as const;
 
 const REGISTRATION_SOURCES = [
@@ -250,6 +365,15 @@ async function seed(): Promise<void> {
   const departmentRepo = dataSource.getRepository(Department);
   const specializationRepo = dataSource.getRepository(Specialization);
   const registrationSourceRepo = dataSource.getRepository(RegistrationSource);
+  const medicationRepo = dataSource.getRepository(Medication);
+  const wardRepo = dataSource.getRepository(Ward);
+  const bedRepo = dataSource.getRepository(Bed);
+  const inventoryRepo = dataSource.getRepository(InventoryBatch);
+  const stockTransactionRepo = dataSource.getRepository(StockTransaction);
+  const supplierRepo = dataSource.getRepository(Supplier);
+  const laboratoryTestRepo = dataSource.getRepository(LaboratoryTest);
+  const radiologyModalityRepo = dataSource.getRepository(RadiologyModality);
+  const operatingRoomRepo = dataSource.getRepository(OperatingRoom);
 
   for (const permission of PERMISSIONS) {
     const existing = await permissionRepo.findOne({ where: { code: permission.code } });
@@ -309,6 +433,72 @@ async function seed(): Promise<void> {
         }),
       );
     }
+  }
+
+  for (const medication of MEDICATIONS) {
+    const existing = await medicationRepo.findOne({ where: { medicineCode: medication.medicineCode } });
+    if (existing) {
+      Object.assign(existing, medication, { isActive: true });
+      await medicationRepo.save(existing);
+    } else {
+      await medicationRepo.save(medicationRepo.create({ ...medication, isActive: true }));
+    }
+  }
+
+  const medicationByCode = new Map((await medicationRepo.find()).map((medication) => [medication.medicineCode, medication] as const));
+  const STOCK = [
+    { code: 'PARA-500', batchNumber: 'PARA-2026-A', expiryDate: '2027-12-31', purchasePrice: '1.20', sellingPrice: '2.00', quantity: 100, reorderLevel: 20, storageLocation: 'Shelf A1' },
+    { code: 'AMOX-500', batchNumber: 'AMOX-2026-A', expiryDate: '2027-10-31', purchasePrice: '4.00', sellingPrice: '6.50', quantity: 60, reorderLevel: 15, storageLocation: 'Shelf A2' },
+    { code: 'OMEP-20', batchNumber: 'OMEP-2026-A', expiryDate: '2028-03-31', purchasePrice: '2.50', sellingPrice: '4.00', quantity: 80, reorderLevel: 15, storageLocation: 'Shelf A3' },
+  ] as const;
+  for (const stock of STOCK) {
+    const medication = medicationByCode.get(stock.code);
+    if (!medication) continue;
+    let batch = await inventoryRepo.findOne({ where: { medicationId: medication.id, batchNumber: stock.batchNumber } });
+    if (!batch) {
+      batch = await inventoryRepo.save(inventoryRepo.create({ medicationId: medication.id, batchNumber: stock.batchNumber, expiryDate: stock.expiryDate, purchasePrice: stock.purchasePrice, sellingPrice: stock.sellingPrice, quantity: stock.quantity, reorderLevel: stock.reorderLevel, storageLocation: stock.storageLocation, isActive: true }));
+      await stockTransactionRepo.save(stockTransactionRepo.create({ batchId: batch.id, type: 'receipt', quantity: stock.quantity, reference: 'SEED-OPENING-STOCK', notes: 'Opening stock supplied with demo environment', createdById: null }));
+    }
+  }
+
+  const openingSupplier = await supplierRepo.findOne({ where: { code: 'MED-SUP-001' } });
+  if (!openingSupplier) await supplierRepo.save(supplierRepo.create({ code: 'MED-SUP-001', name: 'Medora Medical Distributors', contactPerson: 'Procurement Desk', phone: '+91 90000 00000', email: 'procurement@medora.local', address: 'Medora Hospital campus', isActive: true }));
+
+  const LAB_TESTS = [
+    { testCode: 'CBC', testName: 'Complete Blood Count', category: 'Hematology', priority: 'routine' as const, turnaroundHours: 6, price: '450.00' },
+    { testCode: 'RFT', testName: 'Renal Function Test', category: 'Biochemistry', priority: 'routine' as const, turnaroundHours: 12, price: '650.00' },
+    { testCode: 'LFT', testName: 'Liver Function Test', category: 'Biochemistry', priority: 'routine' as const, turnaroundHours: 12, price: '700.00' },
+    { testCode: 'TROP-I', testName: 'Troponin I', category: 'Cardiac', priority: 'urgent' as const, turnaroundHours: 2, price: '900.00' },
+  ] as const;
+  for (const test of LAB_TESTS) {
+    const existing = await laboratoryTestRepo.findOne({ where: { testCode: test.testCode } });
+    if (existing) { Object.assign(existing, test, { isActive: true }); await laboratoryTestRepo.save(existing); }
+    else await laboratoryTestRepo.save(laboratoryTestRepo.create({ ...test, isActive: true }));
+  }
+  const MODALITIES = [
+    { modalityCode: 'XRAY', modalityName: 'Digital X-Ray', category: 'X-Ray', turnaroundHours: 4, price: '500.00' },
+    { modalityCode: 'USG', modalityName: 'Ultrasound Abdomen', category: 'Ultrasound', turnaroundHours: 8, price: '1200.00' },
+    { modalityCode: 'CT', modalityName: 'CT Scan', category: 'CT', turnaroundHours: 24, price: '3500.00' },
+    { modalityCode: 'MRI', modalityName: 'MRI Brain', category: 'MRI', turnaroundHours: 48, price: '6500.00' },
+  ] as const;
+  for (const modality of MODALITIES) {
+    const existing = await radiologyModalityRepo.findOne({ where: { modalityCode: modality.modalityCode } });
+    if (existing) { Object.assign(existing, modality, { isActive: true }); await radiologyModalityRepo.save(existing); }
+    else await radiologyModalityRepo.save(radiologyModalityRepo.create({ ...modality, isActive: true }));
+  }
+
+  for (const wardSeed of WARDS) {
+    let ward = await wardRepo.findOne({ where: { code: wardSeed.code } });
+    if (!ward) ward = await wardRepo.save(wardRepo.create({ code: wardSeed.code, name: wardSeed.name, wardType: wardSeed.wardType, floor: wardSeed.floor, isActive: true }));
+    for (const number of wardSeed.beds) {
+      const existing = await bedRepo.findOne({ where: { wardId: ward.id, number } });
+      if (!existing) await bedRepo.save(bedRepo.create({ wardId: ward.id, number, status: 'available', isActive: true }));
+    }
+  }
+
+  for (const roomSeed of OPERATING_ROOMS) {
+    const existing = await operatingRoomRepo.findOne({ where: { code: roomSeed.code } });
+    if (!existing) await operatingRoomRepo.save(operatingRoomRepo.create({ ...roomSeed, isActive: true }));
   }
 
   for (const menu of MENUS) {
@@ -378,14 +568,13 @@ async function seed(): Promise<void> {
 
   superAdminRole = await roleRepo.save(superAdminRole);
 
-  const passwordHash = await bcrypt.hash(env.SUPER_ADMIN_PASSWORD, 12);
-
   let superAdminUser = await userRepo.findOne({
     where: { username: env.SUPER_ADMIN_USERNAME },
     relations: { roles: true },
   });
 
   if (!superAdminUser) {
+    const passwordHash = await bcrypt.hash(env.SUPER_ADMIN_PASSWORD, 12);
     superAdminUser = userRepo.create({
       employeeId: 'EMP-0001',
       username: env.SUPER_ADMIN_USERNAME,
@@ -407,7 +596,6 @@ async function seed(): Promise<void> {
     superAdminUser.mobileNumber = superAdminUser.mobileNumber || '9999999999';
     superAdminUser.designation = superAdminUser.designation || 'System Administrator';
     superAdminUser.departmentId = superAdminUser.departmentId ?? adminDepartment?.id ?? null;
-    superAdminUser.passwordHash = passwordHash;
     superAdminUser.isActive = true;
     superAdminUser.isSuperAdmin = true;
     superAdminUser.roles = [superAdminRole];

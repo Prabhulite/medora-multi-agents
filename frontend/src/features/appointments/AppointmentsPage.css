@@ -6,6 +6,61 @@
   margin-bottom: 12px;
 }
 
+.appointment-queue-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 18px 0;
+}
+
+.appointment-queue-summary__card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 18px;
+  border: 1px solid rgba(1, 91, 45, 0.18);
+  border-radius: 14px;
+  background: rgba(241, 250, 245, 0.9);
+}
+
+.appointment-queue-summary__card span {
+  color: #547164;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.appointment-queue-summary__card strong {
+  color: #015b2d;
+  font-size: 1.45rem;
+}
+
+.appointment-queue-summary__card--info {
+  background: rgba(239, 247, 255, 0.9);
+  border-color: rgba(41, 105, 173, 0.18);
+}
+
+.appointment-queue-summary__card--info strong {
+  color: #2969ad;
+}
+
+.appointment-queue-summary__card--muted {
+  background: rgba(248, 249, 248, 0.95);
+  border-color: rgba(70, 83, 75, 0.14);
+}
+
+.appointment-queue-summary__card--muted strong {
+  color: #46534b;
+  font-size: 1.05rem;
+}
+
+@media (max-width: 760px) {
+  .appointment-queue-summary {
+    grid-template-columns: 1fr;
+  }
+}
+
 .appointment-filters .ui-field {
   min-width: 160px;
   flex: 1;

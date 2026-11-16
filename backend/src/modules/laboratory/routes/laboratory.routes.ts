@@ -1,0 +1,14 @@
+import { Router } from 'express';
+import { authenticate } from '../../../middleware/authenticate.js';
+import { authorize } from '../../../middleware/authorize.js';
+import { validate } from '../../../middleware/validate.js';
+import { asyncHandler } from '../../../shared/utils/asyncHandler.js';
+import { laboratoryController } from '../controllers/laboratory.controller.js';
+import { collectLaboratorySampleSchema, createLaboratoryOrderSchema, laboratoryOrderIdParamSchema, laboratoryOrderListSchema, updateLaboratoryResultSchema } from '../validators/laboratory.validators.js';
+const router = Router(); router.use(authenticate);
+router.get('/tests', authorize('laboratory.view'), asyncHandler(laboratoryController.listTests));
+router.get('/orders', authorize('laboratory.view'), validate(laboratoryOrderListSchema, 'query'), asyncHandler(laboratoryController.listOrders));
+router.post('/orders', authorize('laboratory.create'), validate(createLaboratoryOrderSchema), asyncHandler(laboratoryController.createOrder));
+router.patch('/orders/:id/collect', authorize('laboratory.update'), validate(laboratoryOrderIdParamSchema, 'params'), validate(collectLaboratorySampleSchema), asyncHandler(laboratoryController.collectSample));
+router.patch('/orders/:id/result', authorize('laboratory.update'), validate(laboratoryOrderIdParamSchema, 'params'), validate(updateLaboratoryResultSchema), asyncHandler(laboratoryController.updateResult));
+export default router;

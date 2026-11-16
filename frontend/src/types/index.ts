@@ -528,6 +528,73 @@ export interface PatientAuditLog {
   createdAt: string;
 }
 
+export interface ClinicalEncounter {
+  id: number;
+  patientId: number;
+  visitId: number | null;
+  doctorId: number | null;
+  encounterType: string;
+  status: 'draft' | 'signed' | 'amended';
+  signedAt: string | null;
+  signedById: number | null;
+  signedBy?: { fullName: string } | null;
+  addenda?: Array<{ id: number; reason: string; addendum: string; createdAt: string; createdBy?: { fullName: string } | null }>;
+  complaints: string | null;
+  examination: string | null;
+  assessment: string | null;
+  plan: string | null;
+  diagnosisCode: string | null;
+  diagnosisSystem: string | null;
+  diagnosisName: string | null;
+  vitals: Record<string, string | number | null> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateClinicalEncounterPayload {
+  patientId: number;
+  visitId?: number | null;
+  doctorId?: number | null;
+  encounterType?: string;
+  complaints?: string | null;
+  examination?: string | null;
+  assessment?: string | null;
+  plan?: string | null;
+  diagnosisCode?: string | null;
+  diagnosisName?: string | null;
+  diagnosisTermId?: number | null;
+  vitals?: Record<string, string | number | null> | null;
+}
+
+export interface Prescription {
+  id: number;
+  patientId: number;
+  encounterId: number | null;
+  medicationId: number | null;
+  medicineName: string;
+  dosage: string | null;
+  frequency: string | null;
+  durationDays: number | null;
+  quantityPrescribed: number | null;
+  route: string;
+  instructions: string | null;
+  status: 'active' | 'stopped' | 'completed';
+  createdAt: string;
+}
+
+export interface CreatePrescriptionPayload {
+  patientId: number;
+  encounterId?: number | null;
+  medicineName: string;
+  medicationId?: number | null;
+  quantityPrescribed?: number | null;
+  dosage?: string | null;
+  frequency?: string | null;
+  durationDays?: number | null;
+  route?: string;
+  instructions?: string | null;
+}
+
 export type AppointmentType = 'new_consultation' | 'follow_up' | 'review';
 export type AppointmentStatus =
   | 'booked'

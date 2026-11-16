@@ -62,6 +62,11 @@ export function AppointmentsPage() {
   const [status, setStatus] = useState('');
   const [busyId, setBusyId] = useState<number | null>(null);
 
+  const queueRows = useMemo(
+    () => rows.filter((row) => row.status === 'checked_in'),
+    [rows],
+  );
+
   const canCreate = hasPermission(user, 'appointments.create');
   const canUpdate = hasPermission(user, 'appointments.update');
 
@@ -255,6 +260,28 @@ export function AppointmentsPage() {
         <Button variant="secondary" size="sm" onClick={() => void load()}>
           Refresh
         </Button>
+        <Button
+          variant={status === 'checked_in' ? 'primary' : 'secondary'}
+          size="sm"
+          onClick={() => setStatus(status === 'checked_in' ? '' : 'checked_in')}
+        >
+          {status === 'checked_in' ? 'Show All' : 'OPD Queue'}
+        </Button>
+      </div>
+
+      <div className="appointment-queue-summary" aria-label="OPD queue summary">
+        <div className="appointment-queue-summary__card">
+          <span>Waiting in OPD</span>
+          <strong>{queueRows.length}</strong>
+        </div>
+        <div className="appointment-queue-summary__card appointment-queue-summary__card--info">
+          <span>Appointments shown</span>
+          <strong>{rows.length}</strong>
+        </div>
+        <div className="appointment-queue-summary__card appointment-queue-summary__card--muted">
+          <span>Queue date</span>
+          <strong>{date || 'All dates'}</strong>
+        </div>
       </div>
 
       <Table

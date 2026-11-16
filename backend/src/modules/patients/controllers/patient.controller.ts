@@ -1,8 +1,21 @@
 import type { Request, Response } from 'express';
 import { sendCreated, sendSuccess } from '../../../shared/utils/response.js';
 import { patientService } from '../services/patient.service.js';
+import { communicationService } from '../services/communication.service.js';
 
 export const patientController = {
+  async followUps(req: Request, res: Response) {
+    return sendSuccess(res, await communicationService.followUps(req.query.status === 'overdue' ? 'overdue' : 'open'), 'Patient follow-ups fetched');
+  },
+  async completeFollowUp(req: Request, res: Response) {
+    return sendSuccess(res, await communicationService.completeFollowUp(Number(req.params.id), Number(req.params.communicationId), req.body.note, req.user?.id ?? null), 'Follow-up completed');
+  },
+  async communications(req: Request, res: Response) {
+    return sendSuccess(res, await communicationService.list(Number(req.params.id)), 'Patient communications fetched');
+  },
+  async recordCommunication(req: Request, res: Response) {
+    return sendCreated(res, await communicationService.create(Number(req.params.id), req.body, req.user?.id ?? null), 'Patient communication recorded');
+  },
   async list(req: Request, res: Response) {
     const includeInactive = String(req.query.includeInactive || '') === 'true';
     return sendSuccess(res, await patientService.list(includeInactive), 'Patients fetched');

@@ -1,0 +1,23 @@
+import { Router } from 'express';
+import { authenticate } from '../../../middleware/authenticate.js';
+import { authorize } from '../../../middleware/authorize.js';
+import { validate } from '../../../middleware/validate.js';
+import { asyncHandler } from '../../../shared/utils/asyncHandler.js';
+import { billingController } from '../controllers/billing.controller.js';
+import { chargeIdParamSchema, chargeSchema, claimActionSchema, claimIdParamSchema, createClaimSchema, createInvoiceSchema, invoiceIdParamSchema, invoiceListQuerySchema, paymentSchema, refundSchema, updateChargeSchema } from '../validators/billing.validators.js';
+import { z } from 'zod';
+
+const router = Router(); router.use(authenticate);
+router.get('/charges', authorize('billing.view'), asyncHandler(billingController.charges));
+router.post('/charges', authorize('billing.charges.manage'), validate(chargeSchema), asyncHandler(billingController.createCharge));
+router.patch('/charges/:id', authorize('billing.charges.manage'), validate(chargeIdParamSchema, 'params'), validate(updateChargeSchema), asyncHandler(billingController.updateCharge));
+router.get('/patients/:patientId/ledger', authorize('billing.view'), validate(z.object({ patientId: z.coerce.number().int().positive() }), 'params'), asyncHandler(billingController.ledger));
+router.get('/claims', authorize('billing.view'), validate(z.object({ invoiceId: z.coerce.number().int().positive().optional() }), 'query'), asyncHandler(billingController.claims));
+router.post('/claims', authorize('billing.create'), validate(createClaimSchema), asyncHandler(billingController.createClaim));
+router.patch('/claims/:id/action', authorize('billing.update'), validate(claimIdParamSchema, 'params'), validate(claimActionSchema), asyncHandler(billingController.claimAction));
+router.get('/invoices', authorize('billing.view'), validate(invoiceListQuerySchema, 'query'), asyncHandler(billingController.list));
+router.post('/invoices', authorize('billing.create'), validate(createInvoiceSchema), asyncHandler(billingController.create));
+router.post('/invoices/:id/payments', authorize('billing.update'), validate(invoiceIdParamSchema, 'params'), validate(paymentSchema), asyncHandler(billingController.payment));
+router.get('/invoices/:id/refunds', authorize('billing.view'), validate(invoiceIdParamSchema, 'params'), asyncHandler(billingController.refunds));
+router.post('/invoices/:id/refunds', authorize('billing.update'), validate(invoiceIdParamSchema, 'params'), validate(refundSchema), asyncHandler(billingController.refund));
+export default router;

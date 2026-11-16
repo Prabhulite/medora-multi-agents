@@ -13,3 +13,5 @@ export const loginSchema = z.object({
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;
+export const changePasswordSchema = z.object({ currentPassword: z.string().min(1).max(128), newPassword: z.string().min(12).max(128) }).refine((value) => value.currentPassword !== value.newPassword, { path: ['newPassword'], message: 'New password must be different' });
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;

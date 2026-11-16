@@ -1,0 +1,2 @@
+import { z } from 'zod';
+export const auditListQuerySchema = z.object({ limit: z.coerce.number().int().positive().max(200).default(50), page: z.coerce.number().int().positive().default(1), pageSize: z.coerce.number().int().positive().max(200).optional(), method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).optional(), module: z.string().trim().max(80).optional(), search: z.string().trim().max(120).optional(), status: z.enum(['2', '4', '5']).optional(), from: z.string().date().optional(), to: z.string().date().optional() });

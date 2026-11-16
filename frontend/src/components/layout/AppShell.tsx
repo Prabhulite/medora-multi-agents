@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import medoraLogo from '../../assets/medora/medora-horizontal.png';
 import { useAuth } from '../../features/auth/AuthContext';
@@ -222,6 +222,7 @@ export function AppShell() {
               </span>
             </div>
           ) : null}
+          <NavLink to="/account/security" className="app-shell__logout-btn" title="Account security" aria-label="Account security">{sidebarExpanded ? 'Account security' : '🔒'}</NavLink>
           <button
             type="button"
             className="app-shell__logout-btn"
@@ -265,7 +266,9 @@ export function AppShell() {
         </header>
 
         <main className="app-shell__content">
-          <Outlet />
+          <Suspense fallback={<div className="app-shell__loading" role="status">Loading page...</div>}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
 

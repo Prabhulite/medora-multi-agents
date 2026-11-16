@@ -5,18 +5,35 @@ import morgan from 'morgan';
 import { env } from './config/env.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import appointmentRoutes from './modules/appointments/routes/appointment.routes.js';
+import clinicalRoutes from './modules/clinical/routes/clinical.routes.js';
 import authRoutes from './modules/auth/routes/auth.routes.js';
 import departmentRoutes from './modules/departments/routes/department.routes.js';
 import doctorRoutes from './modules/doctors/routes/doctor.routes.js';
 import hospitalProfileRoutes from './modules/hospital-profile/routes/hospital-profile.routes.js';
 import menuRoutes from './modules/menus/routes/menu.routes.js';
 import patientRoutes from './modules/patients/routes/patient.routes.js';
+import prescriptionRoutes from './modules/pharmacy/routes/prescription.routes.js';
+import inventoryRoutes from './modules/pharmacy/routes/inventory.routes.js';
+import procurementRoutes from './modules/pharmacy/routes/procurement.routes.js';
+import laboratoryRoutes from './modules/laboratory/routes/laboratory.routes.js';
+import radiologyRoutes from './modules/radiology/routes/radiology.routes.js';
+import operationsRoutes from './modules/operations/routes/operations.routes.js';
+import auditRoutes from './modules/audit/routes/audit.routes.js';
+import inpatientRoutes from './modules/inpatient/routes/inpatient.routes.js';
+import billingRoutes from './modules/billing/routes/billing.routes.js';
+import emergencyRoutes from './modules/emergency/routes/emergency.routes.js';
+import surgeryRoutes from './modules/surgery/routes/surgery.routes.js';
+import rosterRoutes from './modules/roster/routes/roster.routes.js';
+import ambulanceRoutes from './modules/ambulance/routes/ambulance.routes.js';
 import roleRoutes from './modules/roles/routes/role.routes.js';
 import specializationRoutes from './modules/specializations/routes/specialization.routes.js';
 import userRoutes from './modules/users/routes/user.routes.js';
+import { auditRequest } from './middleware/auditRequest.js';
+import { rateLimit } from './middleware/rateLimit.js';
 
 export function createApp() {
   const app = express();
+  app.set('trust proxy', 1);
 
   app.use(helmet());
   app.use(
@@ -25,8 +42,10 @@ export function createApp() {
       credentials: true,
     }),
   );
-  app.use(express.json({ limit: '16mb' }));
+  app.use(express.json({ limit: '2mb' }));
   app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+  app.use(auditRequest);
+  app.use('/api', rateLimit({ windowMs: 60_000, max: 180, keyPrefix: 'api' }));
 
   app.get('/health', (_req, res) => {
     res.json({
@@ -39,13 +58,27 @@ export function createApp() {
     });
   });
 
-  app.use('/api/auth', authRoutes);
+  app.use('/api/auth', rateLimit({ windowMs: 60_000, max: 20, keyPrefix: 'auth' }), authRoutes);
   app.use('/api/users', userRoutes);
   app.use('/api/departments', departmentRoutes);
   app.use('/api/specializations', specializationRoutes);
   app.use('/api/doctors', doctorRoutes);
   app.use('/api/patients', patientRoutes);
   app.use('/api/appointments', appointmentRoutes);
+  app.use('/api/clinical', clinicalRoutes);
+  app.use('/api/pharmacy', prescriptionRoutes);
+  app.use('/api/pharmacy', inventoryRoutes);
+  app.use('/api/pharmacy', procurementRoutes);
+  app.use('/api/laboratory', laboratoryRoutes);
+  app.use('/api/radiology', radiologyRoutes);
+  app.use('/api/operations', operationsRoutes);
+  app.use('/api/audit-logs', auditRoutes);
+  app.use('/api/inpatient', inpatientRoutes);
+  app.use('/api/billing', billingRoutes);
+  app.use('/api/emergency', emergencyRoutes);
+  app.use('/api/surgery', surgeryRoutes);
+  app.use('/api/roster', rosterRoutes);
+  app.use('/api/ambulance', ambulanceRoutes);
   app.use('/api/hospital-profile', hospitalProfileRoutes);
   app.use('/api/roles', roleRoutes);
   app.use('/api/menus', menuRoutes);

@@ -1,0 +1,15 @@
+import { Router } from 'express';
+import { authenticate } from '../../../middleware/authenticate.js';
+import { authorize } from '../../../middleware/authorize.js';
+import { validate } from '../../../middleware/validate.js';
+import { asyncHandler } from '../../../shared/utils/asyncHandler.js';
+import { inventoryController } from '../controllers/inventory.controller.js';
+import { dispenseStockSchema, inventoryListSchema, receiveStockSchema } from '../validators/inventory.validators.js';
+import { z } from 'zod';
+const router = Router();
+router.use(authenticate);
+router.get('/inventory', authorize('pharmacy.inventory.view'), validate(inventoryListSchema, 'query'), asyncHandler(inventoryController.list));
+router.post('/inventory/receipts', authorize('pharmacy.inventory.create'), validate(receiveStockSchema), asyncHandler(inventoryController.receive));
+router.post('/inventory/dispense', authorize('pharmacy.inventory.update'), validate(dispenseStockSchema), asyncHandler(inventoryController.dispense));
+router.get('/inventory/dispenses', authorize('pharmacy.inventory.view'), validate(z.object({ patientId: z.coerce.number().int().positive() }), 'query'), asyncHandler(inventoryController.dispenses));
+export default router;

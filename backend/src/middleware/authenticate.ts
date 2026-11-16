@@ -12,11 +12,12 @@ export async function authenticate(
 ): Promise<void> {
   try {
     const header = req.headers.authorization;
-    if (!header?.startsWith('Bearer ')) {
+    const cookieHeader = req.headers.cookie || '';
+    const cookieToken = cookieHeader.split(';').map((part) => part.trim()).find((part) => part.startsWith('medora_session='))?.slice('medora_session='.length);
+    const token = header?.startsWith('Bearer ') ? header.slice(7) : cookieToken;
+    if (!token) {
       throw new UnauthorizedError('Missing or invalid authorization header');
     }
-
-    const token = header.slice(7);
     let payload: JwtPayload;
 
     try {
@@ -27,8 +28,9 @@ export async function authenticate(
       payload = {
         sub: Number(decoded.sub),
         username: String((decoded as jwt.JwtPayload).username ?? ''),
+        sessionVersion: Number((decoded as jwt.JwtPayload).sessionVersion ?? 1),
       };
-      if (!Number.isFinite(payload.sub)) {
+      if (!Number.isSafeInteger(payload.sub) || payload.sub <= 0 || !Number.isSafeInteger(payload.sessionVersion)) {
         throw new UnauthorizedError('Invalid or expired token');
       }
     } catch (error) {
@@ -40,6 +42,7 @@ export async function authenticate(
     if (!authUser || !authUser.isActive) {
       throw new UnauthorizedError('Account is inactive or not found');
     }
+    if (authUser.sessionVersion !== payload.sessionVersion) throw new UnauthorizedError('Session expired; sign in again');
 
     req.user = {
       id: authUser.id,

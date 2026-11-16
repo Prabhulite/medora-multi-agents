@@ -12,4 +12,5 @@ export interface AuthUser {
 export interface JwtPayload {
   sub: number;
   username: string;
+  sessionVersion: number;
 }
