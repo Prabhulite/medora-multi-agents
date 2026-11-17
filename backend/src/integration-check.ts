@@ -427,6 +427,7 @@ try {
   assert.equal(savedDischargeReview.items.length, 2);
   assert.equal(savedDischargeReview.homeItems.length, 2);
   assert.equal(savedDischargeReview.homeItems.find((row: { homeMedicationId: number }) => row.homeMedicationId === stoppedHome.id).decision, 'stop');
+  assert.equal(savedDischargeReview.homeItems.find((row: { homeMedicationId: number }) => row.homeMedicationId === stoppedHome.id).sourceDetail, 'Family list');
   assert.equal((await ok('GET', '/api/clinical/patients/1/home-medications')).find((row: { id: number }) => row.id === stoppedHome.id).isCurrent, false);
   assert.equal(savedDischargeReview.items.find((row: { prescriptionId: number }) => row.prescriptionId === prescription.id).decision, 'stop');
   assert.equal(savedDischargeReview.items.find((row: { prescriptionId: number }) => row.prescriptionId === continuingPrescription.id).instructions, 'Take 10 mg orally each day until review');

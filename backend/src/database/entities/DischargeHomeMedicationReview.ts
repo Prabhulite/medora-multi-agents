@@ -16,6 +16,7 @@ export class DischargeHomeMedicationReview {
   @Column({ type: 'varchar', length: 80, nullable: true }) frequency!: string | null;
   @Column({ type: 'varchar', length: 40, nullable: true }) route!: string | null;
   @Column({ type: 'varchar', length: 20 }) source!: HomeMedication['source'];
+  @Column({ name: 'source_detail', type: 'varchar', length: 255, nullable: true }) sourceDetail!: string | null;
   @Column({ type: 'varchar', length: 20 }) decision!: 'continue' | 'stop';
   @Column({ type: 'varchar', length: 1000, nullable: true }) instructions!: string | null;
   @Column({ type: 'varchar', length: 1000, nullable: true }) reason!: string | null;
