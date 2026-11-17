@@ -10,7 +10,7 @@ import { Table, type TableColumn } from '../../components/ui/Table';
 import { getErrorMessage } from '../../lib/api';
 import { hasPermission } from '../../lib/permissions';
 import { useAuth } from '../auth/AuthContext';
-import { laboratoryApi, type CreateLaboratoryOrderPayload, type CreateLaboratoryTestPayload, type LaboratoryAddendum, type LaboratoryCommunication, type LaboratoryDoctorCandidate, type LaboratoryOrder, type LaboratoryOrderStatus, type LaboratoryPatientCandidate, type LaboratoryTest, type UpdateLaboratoryResultPayload } from './laboratory.api';
+import { laboratoryApi, type CreateLaboratoryOrderPayload, type CreateLaboratoryTestPayload, type LaboratoryAddendum, type LaboratoryCommunication, type LaboratoryCommunicationQueueItem, type LaboratoryDoctorCandidate, type LaboratoryOrder, type LaboratoryOrderStatus, type LaboratoryPatientCandidate, type LaboratoryTest, type UpdateLaboratoryResultPayload } from './laboratory.api';
 import './LaboratoryDiagnosticsPage.css';
 
 type Modal = 'order' | 'catalog' | 'collect' | 'result' | 'verify' | 'view' | 'communications' | null;
@@ -18,6 +18,14 @@ type Modal = 'order' | 'catalog' | 'collect' | 'result' | 'verify' | 'view' | 'c
 const statusTone: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'neutral'> = {
   ordered: 'info', collected: 'warning', processing: 'warning', verified: 'info', completed: 'success', cancelled: 'danger',
 };
+
+function elapsedLabel(value: string | null, now: number) {
+  if (!value || !Number.isFinite(Date.parse(value))) return 'Unknown';
+  const minutes = Math.max(0, Math.floor((now - Date.parse(value)) / 60_000));
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  return hours < 24 ? `${hours} hr ${minutes % 60} min` : `${Math.floor(hours / 24)} d ${hours % 24} hr`;
+}
 
 function dateLabel(value?: string | null) {
   if (!value) return '—';
@@ -36,6 +44,16 @@ export function LaboratoryDiagnosticsPage() {
   const [tests, setTests] = useState<LaboratoryTest[]>([]);
   const [catalogTests, setCatalogTests] = useState<LaboratoryTest[]>([]);
   const [orders, setOrders] = useState<LaboratoryOrder[]>([]);
+  const [queue, setQueue] = useState<LaboratoryCommunicationQueueItem[]>([]);
+  const [queueTotal, setQueueTotal] = useState(0);
+  const [queuePage, setQueuePage] = useState(1);
+  const [queuePageSize, setQueuePageSize] = useState(25);
+  const [queueSearch, setQueueSearch] = useState('');
+  const [debouncedQueueSearch, setDebouncedQueueSearch] = useState('');
+  const [queueLoading, setQueueLoading] = useState(true);
+  const [queueError, setQueueError] = useState('');
+  const queueRequestId = useRef(0);
+  const [now, setNow] = useState(Date.now());
   const [worklistTotal, setWorklistTotal] = useState(0);
   const [summary, setSummary] = useState({ total: 0, pending: 0, processing: 0, completed: 0 });
   const [page, setPage] = useState(1);
@@ -66,6 +84,34 @@ export function LaboratoryDiagnosticsPage() {
       if (currentRequest === requestId.current) setError(getErrorMessage(err, 'Unable to load laboratory diagnostics'));
     } finally { if (currentRequest === requestId.current) setLoading(false); }
   };
+
+  const loadQueue = async () => {
+    const currentRequest = ++queueRequestId.current;
+    setQueueLoading(true); setQueueError('');
+    try {
+      const result = await laboratoryApi.communicationQueue({ page: queuePage, pageSize: queuePageSize, search: debouncedQueueSearch || undefined });
+      if (currentRequest !== queueRequestId.current) return;
+      setQueue(result.items); setQueueTotal(result.total);
+      if (queuePage > 1 && result.total <= (queuePage - 1) * queuePageSize) setQueuePage(Math.max(1, Math.ceil(result.total / queuePageSize)));
+    } catch (err) { if (currentRequest === queueRequestId.current) setQueueError(getErrorMessage(err, 'Unable to load communication follow-up queue')); }
+    finally { if (currentRequest === queueRequestId.current) setQueueLoading(false); }
+  };
+  useEffect(() => { const timer = setTimeout(() => setDebouncedQueueSearch(queueSearch.trim().length >= 2 ? queueSearch.trim() : ''), 300); return () => clearTimeout(timer); }, [queueSearch]);
+  useEffect(() => { void loadQueue(); }, [queuePage, queuePageSize, debouncedQueueSearch]);
+  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 60_000); return () => window.clearInterval(timer); }, []);
+  const refresh = () => { void load(); void loadQueue(); };
+  const openQueueCommunication = (row: LaboratoryCommunicationQueueItem) => {
+    setSelectedOrder({ id: row.id, orderNumber: row.orderNumber, patientId: row.patientId, patientName: row.patientName, patientMrdNumber: row.patientMrdNumber, testId: 0, testName: row.testName, status: 'completed', priority: row.priority, completedAt: row.completedAt });
+    setModal('communications');
+  };
+  const queueColumns: TableColumn<LaboratoryCommunicationQueueItem>[] = [
+    { key: 'priority', header: 'Priority', render: (row) => <Badge tone={row.priority === 'stat' ? 'danger' : 'warning'}>{row.priority.toUpperCase()}</Badge> },
+    { key: 'order', header: 'Order / patient', render: (row) => <div><div className="ui-table__cell-title">{row.orderNumber}</div><div className="ui-table__cell-sub">{row.patientName || `Patient #${row.patientId}`} / {row.patientMrdNumber || `ID ${row.patientId}`}</div></div> },
+    { key: 'test', header: 'Investigation', render: (row) => row.testName },
+    { key: 'elapsed', header: 'Since release', render: (row) => <div><strong>{elapsedLabel(row.completedAt, now)}</strong><div className="ui-table__cell-sub">{dateLabel(row.completedAt)}</div></div> },
+    { key: 'attempts', header: 'Pending contact', render: (row) => <div>{row.attemptCount} {row.attemptCount === 1 ? 'attempt' : 'attempts'}<div className="ui-table__cell-sub">{row.lastAttemptAt ? `Last: ${dateLabel(row.lastAttemptAt)}` : 'No attempts recorded'}</div></div> },
+    { key: 'actions', header: 'Action', render: (row) => <Button size="sm" variant="secondary" onClick={() => openQueueCommunication(row)}>Communications</Button> },
+  ];
 
   useEffect(() => { const timer = setTimeout(() => setDebouncedSearch(search.trim().length >= 2 ? search.trim() : ''), 300); return () => clearTimeout(timer); }, [search]);
   useEffect(() => { void load(); }, [page, pageSize, debouncedSearch, status]);
@@ -148,7 +194,7 @@ export function LaboratoryDiagnosticsPage() {
   const releaseResult = async () => {
     if (!releaseTarget) return;
     setSaving(true); setError(''); setNotice('');
-    try { const updated = await laboratoryApi.releaseResult(releaseTarget.id); setOrders((current) => current.map((row) => row.id === updated.id ? updated : row)); setReleaseTarget(null); setNotice('Verified result released.'); void load(); }
+    try { const updated = await laboratoryApi.releaseResult(releaseTarget.id); setOrders((current) => current.map((row) => row.id === updated.id ? updated : row)); setReleaseTarget(null); setNotice('Verified result released.'); refresh(); }
     catch (err) { setReleaseTarget(null); setError(getErrorMessage(err, 'Unable to release result')); }
     finally { setSaving(false); }
   };
@@ -170,8 +216,13 @@ export function LaboratoryDiagnosticsPage() {
       <article className="laboratory-kpi--blue"><span>In progress</span><strong>{summary.processing}</strong><small>Collected, processing, or awaiting release</small></article>
       <article className="laboratory-kpi--green"><span>Completed</span><strong>{summary.completed}</strong><small>Results available to care teams</small></article>
     </div>
+    <section className="laboratory-section laboratory-communication-queue" aria-label="Urgent and STAT communication follow-up">
+      <div className="laboratory-section__heading"><div><span className="laboratory-eyebrow">RELEASED RESULTS / CONTACT FOLLOW-UP</span><h2>Urgent / STAT communication follow-up <span className="laboratory-queue-count">{queueTotal}</span></h2><p>Released urgent and STAT orders awaiting confirmed delivery. Record contact attempts and follow up until delivered.</p></div><Button variant="secondary" size="sm" onClick={() => void loadQueue()}>Refresh queue</Button></div>
+      {queueError && <div className="laboratory-queue-error"><Alert tone="error">{queueError}</Alert></div>}
+      <Table columns={queueColumns} rows={queue} rowKey={(row) => row.id} loading={queueLoading} searchPlaceholder="Search order, patient, or test (2+ characters)" emptyMessage="No urgent or STAT released orders awaiting communication." serverPagination={{ page: queuePage, pageSize: queuePageSize, total: queueTotal, search: queueSearch, onPageChange: setQueuePage, onPageSizeChange: (size) => { setQueuePageSize(size); setQueuePage(1); }, onSearchChange: (value) => { setQueueSearch(value); setQueuePage(1); } }} />
+    </section>
     <section className="laboratory-section">
-      <div className="laboratory-section__heading"><div><span className="laboratory-eyebrow">DIAGNOSTICS WORKBENCH</span><h2>Laboratory orders</h2><p>Review requests and enter results when the lab completes an investigation.</p></div><div className="laboratory-actions"><Select label="Status" value={status} onChange={(event) => { setStatus(event.target.value as LaboratoryOrderStatus | ''); setPage(1); }} options={[{ value: '', label: 'All statuses' }, ...(['ordered', 'collected', 'processing', 'verified', 'completed', 'cancelled'] as const).map((value) => ({ value, label: value[0].toUpperCase() + value.slice(1) }))]} /><Button variant="secondary" size="sm" onClick={() => void load()}>Refresh</Button></div></div>
+      <div className="laboratory-section__heading"><div><span className="laboratory-eyebrow">DIAGNOSTICS WORKBENCH</span><h2>Laboratory orders</h2><p>Review requests and enter results when the lab completes an investigation.</p></div><div className="laboratory-actions"><Select label="Status" value={status} onChange={(event) => { setStatus(event.target.value as LaboratoryOrderStatus | ''); setPage(1); }} options={[{ value: '', label: 'All statuses' }, ...(['ordered', 'collected', 'processing', 'verified', 'completed', 'cancelled'] as const).map((value) => ({ value, label: value[0].toUpperCase() + value.slice(1) }))]} /><Button variant="secondary" size="sm" onClick={refresh}>Refresh</Button></div></div>
       <Table columns={columns} rows={orders} rowKey={(row) => row.id} loading={loading} searchPlaceholder="Search order, patient, or test (2+ characters)" emptyMessage="No matching laboratory orders found." serverPagination={{ page, pageSize, total: worklistTotal, search, onPageChange: setPage, onPageSizeChange: (size) => { setPageSize(size); setPage(1); }, onSearchChange: (value) => { setSearch(value); setPage(1); } }} />
     </section>
     {modal === 'order' ? <OrderForm tests={tests} saving={saving} error={error} onClose={() => setModal(null)} onSubmit={(payload) => void saveOrder(payload)} /> : null}
@@ -180,7 +231,7 @@ export function LaboratoryDiagnosticsPage() {
     {modal === 'result' && selectedOrder ? <ResultForm order={selectedOrder} saving={saving} error={error} onClose={() => { setModal(null); setSelectedOrder(null); }} onSubmit={(payload) => void saveResult(payload)} /> : null}
     {modal === 'verify' && selectedOrder ? <VerifyForm order={selectedOrder} saving={saving} error={error} onClose={() => { setModal(null); setSelectedOrder(null); }} onSubmit={() => void verifyResult()} /> : null}
     {modal === 'view' && selectedOrder ? <ResultView order={selectedOrder} canAmend={canAmend} onClose={() => { setModal(null); setSelectedOrder(null); }} /> : null}
-    {modal === 'communications' && selectedOrder ? <CommunicationView order={selectedOrder} canRecord={canRelease} onClose={() => { setModal(null); setSelectedOrder(null); }} /> : null}
+    {modal === 'communications' && selectedOrder ? <CommunicationView order={selectedOrder} canRecord={canRelease} onClose={() => { setModal(null); setSelectedOrder(null); void loadQueue(); }} onRecorded={() => void loadQueue()} /> : null}
     <ConfirmDialog open={Boolean(releaseTarget)} title="Release laboratory result" message="Release this verified result to the care team? The released result cannot be edited in place." confirmLabel="Release result" confirming={saving} onConfirm={() => void releaseResult()} onCancel={() => setReleaseTarget(null)} />
     <ConfirmDialog open={Boolean(retireTarget)} title="Retire laboratory test" message={`Retire ${retireTarget?.name || 'this test'} from new orders? Existing orders remain available.`} confirmLabel="Retire test" tone="danger" confirming={saving} onConfirm={() => void retireTest()} onCancel={() => setRetireTarget(null)} />
     {cancelTarget && <ModalShell title="Cancel laboratory order" eyebrow={cancelTarget.orderNumber} onClose={() => setCancelTarget(null)}><form className="laboratory-form" onSubmit={(event) => { event.preventDefault(); void cancelOrder(); }}><p>Cancel the uncollected order for {cancelTarget.patientName || `patient #${cancelTarget.patientId}`}?</p><label className="laboratory-textarea"><span>Reason</span><textarea required minLength={5} maxLength={500} rows={3} value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} /></label>{error && <Alert tone="error">{error}</Alert>}<FormFooter saving={saving} onClose={() => setCancelTarget(null)} submitLabel="Cancel order" disabled={cancelReason.trim().length < 5} /></form></ModalShell>}
@@ -277,7 +328,7 @@ function ResultView({ order, canAmend, onClose }: { order: LaboratoryOrder; canA
   </div>{released && canAmend && <form className="laboratory-form laboratory-report__correction" onSubmit={(event) => void saveAddendum(event)}><h3>Add a correction</h3><Input label="Reason" required minLength={5} maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} /><label className="laboratory-textarea"><span>Addendum</span><textarea required rows={4} maxLength={10000} value={addendum} onChange={(event) => setAddendum(event.target.value)} /></label><Button type="submit" loading={savingAddendum} disabled={savingAddendum || reason.trim().length < 5 || !addendum.trim()}>Save addendum</Button></form>}</ModalShell>;
 }
 
-function CommunicationView({ order, canRecord, onClose }: { order: LaboratoryOrder; canRecord: boolean; onClose: () => void }) {
+function CommunicationView({ order, canRecord, onClose, onRecorded }: { order: LaboratoryOrder; canRecord: boolean; onClose: () => void; onRecorded: () => void }) {
   const [rows, setRows] = useState<LaboratoryCommunication[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -293,6 +344,7 @@ function CommunicationView({ order, canRecord, onClose }: { order: LaboratoryOrd
     try {
       const item = await laboratoryApi.recordCommunication(order.id, { outcome: form.outcome, method: form.method, recipientName: form.recipientName.trim(), resultSummary: form.resultSummary.trim(), note: form.note.trim() || null, occurredAt: new Date(form.occurredAt).toISOString() });
       setRows((current) => [...current, item]);
+      onRecorded();
       setForm((current) => ({ ...current, resultSummary: '', note: '' }));
     } catch (err) { setError(getErrorMessage(err, 'Unable to record result communication')); }
     finally { setSaving(false); }

@@ -4,7 +4,7 @@ import { authorize } from '../../../middleware/authorize.js';
 import { validate } from '../../../middleware/validate.js';
 import { asyncHandler } from '../../../shared/utils/asyncHandler.js';
 import { laboratoryController } from '../controllers/laboratory.controller.js';
-import { cancelLaboratoryOrderSchema, collectLaboratorySampleSchema, createLaboratoryAddendumSchema, createLaboratoryCommunicationSchema, createLaboratoryOrderSchema, createLaboratoryTestSchema, laboratoryDoctorLookupSchema, laboratoryOrderIdParamSchema, laboratoryOrderListSchema, laboratoryPatientLookupSchema, laboratoryTestIdParamSchema, laboratoryWorklistSchema, updateLaboratoryResultSchema, verifyLaboratoryResultSchema } from '../validators/laboratory.validators.js';
+import { cancelLaboratoryOrderSchema, collectLaboratorySampleSchema, createLaboratoryAddendumSchema, createLaboratoryCommunicationSchema, createLaboratoryOrderSchema, createLaboratoryTestSchema, laboratoryCommunicationQueueSchema, laboratoryDoctorLookupSchema, laboratoryOrderIdParamSchema, laboratoryOrderListSchema, laboratoryPatientLookupSchema, laboratoryTestIdParamSchema, laboratoryWorklistSchema, updateLaboratoryResultSchema, verifyLaboratoryResultSchema } from '../validators/laboratory.validators.js';
 const router = Router(); router.use(authenticate);
 router.get('/tests', authorize('laboratory.view'), asyncHandler(laboratoryController.listTests));
 router.get('/tests/all', authorize('laboratory.catalog.manage'), asyncHandler(laboratoryController.listAllTests));
@@ -15,6 +15,7 @@ router.get('/patients', authorize('laboratory.create'), validate(laboratoryPatie
 router.get('/doctors', authorize('laboratory.create'), validate(laboratoryDoctorLookupSchema, 'query'), asyncHandler(laboratoryController.doctorCandidates));
 router.get('/orders', authorize('laboratory.view'), validate(laboratoryOrderListSchema, 'query'), asyncHandler(laboratoryController.listOrders));
 router.get('/worklist', authorize('laboratory.view'), validate(laboratoryWorklistSchema, 'query'), asyncHandler(laboratoryController.worklist));
+router.get('/communication-queue', authorize('laboratory.view'), validate(laboratoryCommunicationQueueSchema, 'query'), asyncHandler(laboratoryController.communicationQueue));
 router.post('/orders', authorize('laboratory.create'), validate(createLaboratoryOrderSchema), asyncHandler(laboratoryController.createOrder));
 router.post('/orders/:id/cancel', authorize('laboratory.cancel'), validate(laboratoryOrderIdParamSchema, 'params'), validate(cancelLaboratoryOrderSchema), asyncHandler(laboratoryController.cancelOrder));
 router.patch('/orders/:id/collect', authorize('laboratory.update'), validate(laboratoryOrderIdParamSchema, 'params'), validate(collectLaboratorySampleSchema), asyncHandler(laboratoryController.collectSample));

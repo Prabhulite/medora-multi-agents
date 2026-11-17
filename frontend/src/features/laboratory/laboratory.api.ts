@@ -15,6 +15,9 @@ export interface CreateLaboratoryTestPayload { testCode: string; testName: strin
 export type LaboratoryOrderStatus = 'ordered' | 'collected' | 'processing' | 'verified' | 'completed' | 'cancelled';
 export interface LaboratoryWorklist { items: LaboratoryOrder[]; total: number; page: number; pageSize: number; summary: { total: number; pending: number; processing: number; completed: number }; }
 
+export interface LaboratoryCommunicationQueueItem { id: number; orderNumber: string; patientId: number; patientName: string | null; patientMrdNumber: string | null; testName: string; priority: 'urgent' | 'stat'; completedAt: string | null; attemptCount: number; lastAttemptAt: string | null; }
+export interface LaboratoryCommunicationQueue { items: LaboratoryCommunicationQueueItem[]; total: number; page: number; pageSize: number; }
+
 export interface LaboratoryAddendum { id: number; reason: string; addendum: string; createdAt: string; createdById: number | null; authorName: string | null; }
 export interface LaboratoryCommunication { id: number; outcome: 'attempted' | 'delivered'; method: 'phone' | 'in_person' | 'secure_message' | 'other'; recipientName: string; resultSummary: string; note: string | null; occurredAt: string; recordedById: number | null; recorderName: string | null; createdAt: string; }
 export type CreateLaboratoryCommunicationPayload = Pick<LaboratoryCommunication, 'outcome' | 'method' | 'recipientName' | 'resultSummary' | 'occurredAt'> & { note?: string | null };
@@ -126,6 +129,10 @@ export const laboratoryApi = {
   async worklist(params: { page: number; pageSize: number; search?: string; status?: LaboratoryOrderStatus }): Promise<LaboratoryWorklist> {
     const response = await api.get<ApiEnvelope<{ items: any[]; total: number; page: number; pageSize: number; summary: LaboratoryWorklist['summary'] }>>('/laboratory/worklist', { params });
     return { ...response.data.data, items: response.data.data.items.map(mapOrder) };
+  },
+  async communicationQueue(params: { page: number; pageSize: number; search?: string }): Promise<LaboratoryCommunicationQueue> {
+    const response = await api.get<ApiEnvelope<LaboratoryCommunicationQueue> | LaboratoryCommunicationQueue>('/laboratory/communication-queue', { params });
+    return unwrap(response.data);
   },
   async listCommunications(orderId: number): Promise<LaboratoryCommunication[]> {
     const response = await api.get<ApiEnvelope<LaboratoryCommunication[]>>(`/laboratory/orders/${orderId}/communications`);

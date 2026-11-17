@@ -50,3 +50,8 @@
 }
 @media (max-width: 1000px) { .laboratory-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .laboratory-page { padding: 20px 16px 36px; } .laboratory-kpis { grid-template-columns: 1fr 1fr; gap: 10px; } .laboratory-kpis article { min-height: 112px; padding: 14px; } .laboratory-kpis strong { font-size: 24px; } .laboratory-form__grid { grid-template-columns: 1fr; } .laboratory-modal-backdrop { padding: 12px; } .laboratory-section__heading { flex-direction: column; } }
+
+.laboratory-communication-queue { margin-bottom: 20px; border-top: 3px solid var(--color-warning); }
+.laboratory-queue-count { display: inline-block; margin-left: 7px; padding: 2px 9px; border-radius: 999px; background: var(--color-selected); font-size: 14px; vertical-align: middle; }
+.laboratory-queue-error { padding: 0 24px 12px; }
+.laboratory-communication-queue .ui-table-search { display: none; }

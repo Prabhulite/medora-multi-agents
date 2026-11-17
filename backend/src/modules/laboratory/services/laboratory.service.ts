@@ -3,7 +3,7 @@ import { Brackets } from 'typeorm';
 import { Doctor, LaboratoryCommunication, LaboratoryOrder, LaboratoryResultAddendum, LaboratoryTest, Patient, PatientAuditLog, User, UserNotification } from '../../../database/entities/index.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { nextSequenceNumber } from '../../patients/services/number-sequence.service.js';
-import type { CollectLaboratorySampleInput, CreateLaboratoryAddendumInput, CreateLaboratoryCommunicationInput, CreateLaboratoryOrderInput, CreateLaboratoryTestInput, LaboratoryWorklistInput, UpdateLaboratoryResultInput } from '../validators/laboratory.validators.js';
+import type { CollectLaboratorySampleInput, CreateLaboratoryAddendumInput, CreateLaboratoryCommunicationInput, CreateLaboratoryOrderInput, CreateLaboratoryTestInput, LaboratoryCommunicationQueueInput, LaboratoryWorklistInput, UpdateLaboratoryResultInput } from '../validators/laboratory.validators.js';
 
 const orderRelations = { patient: true, test: true, doctor: true, collectedBy: true } as const;
 function orderResponse(order: LaboratoryOrder, canViewDraft = true) {
@@ -19,6 +19,39 @@ function orderResponse(order: LaboratoryOrder, canViewDraft = true) {
 }
 
 export const laboratoryService = {
+  async communicationQueue({ page, pageSize, search }: LaboratoryCommunicationQueueInput) {
+    const pending = AppDataSource.getRepository(LaboratoryOrder).createQueryBuilder('lab')
+      .innerJoin('lab.patient', 'patient').innerJoin('lab.test', 'test')
+      .where('lab.status = :completed', { completed: 'completed' })
+      .andWhere('lab.priority IN (:...priorities)', { priorities: ['urgent', 'stat'] })
+      .andWhere("NOT EXISTS (SELECT 1 FROM laboratory_communications delivered WHERE delivered.order_id = lab.id AND delivered.outcome = 'delivered')");
+    if (search) {
+      const term = `%${search.replace(/[%_\\]/g, '\\$&')}%`;
+      pending.andWhere(new Brackets((terms) => {
+        terms.where('lab.orderNumber LIKE :term', { term })
+          .orWhere('patient.mrdNumber LIKE :term', { term })
+          .orWhere("CONCAT_WS(' ', patient.firstName, patient.middleName, patient.lastName) LIKE :term", { term })
+          .orWhere('test.testName LIKE :term', { term });
+      }));
+    }
+    const total = await pending.clone().getCount();
+    const rows = await pending.clone()
+      .select('lab.id', 'id').addSelect('lab.orderNumber', 'orderNumber')
+      .addSelect('lab.patientId', 'patientId').addSelect('patient.mrdNumber', 'patientMrdNumber')
+      .addSelect('patient.firstName', 'firstName').addSelect('patient.middleName', 'middleName').addSelect('patient.lastName', 'lastName')
+      .addSelect('test.testName', 'testName').addSelect('lab.priority', 'priority').addSelect('lab.completedAt', 'completedAt')
+      .orderBy('lab.completedAt', 'ASC').addOrderBy('lab.id', 'ASC')
+      .limit(pageSize).offset((page - 1) * pageSize).getRawMany<{
+        id: number; orderNumber: string; patientId: number; patientMrdNumber: string; firstName: string; middleName: string | null; lastName: string; testName: string; priority: 'urgent' | 'stat'; completedAt: Date | null;
+      }>();
+    const ids = rows.map((row) => row.id);
+    const attempts = ids.length ? await AppDataSource.getRepository(LaboratoryCommunication).createQueryBuilder('contact')
+      .select('contact.orderId', 'orderId').addSelect('COUNT(*)', 'attemptCount').addSelect('MAX(contact.occurredAt)', 'lastAttemptAt')
+      .where('contact.orderId IN (:...ids)', { ids }).andWhere('contact.outcome = :attempted', { attempted: 'attempted' })
+      .groupBy('contact.orderId').getRawMany<{ orderId: number; attemptCount: string; lastAttemptAt: Date | null }>() : [];
+    const attemptMap = new Map(attempts.map((row) => [Number(row.orderId), row]));
+    return { items: rows.map((row) => ({ id: Number(row.id), orderNumber: row.orderNumber, patientId: Number(row.patientId), patientMrdNumber: row.patientMrdNumber, patientName: [row.firstName, row.middleName, row.lastName].filter(Boolean).join(' '), testName: row.testName, priority: row.priority, completedAt: row.completedAt, attemptCount: Number(attemptMap.get(Number(row.id))?.attemptCount ?? 0), lastAttemptAt: attemptMap.get(Number(row.id))?.lastAttemptAt ?? null })), total, page, pageSize };
+  },
   async listCommunications(orderId: number) {
     if (!await AppDataSource.getRepository(LaboratoryOrder).exist({ where: { id: orderId } })) throw new NotFoundError('Laboratory order not found');
     const rows = await AppDataSource.getRepository(LaboratoryCommunication).find({ where: { orderId }, relations: { recordedBy: true }, order: { id: 'ASC' } });

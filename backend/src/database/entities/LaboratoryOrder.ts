@@ -7,6 +7,7 @@ import { User } from './User.js';
 @Entity({ name: 'laboratory_orders' })
 @Index('IDX_laboratory_orders_worklist', ['orderedAt', 'id'])
 @Index('IDX_laboratory_orders_status_worklist', ['status', 'orderedAt', 'id'])
+@Index('IDX_laboratory_orders_communication_queue', ['status', 'priority', 'completedAt', 'id'])
 export class LaboratoryOrder {
   @PrimaryGeneratedColumn({ unsigned: true }) id!: number;
   @Column({ name: 'order_number', type: 'varchar', length: 40, unique: true }) orderNumber!: string;
