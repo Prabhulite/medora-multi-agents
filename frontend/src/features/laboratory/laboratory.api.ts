@@ -15,7 +15,7 @@ export interface CreateLaboratoryTestPayload { testCode: string; testName: strin
 export type LaboratoryOrderStatus = 'ordered' | 'collected' | 'processing' | 'verified' | 'completed' | 'cancelled';
 export interface LaboratoryWorklist { items: LaboratoryOrder[]; total: number; page: number; pageSize: number; summary: { total: number; pending: number; processing: number; completed: number }; }
 
-export interface LaboratoryCommunicationQueueItem { id: number; orderNumber: string; patientId: number; patientName: string | null; patientMrdNumber: string | null; testName: string; priority: 'routine' | 'urgent' | 'stat'; status: 'verified' | 'completed'; verifiedAt: string | null; completedAt: string | null; latestAddendumAt: string | null; attemptCount: number; lastAttemptAt: string | null; }
+export interface LaboratoryCommunicationQueueItem { id: number; orderNumber: string; patientId: number; patientName: string | null; patientMrdNumber: string | null; testName: string; priority: 'routine' | 'urgent' | 'stat'; criticalResult: boolean; status: 'verified' | 'completed'; verifiedAt: string | null; completedAt: string | null; latestAddendumAt: string | null; attemptCount: number; lastAttemptAt: string | null; }
 export interface LaboratoryCommunicationQueue { items: LaboratoryCommunicationQueueItem[]; total: number; page: number; pageSize: number; }
 
 export interface LaboratoryAddendum { id: number; reason: string; addendum: string; createdAt: string; createdById: number | null; authorName: string | null; }
@@ -36,6 +36,8 @@ export interface LaboratoryOrder {
   testCode?: string | null;
   status: LaboratoryOrderStatus;
   priority?: 'routine' | 'urgent' | 'stat' | string;
+  criticalResult?: boolean;
+  criticalReason?: string | null;
   clinicalNotes?: string | null;
   orderedAt?: string | null;
   collectedAt?: string | null;
@@ -106,6 +108,8 @@ function mapOrder(row: any): LaboratoryOrder {
     testCode: test.code || test.testCode || row.testCode || row.test_code || null,
     status: row.status || 'ordered',
     priority: row.priority || test.priority || 'routine',
+    criticalResult: Boolean(row.criticalResult),
+    criticalReason: row.criticalReason ?? null,
     clinicalNotes: row.clinicalNotes ?? null,
     orderedAt: row.orderedAt || row.ordered_at || row.createdAt || null,
     collectedAt: row.collectedAt || row.collected_at || null,
@@ -175,7 +179,7 @@ export const laboratoryApi = {
     const response = await api.post<ApiEnvelope<LaboratoryAddendum>>(`/laboratory/orders/${orderId}/addenda`, payload);
     return response.data.data;
   },
-  async verifyResult(orderId: number, confirmation: { patientAndSpecimenChecked: boolean; qualityControlChecked: boolean }): Promise<LaboratoryOrder> {
+  async verifyResult(orderId: number, confirmation: { patientAndSpecimenChecked: boolean; qualityControlChecked: boolean; criticalResult: boolean; criticalReason: string | null }): Promise<LaboratoryOrder> {
     const response = await api.post<ApiEnvelope<any>>(`/laboratory/orders/${orderId}/verify`, confirmation);
     return mapOrder(response.data.data);
   },

@@ -11,7 +11,11 @@ export const createLaboratoryOrderSchema = z.object({ patientId: positiveInt, te
 export const collectLaboratorySampleSchema = z.object({ specimenLabel: z.string().trim().min(2).max(80) });
 export const cancelLaboratoryOrderSchema = z.object({ reason: z.string().trim().min(5).max(500) });
 export const updateLaboratoryResultSchema = z.object({ status: z.literal('processing').optional(), resultValue: z.string().trim().min(1).max(5000), resultUnit: z.string().trim().max(60).nullable().optional(), referenceRange: z.string().trim().max(120).nullable().optional(), resultNotes: z.string().trim().max(5000).nullable().optional() });
-export const verifyLaboratoryResultSchema = z.object({ patientAndSpecimenChecked: z.literal(true), qualityControlChecked: z.literal(true) });
+export const verifyLaboratoryResultSchema = z.object({ patientAndSpecimenChecked: z.literal(true), qualityControlChecked: z.literal(true), criticalResult: z.boolean(), criticalReason: z.string().trim().min(10).max(500).nullable() }).superRefine((value, context) => {
+  if (value.criticalResult && !value.criticalReason) context.addIssue({ code: z.ZodIssueCode.custom, path: ['criticalReason'], message: 'Document why the result is critical' });
+  if (!value.criticalResult && value.criticalReason) context.addIssue({ code: z.ZodIssueCode.custom, path: ['criticalReason'], message: 'Critical reason requires a critical result' });
+});
+export type VerifyLaboratoryResultInput = z.infer<typeof verifyLaboratoryResultSchema>;
 export const createLaboratoryAddendumSchema = z.object({ reason: z.string().trim().min(5).max(500), addendum: z.string().trim().min(1).max(10000) });
 export const createLaboratoryCommunicationSchema = z.object({ outcome: z.enum(['attempted', 'delivered']), method: z.enum(['phone', 'in_person', 'secure_message', 'other']), recipientName: z.string().trim().min(2).max(160), resultSummary: z.string().trim().min(5).max(1000), note: z.string().trim().max(1000).nullable().optional(), occurredAt: z.string().datetime({ offset: true }) });
 export const laboratoryOrderIdParamSchema = z.object({ id: z.coerce.number().int().positive() });

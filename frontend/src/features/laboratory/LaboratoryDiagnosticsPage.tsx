@@ -101,11 +101,11 @@ export function LaboratoryDiagnosticsPage() {
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 60_000); return () => window.clearInterval(timer); }, []);
   const refresh = () => { void load(); void loadQueue(); };
   const openQueueCommunication = (row: LaboratoryCommunicationQueueItem) => {
-    setSelectedOrder({ id: row.id, orderNumber: row.orderNumber, patientId: row.patientId, patientName: row.patientName, patientMrdNumber: row.patientMrdNumber, testId: 0, testName: row.testName, status: row.status, priority: row.priority, verifiedAt: row.verifiedAt, completedAt: row.completedAt });
+    setSelectedOrder({ id: row.id, orderNumber: row.orderNumber, patientId: row.patientId, patientName: row.patientName, patientMrdNumber: row.patientMrdNumber, testId: 0, testName: row.testName, status: row.status, priority: row.priority, criticalResult: row.criticalResult, verifiedAt: row.verifiedAt, completedAt: row.completedAt });
     setModal('communications');
   };
   const queueColumns: TableColumn<LaboratoryCommunicationQueueItem>[] = [
-    { key: 'priority', header: 'Priority', render: (row) => <div><Badge tone={row.priority === 'stat' ? 'danger' : row.priority === 'urgent' ? 'warning' : 'neutral'}>{row.priority.toUpperCase()}</Badge>{row.latestAddendumAt && <div className="ui-table__cell-sub">Correction follow-up</div>}</div> },
+    { key: 'priority', header: 'Priority', render: (row) => <div><Badge tone={row.criticalResult || row.priority === 'stat' ? 'danger' : row.priority === 'urgent' ? 'warning' : 'neutral'}>{row.criticalResult ? 'CRITICAL' : row.priority.toUpperCase()}</Badge>{row.latestAddendumAt && <div className="ui-table__cell-sub">Correction follow-up</div>}</div> },
     { key: 'order', header: 'Order / patient', render: (row) => <div><div className="ui-table__cell-title">{row.orderNumber}</div><div className="ui-table__cell-sub">{row.patientName || `Patient #${row.patientId}`} / {row.patientMrdNumber || `ID ${row.patientId}`}</div></div> },
     { key: 'test', header: 'Investigation', render: (row) => row.testName },
     { key: 'elapsed', header: 'Awaiting since', render: (row) => <div><strong>{elapsedLabel(row.latestAddendumAt || row.verifiedAt || row.completedAt, now)}</strong><div className="ui-table__cell-sub">{row.latestAddendumAt ? 'Corrected' : row.status === 'verified' ? 'Verified, awaiting release' : 'Released'} · {dateLabel(row.latestAddendumAt || row.verifiedAt || row.completedAt)}</div></div> },
@@ -129,7 +129,7 @@ export function LaboratoryDiagnosticsPage() {
       {row.status === 'processing' && canVerify && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('verify'); }}>Verify</Button>}
       {row.status === 'verified' && canRelease && <Button size="sm" onClick={() => setReleaseTarget(row)}>Release</Button>}
       {(row.status === 'completed' || row.status === 'verified' && (canUpdate || canVerify || canRelease)) && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('view'); }}>View result</Button>}
-      {(row.status === 'completed' || row.status === 'verified' && ['urgent', 'stat'].includes(row.priority || '')) && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('communications'); }}>Communications</Button>}
+      {(row.status === 'completed' || row.status === 'verified' && (row.criticalResult || ['urgent', 'stat'].includes(row.priority || ''))) && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('communications'); }}>Communications</Button>}
     </div> },
   ], [canUpdate, canVerify, canRelease, canCancel]);
 
@@ -184,7 +184,7 @@ export function LaboratoryDiagnosticsPage() {
     } catch (err) { setError(getErrorMessage(err, 'Unable to collect sample')); }
     finally { setSaving(false); }
   };
-  const verifyResult = async (confirmation: { patientAndSpecimenChecked: boolean; qualityControlChecked: boolean }) => {
+  const verifyResult = async (confirmation: { patientAndSpecimenChecked: boolean; qualityControlChecked: boolean; criticalResult: boolean; criticalReason: string | null }) => {
     if (!selectedOrder) return;
     setSaving(true); setError(''); setNotice('');
     try { const updated = await laboratoryApi.verifyResult(selectedOrder.id, confirmation); setOrders((current) => current.map((row) => row.id === updated.id ? updated : row)); setModal(null); setSelectedOrder(null); setNotice('Result verified. It is ready for release.'); refresh(); }
@@ -280,18 +280,23 @@ function ResultForm({ order, saving, error, onClose, onSubmit }: { order: Labora
   return <ModalShell title={`Result · ${order.testName}`} eyebrow={order.orderNumber} onClose={onClose}><form className="laboratory-form" onSubmit={(event) => { event.preventDefault(); onSubmit({ result: form.result, resultUnit: form.resultUnit || null, referenceRange: form.referenceRange || null, remarks: form.remarks || null, status: form.status }); }}><div className="laboratory-result-context"><strong>{order.patientName || `Patient #${order.patientId}`}</strong><span>{order.patientMrdNumber || `Patient ID ${order.patientId}`} · {order.priority || 'routine'} priority</span></div><label className="laboratory-textarea"><span>Result value</span><textarea rows={4} required value={form.result} onChange={(event) => update('result', event.target.value)} placeholder="Enter the observed result or interpretation" /></label><div className="laboratory-form__grid"><Input label="Unit" value={form.resultUnit} onChange={(event) => update('resultUnit', event.target.value)} placeholder="e.g. mg/dL" /><Input label="Reference range" value={form.referenceRange} onChange={(event) => update('referenceRange', event.target.value)} placeholder="e.g. 70–100 mg/dL" /></div><label className="laboratory-textarea"><span>Remarks</span><textarea rows={3} value={form.remarks} onChange={(event) => update('remarks', event.target.value)} placeholder="Add interpretation or quality notes" /></label>{error && <Alert tone="error">{error}</Alert>}<FormFooter saving={saving} onClose={onClose} submitLabel="Save draft" /></form></ModalShell>;
 }
 
-function VerifyForm({ order, saving, error, onClose, onSubmit }: { order: LaboratoryOrder; saving: boolean; error: string; onClose: () => void; onSubmit: (confirmation: { patientAndSpecimenChecked: boolean; qualityControlChecked: boolean }) => void }) {
+function VerifyForm({ order, saving, error, onClose, onSubmit }: { order: LaboratoryOrder; saving: boolean; error: string; onClose: () => void; onSubmit: (confirmation: { patientAndSpecimenChecked: boolean; qualityControlChecked: boolean; criticalResult: boolean; criticalReason: string | null }) => void }) {
   const [patientAndSpecimenChecked, setPatientAndSpecimenChecked] = useState(false);
   const [qualityControlChecked, setQualityControlChecked] = useState(false);
-  return <ModalShell title={`Verify result · ${order.testName}`} eyebrow={order.orderNumber} onClose={onClose}><form className="laboratory-form" onSubmit={(event) => { event.preventDefault(); if (patientAndSpecimenChecked && qualityControlChecked) onSubmit({ patientAndSpecimenChecked, qualityControlChecked }); }}>
+  const [criticalResult, setCriticalResult] = useState(false);
+  const [criticalReason, setCriticalReason] = useState('');
+  const canSubmit = patientAndSpecimenChecked && qualityControlChecked && (!criticalResult || criticalReason.trim().length >= 10);
+  return <ModalShell title={`Verify result · ${order.testName}`} eyebrow={order.orderNumber} onClose={onClose}><form className="laboratory-form" onSubmit={(event) => { event.preventDefault(); if (canSubmit) onSubmit({ patientAndSpecimenChecked, qualityControlChecked, criticalResult, criticalReason: criticalResult ? criticalReason.trim() : null }); }}>
     <div className="laboratory-result-context"><strong>{order.patientName || `Patient #${order.patientId}`}</strong><span>{order.patientMrdNumber || `Patient ID ${order.patientId}`} · Specimen {order.specimenLabel || 'not labeled'}</span></div>
     {order.clinicalNotes && <section><h3>Order notes</h3><p>{order.clinicalNotes}</p></section>}
     <section><h3>Draft result</h3><p>{order.result} {order.resultUnit || ''}</p><p>{order.referenceRange ? `Reference range: ${order.referenceRange}` : 'Reference range not recorded.'}</p>{order.remarks && <p>{order.remarks}</p>}</section>
     <label><input type="checkbox" checked={patientAndSpecimenChecked} onChange={(event) => setPatientAndSpecimenChecked(event.target.checked)} /> I checked the patient, order, specimen, and transcribed result.</label>
     <label><input type="checkbox" checked={qualityControlChecked} onChange={(event) => setQualityControlChecked(event.target.checked)} /> I reviewed the relevant quality-control information under our laboratory procedure.</label>
+    <label><input type="checkbox" checked={criticalResult} onChange={(event) => setCriticalResult(event.target.checked)} /> This verified result meets our laboratory's critical-result criteria and requires direct communication.</label>
+    {criticalResult && <label className="laboratory-textarea"><span>Reason for critical classification</span><textarea required minLength={10} maxLength={500} value={criticalReason} onChange={(event) => setCriticalReason(event.target.value)} /></label>}
     <Alert tone="warning">Verification requires a staff member other than the person who entered the draft. This records an internal review, not a regulated electronic signature.</Alert>
     {error && <Alert tone="error">{error}</Alert>}
-    <FormFooter saving={saving} onClose={onClose} submitLabel="Verify result" disabled={!patientAndSpecimenChecked || !qualityControlChecked} />
+    <FormFooter saving={saving} onClose={onClose} submitLabel="Verify result" disabled={!canSubmit} />
   </form></ModalShell>;
 }
 
@@ -319,6 +324,7 @@ function ResultView({ order, canAmend, onClose }: { order: LaboratoryOrder; canA
     <div className="laboratory-result-context"><strong>{order.patientName || `Patient #${order.patientId}`}</strong><span>{order.patientMrdNumber || `Patient ID ${order.patientId}`} · {released ? 'Released result' : 'Awaiting release'}</span></div>
     <dl className="laboratory-report__details"><div><dt>Investigation</dt><dd>{order.testName} {order.testCode && `(${order.testCode})`}</dd></div><div><dt>Priority</dt><dd>{order.priority || 'routine'}</dd></div><div><dt>Ordered</dt><dd>{dateLabel(order.orderedAt)}</dd></div><div><dt>Collected</dt><dd>{dateLabel(order.collectedAt)}</dd></div><div><dt>Specimen label</dt><dd>{order.specimenLabel || 'Not recorded'}</dd></div><div><dt>Referring doctor</dt><dd>{order.doctorName || 'Not assigned'}</dd></div><div><dt>Order number</dt><dd>{order.orderNumber}</dd></div></dl>
     <section className="laboratory-report__result"><h3>Result</h3><p>{order.result || 'No result recorded.'} {order.resultUnit || ''}</p>{order.referenceRange && <p>Reference range: {order.referenceRange}</p>}{order.remarks && <p>{order.remarks}</p>}</section>
+    {order.criticalResult && <Alert tone="warning">Marked critical at verification. {order.criticalReason || 'Direct communication required.'}</Alert>}
     {order.verifiedAt && <p>Verified {dateLabel(order.verifiedAt)} · staff #{order.verifiedById || 'unknown'}</p>}
     {order.completedAt && <p>Released {dateLabel(order.completedAt)} · staff #{order.releasedById || 'unknown'}</p>}
     {released && !order.verifiedAt && <p>Historical result: verification details were not recorded in the earlier workflow.</p>}
@@ -351,7 +357,7 @@ function CommunicationView({ order, canRecord, onClose, onRecorded }: { order: L
   };
   return <ModalShell title={`Result communications · ${order.testName}`} eyebrow={order.orderNumber} onClose={onClose}>
     <div className="laboratory-form">
-      {order.status === 'verified' ? <Alert tone="warning">This urgent result is verified but the report is awaiting release. Confirm the verified result and recipient before direct communication.</Alert> : null}
+      {order.status === 'verified' ? <Alert tone="warning">This result is verified but the report is awaiting release. Confirm the verified result and recipient before direct communication.</Alert> : null}
       <div className="laboratory-result-context"><strong>{order.patientName || `Patient #${order.patientId}`}</strong><span>{order.patientMrdNumber || `Patient ID ${order.patientId}`}</span></div>
       <Alert tone="warning">Record actual contact attempts and confirmed delivery. An in-app notification does not confirm receipt.</Alert>
       {error && <Alert tone="error">{error}</Alert>}
