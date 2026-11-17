@@ -57,6 +57,14 @@ try {
   assert.equal(loginResult.status, 200, `Browser login returned ${loginResult.status}`);
   const cookies = await send('Network.getCookies', { urls: ['http://localhost:5173'] });
   assert.ok(cookies.cookies.some((cookie: { name: string }) => cookie.name === 'medora_session'), 'Browser session cookie was not set');
+  await send('Page.reload', { ignoreCache: true });
+  let sessionRestored = false;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    try { sessionRestored = await evaluate('location.pathname !== "/login" && !document.body.innerText.includes("Loading Medora")'); } catch { /* reload resets the execution context */ }
+    if (sessionRestored) break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.ok(sessionRestored, 'Frontend did not restore the authenticated session after login');
   await send('Page.navigate', { url: 'http://localhost:5173/laboratory' });
   let loaded = false;
   for (let attempt = 0; attempt < 100; attempt++) {
