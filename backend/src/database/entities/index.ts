@@ -66,6 +66,7 @@ export { SurgeryCase } from './SurgeryCase.js';
 export { NursingCarePlan } from './NursingCarePlan.js';
 export { NursingCarePlanReview } from './NursingCarePlanReview.js';
 export { NursingHandoff } from './NursingHandoff.js';
+export { NursingHandoffAssignment } from './NursingHandoffAssignment.js';
 export { InsuranceClaim } from './InsuranceClaim.js';
 export { ChargeMaster } from './ChargeMaster.js';
 export { DutyShift } from './DutyShift.js';

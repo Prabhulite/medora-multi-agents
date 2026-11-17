@@ -1,12 +1,12 @@
 import { AppDataSource } from '../../../config/data-source.js';
 import { IsNull } from 'typeorm';
-import { Admission, AdmissionHomeMedicationReview, Bed, BedTransfer, Department, DischargeHomeMedicationReview, DischargeMedicationReview, Doctor, HomeMedication, MedicationAdministration, NursingCarePlan, NursingCarePlanReview, NursingHandoff, NursingObservation, Patient, PatientAuditLog, Prescription, Ward, Medication, User } from '../../../database/entities/index.js';
+import { Admission, AdmissionHomeMedicationReview, Bed, BedTransfer, Department, DischargeHomeMedicationReview, DischargeMedicationReview, Doctor, HomeMedication, MedicationAdministration, NursingCarePlan, NursingCarePlanReview, NursingHandoff, NursingHandoffAssignment, NursingObservation, Patient, PatientAuditLog, Prescription, Ward, Medication, User } from '../../../database/entities/index.js';
 import { assertNoRecordedAllergy } from '../../clinical/services/allergy-check.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { nextSequenceNumber } from '../../patients/services/number-sequence.service.js';
 import type { CreateAdmissionInput } from '../validators/inpatient.validators.js';
 import type { z } from 'zod';
-import { admissionMedicationReviewSchema, closeCarePlanSchema, continueCarePlanSchema, createCarePlanSchema, createNursingHandoffSchema, dischargeSummarySchema, medicationAdministrationSchema, nursingObservationSchema, transferBedSchema } from '../validators/inpatient.validators.js';
+import { admissionMedicationReviewSchema, closeCarePlanSchema, continueCarePlanSchema, createCarePlanSchema, createNursingHandoffSchema, dischargeSummarySchema, medicationAdministrationSchema, nursingObservationSchema, reassignNursingHandoffSchema, transferBedSchema } from '../validators/inpatient.validators.js';
 
 function carePlanResponse(plan: NursingCarePlan | null) {
   if (!plan) throw new NotFoundError('Care plan not found');
@@ -21,6 +21,37 @@ const observationResponse = (row: NursingObservation) => ({ ...row, recordedBy: 
 const handoffResponse = (row: NursingHandoff) => { const { outgoingBy, recipient, acknowledgedBy, ...fields } = row; return { ...fields, outgoingBy: staffReference(outgoingBy), recipient: staffReference(recipient), acknowledgedBy: staffReference(acknowledgedBy) }; };
 
 export const inpatientService = {
+  async nursingHandoffAssignments(admissionId: number, handoffId: number) {
+    if (!(await AppDataSource.getRepository(NursingHandoff).exist({ where: { id: handoffId, admissionId } }))) throw new NotFoundError('Handoff not found');
+    const rows = await AppDataSource.getRepository(NursingHandoffAssignment).find({ where: { handoffId }, relations: { fromRecipient: true, toRecipient: true, changedBy: true }, order: { id: 'ASC' } });
+    return rows.map(({ fromRecipient, toRecipient, changedBy, ...fields }) => ({ ...fields, fromRecipient: staffReference(fromRecipient), toRecipient: staffReference(toRecipient), changedBy: staffReference(changedBy) }));
+  },
+  async reassignNursingHandoff(admissionId: number, handoffId: number, input: z.infer<typeof reassignNursingHandoffSchema>, userId: number | null) {
+    if (!userId) throw new ValidationError('Staff identity is required');
+    return AppDataSource.transaction(async (manager) => {
+      const admission = await manager.getRepository(Admission).createQueryBuilder('admission').setLock('pessimistic_write').where('admission.id = :id', { id: admissionId }).getOne();
+      if (!admission) throw new NotFoundError('Admission not found');
+      if (admission.status === 'discharged') throw new ConflictError('Cannot reassign a handoff after discharge');
+      const handoff = await manager.getRepository(NursingHandoff).createQueryBuilder('handoff').setLock('pessimistic_write').where('handoff.id = :handoffId AND handoff.admission_id = :admissionId', { handoffId, admissionId }).getOne();
+      if (!handoff) throw new NotFoundError('Handoff not found');
+      if (handoff.acknowledgedAt) throw new ConflictError('Handoff is already acknowledged');
+      if (input.recipientId === handoff.recipientId) throw new ConflictError('Handoff is already assigned to this staff member');
+      if (input.recipientId === handoff.outgoingById) throw new ValidationError('Outgoing staff cannot receive their own handoff');
+      const recipient = await manager.getRepository(User).createQueryBuilder('staff')
+        .leftJoin('staff.roles', 'role', 'role.is_active = 1').leftJoin('role.permissions', 'permission')
+        .leftJoin('staff.roles', 'viewRole', 'viewRole.is_active = 1')
+        .leftJoin('viewRole.permissions', 'viewPermission', 'viewPermission.code = :viewCode', { viewCode: 'inpatient.view' })
+        .where('staff.id = :recipientId AND staff.is_active = 1', { recipientId: input.recipientId })
+        .andWhere('(staff.is_super_admin = 1 OR (permission.code = :code AND viewPermission.code = :viewCode))', { code: 'inpatient.update', viewCode: 'inpatient.view' }).getOne();
+      if (!recipient) throw new ValidationError('Receiving staff must have active inpatient view and update permissions');
+      const fromRecipientId = handoff.recipientId;
+      handoff.recipientId = recipient.id;
+      await manager.getRepository(NursingHandoff).save(handoff);
+      const assignment = await manager.getRepository(NursingHandoffAssignment).save({ handoffId, fromRecipientId, toRecipientId: recipient.id, reason: input.reason, changedById: userId });
+      await manager.getRepository(PatientAuditLog).save({ patientId: admission.patientId, action: 'nursing_handoff_reassigned', changedById: userId, changeSummary: `Nursing handoff reassigned for admission ${admission.admissionNumber}`, beforeData: JSON.stringify({ admissionId, handoffId, recipientId: fromRecipientId }), afterData: JSON.stringify({ admissionId, handoffId, assignmentId: assignment.id, recipientId: recipient.id }) });
+      return handoffResponse((await manager.getRepository(NursingHandoff).findOne({ where: { id: handoffId }, relations: { outgoingBy: true, recipient: true, acknowledgedBy: true } }))!);
+    });
+  },
   async handoffReceivers(search: string, currentUserId: number) {
     const pattern = `%${search.replace(/[\\%_]/g, '\\$&')}%`;
     const users = await AppDataSource.getRepository(User).createQueryBuilder('staff')

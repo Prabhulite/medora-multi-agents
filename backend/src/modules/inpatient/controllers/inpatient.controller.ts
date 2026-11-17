@@ -3,6 +3,8 @@ import { sendCreated, sendSuccess } from '../../../shared/utils/response.js';
 import { inpatientService } from '../services/inpatient.service.js';
 
 export const inpatientController = {
+  async nursingHandoffAssignments(req: Request, res: Response) { return sendSuccess(res, await inpatientService.nursingHandoffAssignments(Number(req.params.id), Number(req.params.handoffId)), 'Handoff assignments fetched'); },
+  async reassignNursingHandoff(req: Request, res: Response) { return sendSuccess(res, await inpatientService.reassignNursingHandoff(Number(req.params.id), Number(req.params.handoffId), req.body, req.user?.id ?? null), 'Handoff reassigned'); },
   async handoffReceivers(req: Request, res: Response) { return sendSuccess(res, await inpatientService.handoffReceivers(String(req.query.search), req.user!.id), 'Handoff receivers fetched'); },
   async pendingNursingHandoffs(req: Request, res: Response) { return sendSuccess(res, await inpatientService.pendingNursingHandoffs(Number(req.query.page), Number(req.query.pageSize)), 'Pending nursing handoffs fetched'); },
   async nursingHandoffs(req: Request, res: Response) { return sendSuccess(res, await inpatientService.nursingHandoffs(Number(req.params.id)), 'Nursing handoffs fetched'); },
