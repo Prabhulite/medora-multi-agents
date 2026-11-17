@@ -15,8 +15,11 @@ export const prescriptionService = {
   },
   async create(input: CreatePrescriptionInput, userId: number | null) {
     return AppDataSource.transaction(async (manager) => {
-      const patient = await manager.getRepository(Patient).findOne({ where: { id: input.patientId, isActive: true } });
-      if (!patient || patient.mergedIntoPatientId) throw new NotFoundError('Active patient not found');
+      const patient = await manager.getRepository(Patient).createQueryBuilder('patient')
+        .setLock('pessimistic_write')
+        .where('patient.id = :id', { id: input.patientId })
+        .getOne();
+      if (!patient || !patient.isActive || patient.mergedIntoPatientId) throw new NotFoundError('Active patient not found');
       if (input.encounterId) {
         const encounter = await manager.getRepository(ClinicalEncounter).findOne({ where: { id: input.encounterId, patientId: input.patientId } });
         if (!encounter) throw new ValidationError('Encounter does not belong to this patient');

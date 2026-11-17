@@ -62,6 +62,13 @@ export const inventoryService = {
   },
   async dispense(input: DispenseStockInput, userId: number | null) {
     return AppDataSource.transaction(async (manager) => {
+      if (input.patientId) {
+        const patient = await manager.getRepository(Patient).createQueryBuilder('patient')
+          .setLock('pessimistic_write')
+          .where('patient.id = :id', { id: input.patientId })
+          .getOne();
+        if (!patient || !patient.isActive || patient.mergedIntoPatientId) throw new NotFoundError('Active patient not found');
+      }
       let prescription: Prescription | null = null;
       if (input.prescriptionId) {
         prescription = await manager.getRepository(Prescription).createQueryBuilder('prescription').setLock('pessimistic_write').where('prescription.id = :id', { id: input.prescriptionId }).getOne();
@@ -83,8 +90,6 @@ export const inventoryService = {
         if (input.quantity > remaining) throw new ValidationError(`Dispense exceeds prescribed quantity. Remaining: ${remaining}`);
       }
       if (input.patientId) {
-        const patient = await manager.getRepository(Patient).findOne({ where: { id: input.patientId, isActive: true } });
-        if (!patient || patient.mergedIntoPatientId) throw new NotFoundError('Active patient not found');
         await assertNoRecordedAllergy(manager, input.patientId, [batch.medication.brandName, batch.medication.genericName, prescription?.medicineName]);
       }
       batch.quantity -= input.quantity; await repo.save(batch);
