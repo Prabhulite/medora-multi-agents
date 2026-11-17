@@ -17,6 +17,7 @@ import { RefundPanel } from './RefundPanel';
 import { InsuranceClaimPanel } from './InsuranceClaimPanel';
 import { PatientLedgerPanel } from './PatientLedgerPanel';
 import { ChargeMasterPanel } from './ChargeMasterPanel';
+import { CashierReportPanel } from './CashierReportPanel';
 
 const currency = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
 
@@ -51,6 +52,7 @@ export function BillingDashboardPage() {
   const [claimInvoice, setClaimInvoice] = useState<BillingInvoice | null>(null);
   const [showLedger, setShowLedger] = useState(false);
   const [showCharges, setShowCharges] = useState(false);
+  const [showCashierReport, setShowCashierReport] = useState(false);
 
   const load = async (filter = patientId) => {
     setLoading(true);
@@ -106,7 +108,7 @@ export function BillingDashboardPage() {
   };
 
   return <div className="billing-page">
-    <PageHeader title="Billing & Payments" subtitle="Track patient invoices, collections, and outstanding balances." actions={<div className="billing-actions">{hasPermission(user, 'billing.charges.manage') && <Button variant="secondary" size="sm" onClick={() => setShowCharges(true)}>Charge master</Button>}<Button variant="secondary" size="sm" onClick={() => setShowLedger(true)}>Patient ledger</Button><Button variant="secondary" size="sm" onClick={() => setShowPaymentForm(true)}>Record payment</Button><Button size="sm" onClick={() => setShowInvoiceForm(true)}>Create invoice</Button></div>} />
+    <PageHeader title="Billing & Payments" subtitle="Track patient invoices, collections, and outstanding balances." actions={<div className="billing-actions">{hasPermission(user, 'billing.charges.manage') && <Button variant="secondary" size="sm" onClick={() => setShowCharges(true)}>Charge master</Button>}<Button variant="secondary" size="sm" onClick={() => setShowCashierReport(true)}>Cashier report</Button><Button variant="secondary" size="sm" onClick={() => setShowLedger(true)}>Patient ledger</Button><Button variant="secondary" size="sm" onClick={() => setShowPaymentForm(true)}>Record payment</Button><Button size="sm" onClick={() => setShowInvoiceForm(true)}>Create invoice</Button></div>} />
     {error ? <Alert tone="error">{error}</Alert> : null}
     {notice ? <Alert tone="success">{notice}</Alert> : null}
     <div className="billing-kpis" aria-label="Billing totals">
@@ -124,6 +126,7 @@ export function BillingDashboardPage() {
     {claimInvoice ? <InsuranceClaimPanel invoice={claimInvoice} onClose={() => setClaimInvoice(null)} /> : null}
     {showLedger ? <PatientLedgerPanel onClose={() => setShowLedger(false)} /> : null}
     {showCharges ? <ChargeMasterPanel onClose={() => setShowCharges(false)} /> : null}
+    {showCashierReport ? <CashierReportPanel onClose={() => setShowCashierReport(false)} /> : null}
   </div>;
 }
 

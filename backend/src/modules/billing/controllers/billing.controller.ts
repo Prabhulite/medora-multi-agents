@@ -4,8 +4,10 @@ import { billingService } from '../services/billing.service.js';
 import { insuranceClaimService } from '../services/insurance-claim.service.js';
 import { patientLedgerService } from '../services/patient-ledger.service.js';
 import { chargeMasterService } from '../services/charge-master.service.js';
+import { cashierReportService } from '../services/cashier-report.service.js';
 
 export const billingController = {
+  async cashierReport(req: Request, res: Response) { return sendSuccess(res, await cashierReportService.get(String(req.query.from), String(req.query.to)), 'Cashier report fetched'); },
   async charges(_req: Request, res: Response) { return sendSuccess(res, await chargeMasterService.list(), 'Charges fetched'); },
   async createCharge(req: Request, res: Response) { return sendCreated(res, await chargeMasterService.create(req.body), 'Charge created'); },
   async updateCharge(req: Request, res: Response) { return sendSuccess(res, await chargeMasterService.update(Number(req.params.id), req.body), 'Charge updated'); },

@@ -73,6 +73,7 @@ Current patient chart tabs: Profile and MRD show identity details and audit hist
 - Insurance, corporate accounts, approvals, claims-ready records
 - Patient ledger, discounts, taxes, payment reconciliation
 - Financial reports and cashier controls
+- Billing now has a date-range cashier report (up to 90 days) with payment-method receipt counts, refund counts, gross receipts, refunds, and net collections. Dates follow the MySQL session local time and totals come from stored transaction amounts; the report does not represent historical outstanding balances. Shift closeout, cashier attribution, exports, and reconciliation remain future work.
 
 ### Phase 5: Pharmacy and inventory
 

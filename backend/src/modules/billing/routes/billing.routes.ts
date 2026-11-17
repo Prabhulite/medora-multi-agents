@@ -4,10 +4,11 @@ import { authorize } from '../../../middleware/authorize.js';
 import { validate } from '../../../middleware/validate.js';
 import { asyncHandler } from '../../../shared/utils/asyncHandler.js';
 import { billingController } from '../controllers/billing.controller.js';
-import { chargeIdParamSchema, chargeSchema, claimActionSchema, claimIdParamSchema, createClaimSchema, createInvoiceSchema, invoiceIdParamSchema, invoiceListQuerySchema, paymentSchema, refundSchema, updateChargeSchema } from '../validators/billing.validators.js';
+import { cashierReportQuerySchema, chargeIdParamSchema, chargeSchema, claimActionSchema, claimIdParamSchema, createClaimSchema, createInvoiceSchema, invoiceIdParamSchema, invoiceListQuerySchema, paymentSchema, refundSchema, updateChargeSchema } from '../validators/billing.validators.js';
 import { z } from 'zod';
 
 const router = Router(); router.use(authenticate);
+router.get('/reports/cashier', authorize('billing.view'), validate(cashierReportQuerySchema, 'query'), asyncHandler(billingController.cashierReport));
 router.get('/charges', authorize('billing.view'), asyncHandler(billingController.charges));
 router.post('/charges', authorize('billing.charges.manage'), validate(chargeSchema), asyncHandler(billingController.createCharge));
 router.patch('/charges/:id', authorize('billing.charges.manage'), validate(chargeIdParamSchema, 'params'), validate(updateChargeSchema), asyncHandler(billingController.updateCharge));

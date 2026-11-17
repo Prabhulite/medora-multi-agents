@@ -774,6 +774,12 @@ try {
   const refund = await ok('POST', `/api/billing/invoices/${invoice.id}/refunds`, { paymentId, amount: 40, method: 'cash', reason: 'Integration refund' }, 201);
   assert.deepEqual(Object.keys(refund.createdBy).sort(), ['fullName', 'id']);
   assert.equal((await request('POST', `/api/billing/invoices/${invoice.id}/refunds`, { paymentId, amount: 70, method: 'cash', reason: 'Over refund' })).status, 422);
+  const reportFrom = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const reportTo = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const cashierReport = await ok('GET', `/api/billing/reports/cashier?from=${reportFrom}&to=${reportTo}`);
+  assert.deepEqual(cashierReport.totals, { received: '140.00', refunded: '40.00', net: '100.00', paymentCount: 2, refundCount: 1 });
+  assert.deepEqual(cashierReport.rows.find((row: { method: string }) => row.method === 'cash'), { method: 'cash', paymentCount: 1, refundCount: 1, received: '100.00', refunded: '40.00', net: '60.00' });
+  assert.equal((await request('GET', '/api/billing/reports/cashier?from=2026-02-01&to=2026-01-01')).status, 422);
   const invoiceList = await ok('GET', '/api/billing/invoices?patientId=1');
   assert.equal(invoiceList[0].paidAmount, '100.00');
   assert.equal(invoiceList[0].balanceAmount, '50.00');

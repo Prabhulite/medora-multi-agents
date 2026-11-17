@@ -31,6 +31,7 @@ export interface BillingInvoice {
 
 export interface BillingPayment { id: number; amount: number; method: string; referenceNumber: string | null; paidAt: string }
 export interface BillingRefund { id: number; paymentId: number; amount: number; method: string; reason: string; referenceNumber: string | null; refundedAt: string; createdBy?: { fullName: string } | null }
+export interface CashierReport { from: string; to: string; timezone: string; rows: Array<{ method: string; paymentCount: number; refundCount: number; received: string; refunded: string; net: string }>; totals: { received: string; refunded: string; net: string; paymentCount: number; refundCount: number } }
 export interface RecordRefundPayload { invoiceId: number; paymentId: number; amount: number; method: 'cash' | 'card' | 'upi' | 'bank_transfer'; referenceNumber?: string | null; reason: string }
 export interface InsuranceClaim { id: number; invoiceId: number; claimNumber: string; payerName: string; policyNumber: string; claimedAmount: string; approvedAmount: string | null; status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'settled'; notes: string | null; decisionNote: string | null; createdAt: string; submittedAt: string | null; decidedAt: string | null; settledAt: string | null }
 export interface CreateClaimPayload { invoiceId: number; payerName: string; policyNumber: string; claimedAmount: number; notes?: string | null }
@@ -68,6 +69,7 @@ function mapInvoice(row: any): BillingInvoice {
 }
 
 export const billingApi = {
+  async cashierReport(from: string, to: string): Promise<CashierReport> { return unwrap((await api.get<ApiEnvelope<CashierReport>>('/billing/reports/cashier', { params: { from, to } })).data); },
   async listCharges(): Promise<BillingCharge[]> { return unwrap((await api.get<ApiEnvelope<BillingCharge[]>>('/billing/charges')).data); },
   async createCharge(payload: ChargePayload): Promise<BillingCharge> { return unwrap((await api.post<ApiEnvelope<BillingCharge>>('/billing/charges', payload)).data); },
   async updateCharge(id: number, payload: Partial<ChargePayload>): Promise<BillingCharge> { return unwrap((await api.patch<ApiEnvelope<BillingCharge>>(`/billing/charges/${id}`, payload)).data); },
