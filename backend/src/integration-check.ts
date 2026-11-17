@@ -511,6 +511,13 @@ try {
   const handoff = await ok('POST', `/api/inpatient/admissions/${admission.id}/handoffs`, { recipientId: receiver.id, conditionSummary: 'Stable for handoff', pendingTasks: 'Review mobility care plan', safetyConcerns: 'Fall risk', acknowledgementDueAt: handoffDue }, 201);
   assert.equal(handoff.outgoingBy.fullName, 'Integration Admin');
   assert.equal(handoff.recipient.fullName, 'Integration Receiver');
+  token = (await (await import('./modules/auth/services/auth.service.js')).authService.login({ username: 'integration_receiver', password: 'Temporary!Pass123' })).token;
+  const receiverHandoffNotice = (await ok('GET', '/api/notifications')).items.find((item: { kind: string; sourceId: number; message: string }) => item.kind === 'nursing_handoff_assigned' && item.sourceId === handoff.id);
+  assert.ok(receiverHandoffNotice);
+  assert.equal(receiverHandoffNotice.message.includes(handoffDue), true);
+  assert.equal(receiverHandoffNotice.message.includes('Stable for handoff'), false);
+  assert.equal(receiverHandoffNotice.message.includes('Fall risk'), false);
+  token = adminToken;
   assert.equal((await request('GET', '/api/inpatient/handoffs/pending?page=0')).status, 422);
   const pendingHandoffs = await ok('GET', '/api/inpatient/handoffs/pending?page=1&pageSize=1');
   assert.equal(pendingHandoffs.total, 1);
@@ -528,6 +535,9 @@ try {
   assert.equal((await request('POST', `/api/inpatient/admissions/${admission.id}/handoffs/${handoff.id}/reassign`, { recipientId: bystander.id, reason: 'No' })).status, 422);
   assert.equal((await request('POST', `/api/inpatient/admissions/${admission.id}/handoffs/${handoff.id}/reassign`, { recipientId: receiver.id, reason: 'Same receiver' })).status, 409);
   assert.equal((await ok('POST', `/api/inpatient/admissions/${admission.id}/handoffs/${handoff.id}/reassign`, { recipientId: bystander.id, reason: 'Receiver unavailable' })).recipientId, bystander.id);
+  token = (await (await import('./modules/auth/services/auth.service.js')).authService.login({ username: 'integration_bystander', password: 'Temporary!Pass123' })).token;
+  assert.equal((await ok('GET', '/api/notifications')).items.some((item: { kind: string; sourceId: number; message: string }) => item.kind === 'nursing_handoff_reassigned' && item.sourceId === handoff.id && !item.message.includes('Receiver unavailable')), true);
+  token = adminToken;
   assert.equal((await ok('GET', '/api/inpatient/handoffs/pending')).items[0].recipientId, bystander.id);
   token = (await (await import('./modules/auth/services/auth.service.js')).authService.login({ username: 'integration_clinician', password: 'Temporary!Pass123' })).token;
   assert.equal((await request('POST', `/api/inpatient/admissions/${admission.id}/handoffs/${handoff.id}/reassign`, { recipientId: receiver.id, reason: 'Unauthorized change' })).status, 403);

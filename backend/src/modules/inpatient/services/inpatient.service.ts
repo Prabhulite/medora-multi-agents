@@ -1,6 +1,6 @@
 import { AppDataSource } from '../../../config/data-source.js';
 import { IsNull } from 'typeorm';
-import { Admission, AdmissionHomeMedicationReview, Bed, BedTransfer, Department, DischargeHomeMedicationReview, DischargeMedicationReview, Doctor, HomeMedication, MedicationAdministration, NursingCarePlan, NursingCarePlanReview, NursingHandoff, NursingHandoffAssignment, NursingObservation, Patient, PatientAuditLog, Prescription, Ward, Medication, User } from '../../../database/entities/index.js';
+import { Admission, AdmissionHomeMedicationReview, Bed, BedTransfer, Department, DischargeHomeMedicationReview, DischargeMedicationReview, Doctor, HomeMedication, MedicationAdministration, NursingCarePlan, NursingCarePlanReview, NursingHandoff, NursingHandoffAssignment, NursingObservation, Patient, PatientAuditLog, Prescription, Ward, Medication, User, UserNotification } from '../../../database/entities/index.js';
 import { assertNoRecordedAllergy } from '../../clinical/services/allergy-check.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { nextSequenceNumber } from '../../patients/services/number-sequence.service.js';
@@ -49,6 +49,7 @@ export const inpatientService = {
       handoff.recipientId = recipient.id;
       await manager.getRepository(NursingHandoff).save(handoff);
       const assignment = await manager.getRepository(NursingHandoffAssignment).save({ handoffId, fromRecipientId, toRecipientId: recipient.id, reason: input.reason, changedById: userId });
+      await manager.getRepository(UserNotification).save({ recipientId: recipient.id, kind: 'nursing_handoff_reassigned', sourceId: handoff.id, title: 'Nursing handoff reassigned', message: `Handoff for admission ${admission.admissionNumber} is assigned to you. Review it in Inpatient Management by ${handoff.acknowledgementDueAt?.toISOString() ?? 'the recorded due time'}.`, route: '/inpatient' });
       await manager.getRepository(PatientAuditLog).save({ patientId: admission.patientId, action: 'nursing_handoff_reassigned', changedById: userId, changeSummary: `Nursing handoff reassigned for admission ${admission.admissionNumber}`, beforeData: JSON.stringify({ admissionId, handoffId, recipientId: fromRecipientId }), afterData: JSON.stringify({ admissionId, handoffId, assignmentId: assignment.id, recipientId: recipient.id }) });
       return handoffResponse((await manager.getRepository(NursingHandoff).findOne({ where: { id: handoffId }, relations: { outgoingBy: true, recipient: true, acknowledgedBy: true } }))!);
     });
@@ -119,6 +120,7 @@ export const inpatientService = {
       if (pending) throw new ConflictError('A handoff is still awaiting acknowledgement');
       if (acknowledgementDueAt.getTime() <= Date.now()) throw new ValidationError('Acknowledgement due time must be in the future');
       const record = await manager.getRepository(NursingHandoff).save({ admissionId, conditionSummary: input.conditionSummary, pendingTasks: input.pendingTasks, safetyConcerns: input.safetyConcerns ?? null, outgoingById: userId, recipientId: recipient.id, acknowledgementDueAt });
+      await manager.getRepository(UserNotification).save({ recipientId: recipient.id, kind: 'nursing_handoff_assigned', sourceId: record.id, title: 'Nursing handoff assigned', message: `Handoff for admission ${admission.admissionNumber} is assigned to you. Review it in Inpatient Management by ${acknowledgementDueAt.toISOString()}.`, route: '/inpatient' });
       await manager.getRepository(PatientAuditLog).save({ patientId: admission.patientId, action: 'nursing_handoff_created', changedById: userId, changeSummary: `Nursing handoff created for admission ${admission.admissionNumber}`, beforeData: null, afterData: JSON.stringify({ admissionId, handoffId: record.id, recipientId: recipient.id, acknowledgementDueAt }) });
       return handoffResponse((await manager.getRepository(NursingHandoff).findOne({ where: { id: record.id }, relations: { outgoingBy: true, recipient: true, acknowledgedBy: true } }))!);
     });
