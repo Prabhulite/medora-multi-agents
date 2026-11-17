@@ -1,4 +1,5 @@
 import { api } from '../../lib/api';
+import axios from 'axios';
 import type {
   ApiResponse,
   Patient,
@@ -7,6 +8,32 @@ import type {
 } from '../../types';
 
 export const patientsApi = {
+  downloadFhirR4: async (patientId: number) => {
+    let response;
+    try {
+      response = await api.get<Blob>(`/fhir/r4/Patient/${patientId}`, { responseType: 'blob' });
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.data instanceof Blob) {
+        try {
+          const parsed: unknown = JSON.parse(await error.response.data.text());
+          if (parsed && typeof parsed === 'object' && 'message' in parsed && typeof parsed.message === 'string') {
+            error.response.data = parsed;
+          }
+        } catch {
+          // Keep the original HTTP error when the response is not JSON.
+        }
+      }
+      throw error;
+    }
+    const url = URL.createObjectURL(response.data);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `patient-${patientId}-fhir-r4.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  },
   communications: async (patientId: number) => {
     const { data } = await api.get<ApiResponse<Array<{ id: number; channel: string; direction: string; subject: string; summary: string; occurredAt: string; followUpDueAt: string | null; followUpCompletedAt: string | null; followUpCompletionNote: string | null }>>>(`/patients/${patientId}/communications`);
     return data.data;

@@ -11,6 +11,7 @@ export class RadiologyOrder {
   @Column({ name: 'patient_id', type: 'int', unsigned: true }) patientId!: number;
   @ManyToOne(() => Patient, { onDelete: 'CASCADE' }) @JoinColumn({ name: 'patient_id' }) patient!: Patient;
   @Column({ name: 'modality_id', type: 'int', unsigned: true }) modalityId!: number;
+  @Column({ name: 'study_name', type: 'varchar', length: 160, nullable: true }) studyName!: string | null;
   @ManyToOne(() => RadiologyModality, { onDelete: 'RESTRICT' }) @JoinColumn({ name: 'modality_id' }) modality!: RadiologyModality;
   @Column({ name: 'doctor_id', type: 'int', unsigned: true, nullable: true }) doctorId!: number | null;
   @ManyToOne(() => Doctor, { onDelete: 'SET NULL', nullable: true }) @JoinColumn({ name: 'doctor_id' }) doctor!: Doctor | null;

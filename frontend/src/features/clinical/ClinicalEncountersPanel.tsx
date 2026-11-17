@@ -20,6 +20,7 @@ export function ClinicalEncountersPanel({ patientId, onAllergiesChanged }: { pat
   const { user } = useAuth();
   const canCreateClinical = hasPermission(user, 'clinical.create');
   const canSignClinical = hasPermission(user, 'clinical.update');
+  const canManageDiagnosisCatalog = hasPermission(user, 'clinical.catalog.manage');
   const canViewPharmacy = hasPermission(user, 'pharmacy.view') || hasPermission(user, 'pharmacy.inventory.update');
   const canCreatePharmacy = hasPermission(user, 'pharmacy.create');
   const [rows, setRows] = useState<ClinicalEncounter[]>([]);
@@ -113,12 +114,12 @@ export function ClinicalEncountersPanel({ patientId, onAllergiesChanged }: { pat
 
   useEffect(() => { void load(); }, [patientId]);
   useEffect(() => {
-    if (!canCreateClinical && !canSignClinical) return;
+    if (!canCreateClinical && !canManageDiagnosisCatalog) return;
     const timer = window.setTimeout(() => {
       clinicalApi.listDiagnoses(diagnosisSearch).then(setDiagnosisTerms).catch((err) => setError(getErrorMessage(err, 'Unable to load diagnosis terms')));
     }, 200);
     return () => window.clearTimeout(timer);
-  }, [canCreateClinical, canSignClinical, diagnosisSearch]);
+  }, [canCreateClinical, canManageDiagnosisCatalog, diagnosisSearch]);
   useEffect(() => { if (canCreatePharmacy) prescriptionsApi.listMedications().then(setMedications).catch(() => undefined); }, [canCreatePharmacy]);
 
   const save = async () => {
@@ -204,7 +205,7 @@ export function ClinicalEncountersPanel({ patientId, onAllergiesChanged }: { pat
         </div> : null}
       </div>
       {canCreateClinical ? <div className="clinical-encounter-form">
-        <Input label="Search diagnosis catalog" value={diagnosisSearch} onChange={(event) => setDiagnosisSearch(event.target.value)} placeholder="Code or diagnosis name" />
+        <Input label="Search diagnosis catalog" value={diagnosisSearch} onChange={(event) => { setDiagnosisSearch(event.target.value); setDiagnosisTermId(''); }} placeholder="Code or diagnosis name" />
         <Select label="Catalog diagnosis" value={diagnosisTermId} onChange={(event) => setDiagnosisTermId(event.target.value)} options={[{ value: '', label: 'Use free-text diagnosis' }, ...diagnosisTerms.map((term) => ({ value: term.id, label: `${term.system} ${term.code} - ${term.name}${term.version ? ` (${term.version})` : ''}` }))]} />
         {!diagnosisTermId ? <Input label="Free-text diagnosis" value={diagnosisName} onChange={(event) => setDiagnosisName(event.target.value)} placeholder="e.g. Acute fever" /> : null}
         <Input label="Temperature (°C)" value={temperature} onChange={(event) => setTemperature(event.target.value)} inputMode="decimal" />
@@ -217,7 +218,7 @@ export function ClinicalEncountersPanel({ patientId, onAllergiesChanged }: { pat
         <label className="ui-field"><span className="ui-field__label">Plan / treatment</span><textarea className="ui-field__input clinical-encounter-textarea" value={plan} onChange={(event) => setPlan(event.target.value)} /></label>
         <Button size="sm" loading={busy} onClick={() => void save()}>Save Encounter</Button>
       </div> : null}
-      {canSignClinical ? <div className="clinical-prescription-section">
+      {canManageDiagnosisCatalog ? <div className="clinical-prescription-section">
         <h4>Diagnosis catalog maintenance</h4>
         <p className="pd-empty">Enter only codes and labels verified against your licensed terminology source. Existing encounters retain their recorded values.</p>
         <div className="clinical-prescription-form">
@@ -233,7 +234,7 @@ export function ClinicalEncountersPanel({ patientId, onAllergiesChanged }: { pat
         {rows.length ? rows.map((row) => (
           <div key={row.id}>
             <div className="pd-visit-row">
-              <div><div className="ui-table__cell-title">{row.diagnosisName || 'Clinical consultation'} · {row.status}</div><div className="ui-table__cell-sub">{row.complaints || row.assessment || 'No narrative recorded'}</div><div className="ui-table__cell-sub">{row.signedAt ? `Signed ${dateTime(row.signedAt)}${row.signedBy?.fullName ? ` by ${row.signedBy.fullName}` : ''}` : 'Draft encounter'}</div></div>
+              <div><div className="ui-table__cell-title">{row.diagnosisName || 'Clinical consultation'} · {row.status}</div>{row.diagnosisSystem && row.diagnosisCode ? <div className="ui-table__cell-sub">{row.diagnosisSystem} {row.diagnosisCode}{row.diagnosisVersion ? ` · ${row.diagnosisVersion}` : ''}</div> : null}<div className="ui-table__cell-sub">{row.complaints || row.assessment || 'No narrative recorded'}</div><div className="ui-table__cell-sub">{row.signedAt ? `Signed ${dateTime(row.signedAt)}${row.signedBy?.fullName ? ` by ${row.signedBy.fullName}` : ''}` : 'Draft encounter'}</div></div>
               <div><strong>{dateTime(row.createdAt)}</strong>{canSignClinical && row.status === 'draft' ? <Button size="sm" disabled={busy} onClick={() => void signEncounter(row.id)}>Sign</Button> : null}{canSignClinical && row.status !== 'draft' ? <Button size="sm" variant="secondary" disabled={busy} onClick={() => setAddendumEncounterId(addendumEncounterId === row.id ? null : row.id)}>Add addendum</Button> : null}</div>
             </div>
             {row.addenda?.map((item) => <div key={item.id} className="pd-visit-row"><div><div className="ui-table__cell-title">Addendum: {item.reason}</div><div className="ui-table__cell-sub">{item.addendum}</div></div><strong>{dateTime(item.createdAt)}{item.createdBy?.fullName ? ` · ${item.createdBy.fullName}` : ''}</strong></div>)}

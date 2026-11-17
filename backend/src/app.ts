@@ -1,5 +1,5 @@
 import cors from 'cors';
-import express from 'express';
+import express, { type Request } from 'express';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { env } from './config/env.js';
@@ -30,6 +30,9 @@ import specializationRoutes from './modules/specializations/routes/specializatio
 import userRoutes from './modules/users/routes/user.routes.js';
 import { auditRequest } from './middleware/auditRequest.js';
 import { rateLimit } from './middleware/rateLimit.js';
+import fhirRoutes from './modules/interoperability/routes/fhir.routes.js';
+import bloodBankRoutes from './modules/blood-bank/routes/blood-bank.routes.js';
+import notificationRoutes from './modules/notifications/routes/notification.routes.js';
 
 export function createApp() {
   const app = express();
@@ -43,9 +46,10 @@ export function createApp() {
     }),
   );
   app.use(express.json({ limit: '2mb' }));
-  app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+  morgan.token('request-path', (req) => (req as Request).path);
+  app.use(morgan(':method :request-path :status :res[content-length] - :response-time ms request=:res[x-request-id]'));
   app.use(auditRequest);
-  app.use('/api', rateLimit({ windowMs: 60_000, max: 180, keyPrefix: 'api' }));
+  app.use('/api', rateLimit({ windowMs: 60_000, max: env.NODE_ENV === 'test' ? 1000 : 180, keyPrefix: 'api' }));
 
   app.get('/health', (_req, res) => {
     res.json({
@@ -66,6 +70,7 @@ export function createApp() {
   app.use('/api/patients', patientRoutes);
   app.use('/api/appointments', appointmentRoutes);
   app.use('/api/clinical', clinicalRoutes);
+  app.use('/api/fhir', fhirRoutes);
   app.use('/api/pharmacy', prescriptionRoutes);
   app.use('/api/pharmacy', inventoryRoutes);
   app.use('/api/pharmacy', procurementRoutes);
@@ -79,6 +84,8 @@ export function createApp() {
   app.use('/api/surgery', surgeryRoutes);
   app.use('/api/roster', rosterRoutes);
   app.use('/api/ambulance', ambulanceRoutes);
+  app.use('/api/blood-bank', bloodBankRoutes);
+  app.use('/api/notifications', notificationRoutes);
   app.use('/api/hospital-profile', hospitalProfileRoutes);
   app.use('/api/roles', roleRoutes);
   app.use('/api/menus', menuRoutes);

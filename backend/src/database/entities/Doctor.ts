@@ -15,6 +15,7 @@ import { DoctorDocument } from './DoctorDocument.js';
 import { DoctorLeave } from './DoctorLeave.js';
 import { DoctorSchedule } from './DoctorSchedule.js';
 import { Specialization } from './Specialization.js';
+import { User } from './User.js';
 
 export type DoctorGender = 'male' | 'female' | 'other';
 export type DoctorDesignation =
@@ -30,6 +31,12 @@ export class Doctor {
 
   @Column({ name: 'doctor_code', type: 'varchar', length: 20, unique: true })
   doctorCode!: string;
+
+  @Column({ name: 'account_user_id', type: 'int', unsigned: true, unique: true, nullable: true })
+  accountUserId!: number | null;
+  @ManyToOne(() => User, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'account_user_id' })
+  accountUser!: User | null;
 
   @Column({ type: 'varchar', length: 160 })
   name!: string;

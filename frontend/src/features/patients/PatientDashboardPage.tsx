@@ -82,8 +82,19 @@ export function PatientDashboardPage() {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>('Dashboard');
   const [allergyRevision, setAllergyRevision] = useState(0);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
 
   const canUpdate = hasPermission(user, 'patients.update');
+  const canExport = hasPermission(user, 'patients.export');
+
+  const downloadFhir = async () => {
+    if (!patientId) return;
+    setExporting(true); setExportError('');
+    try { await patientsApi.downloadFhirR4(patientId); }
+    catch (err) { setExportError(getErrorMessage(err, 'Unable to export patient resource')); }
+    finally { setExporting(false); }
+  };
 
   useEffect(() => {
     if (!patientId || Number.isNaN(patientId)) {
@@ -156,6 +167,7 @@ export function PatientDashboardPage() {
           <p>Patient master overview for clinical and front-office reference.</p>
         </div>
         <div className="pd-topbar__actions">
+          {canExport ? <Button variant="secondary" size="sm" loading={exporting} onClick={() => void downloadFhir()}>Export FHIR R4</Button> : null}
           {canUpdate ? (
             <Button size="sm" onClick={() => navigate(`/patients/${patient.id}/edit`)}>
               Edit Patient
@@ -166,6 +178,8 @@ export function PatientDashboardPage() {
           </Button>
         </div>
       </div>
+
+      {exportError ? <Alert tone="error">{exportError}</Alert> : null}
 
       <nav className="pd-tabs" aria-label="Patient sections">
         {TABS.map((tab) => (

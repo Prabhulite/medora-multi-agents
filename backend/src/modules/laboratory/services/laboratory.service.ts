@@ -1,5 +1,5 @@
 import { AppDataSource } from '../../../config/data-source.js';
-import { LaboratoryOrder, LaboratoryTest, Patient } from '../../../database/entities/index.js';
+import { Doctor, LaboratoryOrder, LaboratoryTest, Patient, User, UserNotification } from '../../../database/entities/index.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { nextSequenceNumber } from '../../patients/services/number-sequence.service.js';
 import type { CollectLaboratorySampleInput, CreateLaboratoryOrderInput, UpdateLaboratoryResultInput } from '../validators/laboratory.validators.js';
@@ -38,6 +38,12 @@ export const laboratoryService = {
       if (order.status === 'completed') throw new ConflictError('Completed results require an amendment workflow');
       order.status = input.status; order.resultValue = input.resultValue; order.resultUnit = input.resultUnit ?? null; order.referenceRange = input.referenceRange ?? null; order.resultNotes = input.resultNotes ?? null; order.completedAt = input.status === 'completed' ? new Date() : null; order.resultedById = userId;
       await repo.save(order);
+      if (input.status === 'completed' && order.doctorId) {
+        const doctor = await manager.getRepository(Doctor).findOne({ where: { id: order.doctorId, isActive: true } });
+        if (doctor?.accountUserId && await manager.getRepository(User).exist({ where: { id: doctor.accountUserId, isActive: true } })) {
+          await manager.getRepository(UserNotification).save({ recipientId: doctor.accountUserId, kind: 'lab_result_completed', sourceId: order.id, title: 'Laboratory result completed', message: `Laboratory order ${order.orderNumber} has a completed result. Open the laboratory module to review it.`, route: '/laboratory' });
+        }
+      }
       return repo.findOne({ where: { id: orderId }, relations: { patient: true, test: true, doctor: true, collectedBy: true } });
     });
   },

@@ -728,6 +728,7 @@ export function DoctorFormPage() {
       </section>
 
       <footer className="doc-form-footer">
+        {isEdit && doctorId && hasPermission(user, 'doctors.account_link') && <Button type="button" variant="secondary" size="sm" onClick={() => navigate(`/doctors/${doctorId}/account`)}>Staff account link</Button>}
         <Button type="button" variant="secondary" size="sm" onClick={() => navigate('/doctors')}>
           Cancel
         </Button>

@@ -13,6 +13,7 @@ const RolesPage = lazy(() => import('../features/roles/RolesPage').then((module)
 const DepartmentFormPage = lazy(() => import('../features/departments/DepartmentFormPage').then((module) => ({ default: module.DepartmentFormPage })));
 const DepartmentsPage = lazy(() => import('../features/departments/DepartmentsPage').then((module) => ({ default: module.DepartmentsPage })));
 const DoctorFormPage = lazy(() => import('../features/doctors/DoctorFormPage').then((module) => ({ default: module.DoctorFormPage })));
+const DoctorAccountPage = lazy(() => import('../features/doctors/DoctorAccountPage').then((module) => ({ default: module.DoctorAccountPage })));
 const DoctorsPage = lazy(() => import('../features/doctors/DoctorsPage').then((module) => ({ default: module.DoctorsPage })));
 const HospitalProfilePage = lazy(() => import('../features/hospital-profile/HospitalProfilePage').then((module) => ({ default: module.HospitalProfilePage })));
 const AppointmentFormPage = lazy(() => import('../features/appointments/AppointmentFormPage').then((module) => ({ default: module.AppointmentFormPage })));
@@ -30,6 +31,8 @@ const EmergencyPage = lazy(() => import('../features/emergency/EmergencyPage').t
 const SurgeryPage = lazy(() => import('../features/surgery/SurgeryPage').then((module) => ({ default: module.SurgeryPage })));
 const RosterPage = lazy(() => import('../features/roster/RosterPage').then((module) => ({ default: module.RosterPage })));
 const AmbulancePage = lazy(() => import('../features/ambulance/AmbulancePage').then((module) => ({ default: module.AmbulancePage })));
+const BloodBankPage = lazy(() => import('../features/blood-bank/BloodBankPage').then((module) => ({ default: module.BloodBankPage })));
+const NotificationsPage = lazy(() => import('../features/notifications/NotificationsPage').then((module) => ({ default: module.NotificationsPage })));
 const PharmacyInventoryPage = lazy(() => import('../features/pharmacy/PharmacyInventoryPage').then((module) => ({ default: module.PharmacyInventoryPage })));
 const PharmacyPurchasingPage = lazy(() => import('../features/pharmacy/PharmacyPurchasingPage').then((module) => ({ default: module.PharmacyPurchasingPage })));
 const LaboratoryDiagnosticsPage = lazy(() => import('../features/laboratory/LaboratoryDiagnosticsPage').then((module) => ({ default: module.LaboratoryDiagnosticsPage })));
@@ -87,6 +90,9 @@ export default function App() {
               <Route element={<ProtectedRoute permission="doctors.update" />}>
                 <Route path="doctors/:id/edit" element={<DoctorFormPage />} />
               </Route>
+              <Route element={<ProtectedRoute permission="doctors.account_link" />}>
+                <Route path="doctors/:id/account" element={<DoctorAccountPage />} />
+              </Route>
               <Route element={<ProtectedRoute permission="patients.view" />}>
                 <Route path="patients" element={<PatientsPage />} />
               </Route>
@@ -120,6 +126,10 @@ export default function App() {
               <Route element={<ProtectedRoute permission="ambulance.view" />}>
                 <Route path="ambulance" element={<AmbulancePage />} />
               </Route>
+              <Route element={<ProtectedRoute permission="blood_bank.view" />}>
+                <Route path="blood-bank" element={<BloodBankPage />} />
+              </Route>
+              <Route path="notifications" element={<NotificationsPage />} />
               <Route element={<ProtectedRoute permission="pharmacy.inventory.view" />}>
                 <Route path="pharmacy" element={<PharmacyInventoryPage />} />
               </Route>

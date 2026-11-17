@@ -545,6 +545,8 @@ export interface ClinicalEncounter {
   plan: string | null;
   diagnosisCode: string | null;
   diagnosisSystem: string | null;
+  diagnosisTermId: number | null;
+  diagnosisVersion: string | null;
   diagnosisName: string | null;
   vitals: Record<string, string | number | null> | null;
   createdAt: string;

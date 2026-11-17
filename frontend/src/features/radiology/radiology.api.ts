@@ -8,7 +8,9 @@ export interface RadiologyModality {
   isActive?: boolean;
 }
 
-export type RadiologyOrderStatus = 'ordered' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | string;
+export type RadiologyOrderStatus = 'ordered' | 'scheduled' | 'performed' | 'reported' | 'cancelled';
+export interface ReferringDoctor { id: number; name: string; doctorCode: string; medicalRegistrationNumber: string }
+export interface RadiologyAddendum { id: number; reason: string; addendum: string; createdById: number | null; createdAt: string; authorName: string | null }
 
 export interface RadiologyOrder {
   id: number;
@@ -17,6 +19,7 @@ export interface RadiologyOrder {
   patientName?: string | null;
   patientMrdNumber?: string | null;
   modalityId: number;
+  doctorId?: number | null;
   modalityName: string;
   modalityCode?: string | null;
   studyName: string;
@@ -37,16 +40,16 @@ export interface RadiologyOrder {
 export interface CreateRadiologyOrderPayload {
   patientId: number;
   modalityId: number;
+  doctorId?: number | null;
   studyName: string;
   priority?: 'routine' | 'urgent' | 'stat';
   clinicalNotes?: string | null;
 }
 
 export interface UpdateRadiologyReportPayload {
-  report: string;
-  findings?: string | null;
+  report?: string;
   impression?: string | null;
-  status?: 'completed' | 'in_progress';
+  status: 'performed' | 'reported';
 }
 
 interface ApiEnvelope<T> { data: T; }
@@ -74,7 +77,7 @@ function mapOrder(row: any): RadiologyOrder {
     id: Number(row.id),
     orderNumber: row.orderNumber || row.order_number || row.number || `RAD-${row.id}`,
     patientId: Number(row.patientId ?? patient.id),
-    patientName: patient.fullName || patient.name || row.patientName || null,
+    patientName: patient.fullName || patient.name || [patient.firstName, patient.middleName, patient.lastName].filter(Boolean).join(' ') || row.patientName || null,
     patientMrdNumber: patient.mrdNumber || patient.mrd_number || row.patientMrdNumber || null,
     modalityId: Number(row.modalityId ?? modality.id),
     modalityName: modality.name || modality.modalityName || row.modalityName || row.modality_name || 'Imaging study',
@@ -96,6 +99,18 @@ function mapOrder(row: any): RadiologyOrder {
 }
 
 export const radiologyApi = {
+  async listAddenda(orderId: number): Promise<RadiologyAddendum[]> {
+    const response = await api.get<ApiEnvelope<RadiologyAddendum[]>>(`/radiology/orders/${orderId}/addenda`);
+    return response.data.data;
+  },
+  async addAddendum(orderId: number, payload: { reason: string; addendum: string }): Promise<RadiologyAddendum> {
+    const response = await api.post<ApiEnvelope<RadiologyAddendum>>(`/radiology/orders/${orderId}/addenda`, payload);
+    return response.data.data;
+  },
+  async doctors(search: string): Promise<ReferringDoctor[]> {
+    const response = await api.get<ApiEnvelope<ReferringDoctor[]>>('/radiology/doctors', { params: { search } });
+    return response.data.data;
+  },
   async listModalities(): Promise<RadiologyModality[]> {
     const response = await api.get<ApiEnvelope<any[]> | any[]>('/radiology/modalities');
     return (unwrap(response.data) || []).map(mapModality).filter((modality) => modality.isActive !== false);
@@ -112,7 +127,7 @@ export const radiologyApi = {
   },
 
   async updateReport(orderId: number, payload: UpdateRadiologyReportPayload): Promise<RadiologyOrder> {
-    const response = await api.patch<ApiEnvelope<any> | any>(`/radiology/orders/${orderId}/report`, { status: payload.status === 'in_progress' ? 'performed' : 'reported', reportText: payload.report, impression: payload.impression || payload.findings || null });
+    const response = await api.patch<ApiEnvelope<any> | any>(`/radiology/orders/${orderId}/report`, { status: payload.status, ...(payload.report !== undefined ? { reportText: payload.report } : {}), ...(payload.impression !== undefined ? { impression: payload.impression } : {}) });
     return mapOrder(unwrap(response.data));
   },
 };

@@ -18,8 +18,8 @@ services:
     environment:
       NODE_ENV: production
       PORT: 4000
-      APP_URL: http://backend:4000
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      APP_URL: ${APP_URL:?Set public HTTPS APP_URL in .env}
+      FRONTEND_URL: ${FRONTEND_URL:?Set public HTTPS FRONTEND_URL in .env}
       DB_HOST: mysql
       DB_PORT: 3306
       DB_USER: root
@@ -44,7 +44,7 @@ services:
   frontend:
     build: ./frontend
     ports:
-      - "80:80"
+      - "127.0.0.1:80:80"
     depends_on:
       backend:
         condition: service_healthy

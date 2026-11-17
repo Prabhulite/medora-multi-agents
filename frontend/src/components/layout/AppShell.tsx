@@ -4,6 +4,7 @@ import medoraLogo from '../../assets/medora/medora-horizontal.png';
 import { useAuth } from '../../features/auth/AuthContext';
 import { getMenuIcon } from '../../features/menus/menuIcons';
 import { menusApi } from '../../features/menus/menus.api';
+import { notificationsApi } from '../../features/notifications/notifications.api';
 import type { MenuItem } from '../../types';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
@@ -22,6 +23,16 @@ export function AppShell() {
   const [navMenus, setNavMenus] = useState<MenuItem[]>([]);
   const [openGroups, setOpenGroups] = useState<Record<number, boolean>>({});
   const [menuSearch, setMenuSearch] = useState('');
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    const refresh = () => { void notificationsApi.list().then((data) => { if (active) setUnreadNotifications(data.unreadCount); }).catch(() => undefined); };
+    refresh();
+    const timer = window.setInterval(refresh, 60_000);
+    window.addEventListener('medora:notifications-updated', refresh);
+    return () => { active = false; window.clearInterval(timer); window.removeEventListener('medora:notifications-updated', refresh); };
+  }, [user?.id]);
 
   useEffect(() => {
     let active = true;
@@ -263,6 +274,10 @@ export function AppShell() {
             </button>
             <img src={medoraLogo} alt="Medora" className="app-shell__header-logo" />
           </div>
+          <NavLink to="/notifications" className="app-shell__notification-link" aria-label={`Notifications, ${unreadNotifications} unread`}>
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            {unreadNotifications > 0 && <span>{unreadNotifications > 99 ? '99+' : unreadNotifications}</span>}
+          </NavLink>
         </header>
 
         <main className="app-shell__content">

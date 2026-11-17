@@ -9,8 +9,8 @@ import { allergyParamSchema, clinicalEncounterIdParamSchema, consentParamSchema,
 const router = Router();
 router.use(authenticate);
 router.get('/diagnoses', authorize('clinical.view'), validate(diagnosisTermQuerySchema, 'query'), asyncHandler(clinicalController.listDiagnoses));
-router.post('/diagnoses', authorize('clinical.update'), validate(createDiagnosisTermSchema), asyncHandler(clinicalController.createDiagnosis));
-router.patch('/diagnoses/:id/deactivate', authorize('clinical.update'), validate(diagnosisTermParamSchema, 'params'), asyncHandler(clinicalController.deactivateDiagnosis));
+router.post('/diagnoses', authorize('clinical.catalog.manage'), validate(createDiagnosisTermSchema), asyncHandler(clinicalController.createDiagnosis));
+router.patch('/diagnoses/:id/deactivate', authorize('clinical.catalog.manage'), validate(diagnosisTermParamSchema, 'params'), asyncHandler(clinicalController.deactivateDiagnosis));
 router.get('/patients/:patientId/timeline', authorize('clinical.view'), validate(patientClinicalParamSchema, 'params'), asyncHandler(clinicalController.timeline));
 router.get('/patients/:patientId/consents', authorize('clinical.view'), validate(patientClinicalParamSchema, 'params'), asyncHandler(clinicalController.listConsents));
 router.post('/patients/:patientId/consents', authorize('clinical.create'), validate(patientClinicalParamSchema, 'params'), validate(createConsentSchema), asyncHandler(clinicalController.createConsent));

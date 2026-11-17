@@ -44,6 +44,8 @@ export const clinicalService = {
         plan: input.plan ?? null,
         diagnosisCode: diagnosisTerm?.code ?? input.diagnosisCode ?? null,
         diagnosisSystem: diagnosisTerm?.system ?? null,
+        diagnosisTermId: diagnosisTerm?.id ?? null,
+        diagnosisVersion: diagnosisTerm?.version ?? null,
         diagnosisName: diagnosisTerm?.name ?? input.diagnosisName ?? null,
         vitals: input.vitals ?? null,
       }));
@@ -53,7 +55,7 @@ export const clinicalService = {
         changedById: userId,
         changeSummary: `Clinical encounter created: ${encounter.id}`,
         beforeData: null,
-        afterData: JSON.stringify({ id: encounter.id, visitId: encounter.visitId, doctorId: encounter.doctorId, diagnosisCode: encounter.diagnosisCode, diagnosisSystem: encounter.diagnosisSystem, diagnosisName: encounter.diagnosisName, status: encounter.status }),
+        afterData: JSON.stringify({ id: encounter.id, visitId: encounter.visitId, doctorId: encounter.doctorId, diagnosisTermId: encounter.diagnosisTermId, diagnosisCode: encounter.diagnosisCode, diagnosisSystem: encounter.diagnosisSystem, diagnosisVersion: encounter.diagnosisVersion, diagnosisName: encounter.diagnosisName, status: encounter.status }),
       }));
       return encounter;
     });

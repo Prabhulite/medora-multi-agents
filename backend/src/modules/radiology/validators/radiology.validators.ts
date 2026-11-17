@@ -1,8 +1,13 @@
 import { z } from 'zod';
 const positiveInt = z.number().int().positive();
 export const radiologyOrderListSchema = z.object({ patientId: z.coerce.number().int().positive().optional(), status: z.enum(['ordered', 'scheduled', 'performed', 'reported', 'cancelled']).optional() });
-export const createRadiologyOrderSchema = z.object({ patientId: positiveInt, modalityId: positiveInt, doctorId: positiveInt.nullable().optional(), priority: z.enum(['routine', 'urgent', 'stat']).default('routine'), clinicalNotes: z.string().trim().max(5000).nullable().optional() });
+export const radiologyDoctorLookupSchema = z.object({ search: z.string().trim().min(2).max(80) });
+export const createRadiologyOrderSchema = z.object({ patientId: positiveInt, modalityId: positiveInt, studyName: z.string().trim().min(2).max(160), doctorId: positiveInt.nullable().optional(), priority: z.enum(['routine', 'urgent', 'stat']).default('routine'), clinicalNotes: z.string().trim().max(5000).nullable().optional() });
 export const updateRadiologyReportSchema = z.object({ status: z.enum(['performed', 'reported']), reportText: z.string().trim().max(10000).nullable().optional(), impression: z.string().trim().max(5000).nullable().optional() });
 export const radiologyOrderIdParamSchema = z.object({ id: z.coerce.number().int().positive() });
+export const createRadiologyAddendumSchema = z.object({ reason: z.string().trim().min(5).max(500), addendum: z.string().trim().min(1).max(10000) });
+export const createRadiologyCommunicationSchema = z.object({ outcome: z.enum(['attempted', 'delivered']), method: z.enum(['phone', 'in_person', 'secure_message', 'other']), recipientName: z.string().trim().min(2).max(160), findingSummary: z.string().trim().min(5).max(1000), note: z.string().trim().max(1000).nullable().optional(), occurredAt: z.string().datetime({ offset: true }) });
 export type CreateRadiologyOrderInput = z.infer<typeof createRadiologyOrderSchema>;
 export type UpdateRadiologyReportInput = z.infer<typeof updateRadiologyReportSchema>;
+export type CreateRadiologyAddendumInput = z.infer<typeof createRadiologyAddendumSchema>;
+export type CreateRadiologyCommunicationInput = z.infer<typeof createRadiologyCommunicationSchema>;

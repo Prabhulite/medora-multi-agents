@@ -331,6 +331,10 @@
   object-fit: contain;
 }
 
+.app-shell__notification-link { display: inline-flex; align-items: center; gap: 6px; padding: 8px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-md); color: var(--color-heading); text-decoration: none; }
+.app-shell__notification-link:hover, .app-shell__notification-link.active { color: var(--color-primary); border-color: var(--color-primary); }
+.app-shell__notification-link span { min-width: 20px; padding: 2px 5px; border-radius: 999px; background: var(--color-primary); color: white; font-size: 11px; text-align: center; }
+
 .app-shell__sidebar-footer {
   margin-top: auto;
   padding-top: 0.85rem;

@@ -13,6 +13,7 @@ import { Patient } from './Patient.js';
 import { PatientVisit } from './PatientVisit.js';
 import { User } from './User.js';
 import { ClinicalEncounterAddendum } from './ClinicalEncounterAddendum.js';
+import { DiagnosisTerm } from './DiagnosisTerm.js';
 
 @Entity({ name: 'clinical_encounters' })
 export class ClinicalEncounter {
@@ -31,6 +32,9 @@ export class ClinicalEncounter {
   @Column({ type: 'text', nullable: true }) plan!: string | null;
   @Column({ name: 'diagnosis_code', type: 'varchar', length: 40, nullable: true }) diagnosisCode!: string | null;
   @Column({ name: 'diagnosis_system', type: 'varchar', length: 20, nullable: true }) diagnosisSystem!: string | null;
+  @Column({ name: 'diagnosis_term_id', type: 'int', unsigned: true, nullable: true }) diagnosisTermId!: number | null;
+  @ManyToOne(() => DiagnosisTerm, { onDelete: 'SET NULL', nullable: true }) @JoinColumn({ name: 'diagnosis_term_id' }) diagnosisTerm!: DiagnosisTerm | null;
+  @Column({ name: 'diagnosis_version', type: 'varchar', length: 40, nullable: true }) diagnosisVersion!: string | null;
   @Column({ name: 'diagnosis_name', type: 'varchar', length: 160, nullable: true }) diagnosisName!: string | null;
   @Column({ type: 'json', nullable: true }) vitals!: Record<string, string | number | null> | null;
   @Column({ name: 'created_by_id', type: 'int', unsigned: true, nullable: true }) createdById!: number | null;

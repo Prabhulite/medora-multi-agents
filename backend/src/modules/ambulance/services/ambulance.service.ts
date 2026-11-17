@@ -1,5 +1,5 @@
 import { AppDataSource } from '../../../config/data-source.js';
-import { AmbulanceDriver, AmbulanceTrip, AmbulanceVehicle, Patient, User } from '../../../database/entities/index.js';
+import { AmbulanceDriver, AmbulanceTrip, AmbulanceVehicle, Patient, User, UserNotification } from '../../../database/entities/index.js';
 import { ConflictError, NotFoundError } from '../../../shared/errors/AppError.js';
 import { nextSequenceNumber } from '../../patients/services/number-sequence.service.js';
 import type { CreateTripInput, RegisterDriverInput, TripListQuery, TripStatusInput, UpdateDriverInput, VehicleInput, VehicleUpdateInput } from '../validators/ambulance.validators.js';
@@ -99,6 +99,8 @@ export const ambulanceService = {
       const conflict = await manager.getRepository(AmbulanceTrip).createQueryBuilder('trip').where('(trip.vehicle_id = :vehicleId OR trip.driver_id = :driverId) AND trip.status IN (:...statuses)', { vehicleId: vehicle.id, driverId: driver.id, statuses: activeStatuses }).getOne();
       if (conflict) throw new ConflictError(conflict.vehicleId === vehicle.id ? 'Vehicle already has an active trip' : 'Driver already has an active trip');
       const trip = await manager.getRepository(AmbulanceTrip).save(manager.getRepository(AmbulanceTrip).create({ tripNumber: await nextSequenceNumber(manager, 'AMB', 'AMB', 6), vehicleId: vehicle.id, driverId: driver.id, patientId: input.patientId ?? null, pickupLocation: input.pickupLocation, destination: input.destination, notes: input.notes ?? null, status: 'assigned', dispatchedAt: new Date(), dispatchedById: userId }));
+      const dispatchSummary = `Trip ${trip.tripNumber}: ${input.pickupLocation} to ${input.destination}`;
+      await manager.getRepository(UserNotification).save(manager.getRepository(UserNotification).create({ recipientId: driver.id, kind: 'ambulance_assigned', sourceId: trip.id, title: 'Ambulance trip assigned', message: dispatchSummary.length > 500 ? `${dispatchSummary.slice(0, 497)}...` : dispatchSummary, route: '/ambulance' }));
       return tripResponse((await manager.getRepository(AmbulanceTrip).findOne({ where: { id: trip.id }, relations }))!);
     });
   },
@@ -121,6 +123,10 @@ export const ambulanceService = {
       if (input.status === 'transporting') trip.transportingAt = now;
       if (input.status === 'completed' || input.status === 'cancelled') { trip.closedAt = now; trip.closureNote = input.closureNote ?? null; }
       await repo.save(trip);
+      if (input.status === 'cancelled') {
+        const cancellationSummary = `Trip ${trip.tripNumber} cancelled: ${input.closureNote ?? 'No reason recorded'}`;
+        await manager.getRepository(UserNotification).save(manager.getRepository(UserNotification).create({ recipientId: trip.driverId, kind: 'ambulance_cancelled', sourceId: trip.id, title: 'Ambulance trip cancelled', message: cancellationSummary.length > 500 ? `${cancellationSummary.slice(0, 497)}...` : cancellationSummary, route: '/ambulance' }));
+      }
       return tripResponse((await repo.findOne({ where: { id }, relations }))!);
     });
   },

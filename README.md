@@ -61,6 +61,20 @@ npm run dev
 
 Optional single-app scripts: `npm run dev:backend`, `npm run dev:frontend`
 
+## Verification
+
+Run the same build and database checks as the GitHub Actions workflow:
+
+```bash
+npm --prefix frontend ci
+npm --prefix frontend run build
+npm --prefix backend ci
+npm --prefix backend run build
+npm --prefix backend run test:integration
+```
+
+The integration command requires a reachable MySQL server and credentials in `backend/.env` or environment variables. It creates a uniquely named temporary database, applies all migrations, checks the API workflows, and removes that database when finished. The CI workflow is in `.github/workflows/ci.yml` and uses a disposable MySQL service; its fixture credentials must never be reused for a real deployment.
+
 ## Super admin
 
 Set `SUPER_ADMIN_*` values in `backend/.env` (see `.env.example`). They are seeded by `npm run db:seed`. Do not commit real credentials.

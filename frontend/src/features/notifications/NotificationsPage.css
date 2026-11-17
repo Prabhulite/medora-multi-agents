@@ -1,0 +1,10 @@
+.notifications-page { display: grid; gap: 16px; }
+.notifications-count { margin: 0; color: var(--color-text-secondary); }
+.notifications-list { display: grid; gap: 10px; }
+.notification-card { display: flex; align-items: start; justify-content: space-between; gap: 16px; padding: 16px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
+.notification-card--unread { border-left: 4px solid var(--color-primary); }
+.notification-card h2 { margin: 0 0 6px; font-size: 16px; }
+.notification-card p { margin: 0 0 8px; }
+.notification-card time { color: var(--color-text-secondary); font-size: 12px; }
+.notification-card__actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+@media (max-width: 680px) { .notification-card { display: grid; } }

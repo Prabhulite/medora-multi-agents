@@ -1,5 +1,5 @@
 import { AppDataSource } from '../../../config/data-source.js';
-import { DutyShift, User } from '../../../database/entities/index.js';
+import { DutyShift, User, UserNotification } from '../../../database/entities/index.js';
 import { ConflictError, NotFoundError } from '../../../shared/errors/AppError.js';
 import type { CloseShiftInput, CreateShiftInput, ShiftListQuery } from '../validators/roster.validators.js';
 
@@ -25,6 +25,7 @@ export const rosterService = {
       const overlap = await manager.getRepository(DutyShift).createQueryBuilder('shift').where('shift.staff_id = :staffId AND shift.status = :status AND shift.starts_at < :end AND shift.ends_at > :start', { staffId: input.staffId, status: 'scheduled', start: new Date(input.startsAt), end: new Date(input.endsAt) }).getOne();
       if (overlap) throw new ConflictError('Staff member already has an overlapping shift');
       const created = await manager.getRepository(DutyShift).save(manager.getRepository(DutyShift).create({ staffId: input.staffId, startsAt: new Date(input.startsAt), endsAt: new Date(input.endsAt), location: input.location, dutyRole: input.dutyRole, notes: input.notes ?? null, assignedById: userId }));
+      await manager.getRepository(UserNotification).save(manager.getRepository(UserNotification).create({ recipientId: staff.id, kind: 'duty_shift_assigned', sourceId: created.id, title: 'Duty shift assigned', message: `${input.dutyRole} at ${input.location}, ${new Date(input.startsAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} to ${new Date(input.endsAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`, route: '/roster' }));
       return shiftResponse((await manager.getRepository(DutyShift).findOne({ where: { id: created.id }, relations }))!);
     });
   },
@@ -38,6 +39,10 @@ export const rosterService = {
       if (shift.status !== 'scheduled') throw new ConflictError('Shift is already closed');
       shift.status = input.status; shift.closureNote = input.closureNote; shift.closedById = userId;
       await manager.getRepository(DutyShift).save(shift);
+      if (input.status === 'cancelled') {
+        const summary = `${shift.dutyRole} at ${shift.location}, ${shift.startsAt.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}: ${input.closureNote}`;
+        await manager.getRepository(UserNotification).save(manager.getRepository(UserNotification).create({ recipientId: shift.staffId, kind: 'duty_shift_cancelled', sourceId: shift.id, title: 'Duty shift cancelled', message: summary.length > 500 ? `${summary.slice(0, 497)}...` : summary, route: '/roster' }));
+      }
       return shiftResponse((await manager.getRepository(DutyShift).findOne({ where: { id }, relations }))!);
     });
   },
