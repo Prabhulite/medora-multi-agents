@@ -85,6 +85,7 @@ export const inpatientService = {
       if (!admission) throw new NotFoundError('Admission not found');
       if (admission.status === 'discharged') throw new ConflictError('Cannot create a care plan after discharge');
       const record = await manager.getRepository(NursingCarePlan).save(manager.getRepository(NursingCarePlan).create({ admissionId, problem: input.problem, goal: input.goal, interventions: input.interventions, reviewAt: input.reviewAt ? new Date(input.reviewAt) : null, createdById: userId }));
+      await manager.getRepository(PatientAuditLog).save({ patientId: admission.patientId, action: 'care_plan_created', changedById: userId, changeSummary: `Care plan created for admission ${admission.admissionNumber}`, beforeData: null, afterData: JSON.stringify({ admissionId, carePlanId: record.id, reviewAt: record.reviewAt }) });
       return carePlanResponse(await manager.getRepository(NursingCarePlan).findOne({ where: { id: record.id }, relations: { createdBy: true, closedBy: true } }));
     });
   },
@@ -98,6 +99,7 @@ export const inpatientService = {
       if (plan.status !== 'active') throw new ConflictError('Care plan is already closed');
       plan.status = input.status; plan.reviewNote = input.reviewNote; plan.closedAt = new Date(); plan.closedById = userId;
       await manager.getRepository(NursingCarePlan).save(plan);
+      await manager.getRepository(PatientAuditLog).save({ patientId: admission.patientId, action: 'care_plan_closed', changedById: userId, changeSummary: `Care plan ${input.status} for admission ${admission.admissionNumber}`, beforeData: JSON.stringify({ admissionId, carePlanId: plan.id, status: 'active' }), afterData: JSON.stringify({ admissionId, carePlanId: plan.id, status: input.status }) });
       return carePlanResponse(await manager.getRepository(NursingCarePlan).findOne({ where: { id: plan.id }, relations: { createdBy: true, closedBy: true } }));
     });
   },
@@ -129,6 +131,7 @@ export const inpatientService = {
         await assertNoRecordedAllergy(manager, admission.patientId, [prescription.medicineName, medication?.brandName, medication?.genericName]);
       }
       const record = await manager.getRepository(MedicationAdministration).save(manager.getRepository(MedicationAdministration).create({ admissionId, prescriptionId: prescription.id, outcome: input.outcome, doseGiven: input.outcome === 'given' ? input.doseGiven ?? null : null, route: input.outcome === 'given' ? input.route ?? prescription.route : null, notes: input.notes ?? null, administeredById: userId }));
+      await manager.getRepository(PatientAuditLog).save({ patientId: admission.patientId, action: 'medication_administration_recorded', changedById: userId, changeSummary: `Medication administration recorded for admission ${admission.admissionNumber}`, beforeData: null, afterData: JSON.stringify({ admissionId, administrationId: record.id, prescriptionId: prescription.id, outcome: input.outcome }) });
       return medicationAdministrationResponse(await manager.getRepository(MedicationAdministration).findOne({ where: { id: record.id }, relations: { prescription: true, administeredBy: true } }));
     });
   },
@@ -157,6 +160,7 @@ export const inpatientService = {
       await manager.getRepository(Bed).save([fromBed, toBed]);
       await manager.getRepository(Admission).save(admission);
       const transfer = await manager.getRepository(BedTransfer).save(manager.getRepository(BedTransfer).create({ admissionId: id, fromBedId: fromBed.id, toBedId: toBed.id, reason: input.reason, transferredById: userId }));
+      await manager.getRepository(PatientAuditLog).save({ patientId: admission.patientId, action: 'inpatient_transferred', changedById: userId, changeSummary: `Bed transferred for admission ${admission.admissionNumber}`, beforeData: JSON.stringify({ admissionId: id, bedId: fromBed.id }), afterData: JSON.stringify({ admissionId: id, transferId: transfer.id, bedId: toBed.id }) });
       return transferResponse(await manager.getRepository(BedTransfer).findOne({ where: { id: transfer.id }, relations: { fromBed: { ward: true }, toBed: { ward: true }, transferredBy: true } }));
     });
   },
@@ -169,7 +173,9 @@ export const inpatientService = {
       const admission = await manager.getRepository(Admission).createQueryBuilder('admission').setLock('pessimistic_write').where('admission.id = :id', { id: admissionId }).getOne();
       if (!admission) throw new NotFoundError('Admission not found');
       if (admission.status === 'discharged') throw new ConflictError('Cannot record observations after discharge');
-      return manager.getRepository(NursingObservation).save(manager.getRepository(NursingObservation).create({ admissionId, observedAt: new Date(), temperatureC: input.temperatureC == null ? null : input.temperatureC.toFixed(1), pulseBpm: input.pulseBpm ?? null, systolicBp: input.systolicBp ?? null, diastolicBp: input.diastolicBp ?? null, spo2Percent: input.spo2Percent ?? null, notes: input.notes ?? null, recordedById: userId }));
+      const observation = await manager.getRepository(NursingObservation).save(manager.getRepository(NursingObservation).create({ admissionId, observedAt: new Date(), temperatureC: input.temperatureC == null ? null : input.temperatureC.toFixed(1), pulseBpm: input.pulseBpm ?? null, systolicBp: input.systolicBp ?? null, diastolicBp: input.diastolicBp ?? null, spo2Percent: input.spo2Percent ?? null, notes: input.notes ?? null, recordedById: userId }));
+      await manager.getRepository(PatientAuditLog).save({ patientId: admission.patientId, action: 'nursing_observation_recorded', changedById: userId, changeSummary: `Nursing observation recorded for admission ${admission.admissionNumber}`, beforeData: null, afterData: JSON.stringify({ admissionId, observationId: observation.id }) });
+      return observation;
     });
   },
   async wards() { return AppDataSource.getRepository(Ward).find({ where: { isActive: true }, relations: { beds: true }, order: { name: 'ASC' } }); },
@@ -190,7 +196,9 @@ export const inpatientService = {
       if (input.departmentId && !(await manager.getRepository(Department).findOne({ where: { id: input.departmentId, isActive: true } }))) throw new ValidationError('Department is invalid or inactive');
       const admission = manager.getRepository(Admission).create({ admissionNumber: await nextSequenceNumber(manager, 'ADM', 'ADM', 6), patientId: input.patientId, bedId: input.bedId, doctorId: input.doctorId ?? null, departmentId: input.departmentId ?? null, admittedAt: new Date(), status: 'admitted', reason: input.reason ?? null, notes: input.notes ?? null, createdById: userId });
       bed.status = 'occupied'; await manager.getRepository(Bed).save(bed);
-      return manager.getRepository(Admission).save(admission);
+      const saved = await manager.getRepository(Admission).save(admission);
+      await manager.getRepository(PatientAuditLog).save({ patientId: patient.id, action: 'inpatient_admitted', changedById: userId, changeSummary: `Patient admitted: ${saved.admissionNumber}`, beforeData: null, afterData: JSON.stringify({ admissionId: saved.id, bedId: saved.bedId }) });
+      return saved;
     });
   },
   async discharge(id: number, summary: z.infer<typeof dischargeSummarySchema>, userId: number | null) {

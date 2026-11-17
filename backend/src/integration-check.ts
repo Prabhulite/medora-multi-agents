@@ -496,6 +496,15 @@ try {
   assert.equal((await request('POST', '/api/pharmacy/prescriptions', { patientId: 1, medicineName: 'integration medicine' })).status, 409);
   assert.equal((await request('POST', `/api/inpatient/admissions/${admission.id}/medication-administrations`, { prescriptionId: prescription.id, outcome: 'given', doseGiven: '5 mg' })).status, 409);
   assert.equal((await ok('POST', `/api/inpatient/admissions/${admission.id}/medication-administrations`, { prescriptionId: prescription.id, outcome: 'withheld', notes: 'Recorded allergy requires review' }, 201)).outcome, 'withheld');
+  const inpatientAudit = await dataSource.query("SELECT action, changed_by_id AS changedById, change_summary AS changeSummary, before_data AS beforeData, after_data AS afterData FROM patient_audit_logs WHERE patient_id = 1 AND action IN ('inpatient_admitted', 'inpatient_transferred', 'care_plan_created', 'care_plan_closed', 'nursing_observation_recorded', 'medication_administration_recorded') ORDER BY id");
+  assert.equal(inpatientAudit.filter((row: { action: string }) => row.action === 'care_plan_created').length, 3);
+  assert.equal(inpatientAudit.filter((row: { action: string }) => row.action === 'care_plan_closed').length, 2);
+  for (const action of ['inpatient_admitted', 'inpatient_transferred', 'nursing_observation_recorded', 'medication_administration_recorded']) assert.equal(inpatientAudit.filter((row: { action: string }) => row.action === action).length, 1);
+  assert.equal(inpatientAudit.every((row: { changedById: number | null }) => row.changedById != null), true);
+  assert.equal(JSON.parse(inpatientAudit.find((row: { action: string }) => row.action === 'medication_administration_recorded').afterData).outcome, 'withheld');
+  assert.equal(JSON.stringify(inpatientAudit).includes('Recorded allergy requires review'), false);
+  assert.equal(JSON.stringify(inpatientAudit).includes('Assess mobility each shift'), false);
+  assert.equal(JSON.stringify(inpatientAudit).includes('Integration transfer'), false);
   await ok('DELETE', `/api/clinical/patients/1/allergies/${allergy.id}`);
   assert.equal((await ok('GET', '/api/clinical/patients/1/allergies')).length, 0);
   assert.equal((await ok('GET', '/api/patients/1/audit-logs')).filter((row: { action: string }) => row.action.startsWith('allergy_')).length, 2);

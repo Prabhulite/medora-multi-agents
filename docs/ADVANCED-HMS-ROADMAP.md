@@ -63,6 +63,7 @@ Current patient chart tabs: Profile and MRD show identity details and audit hist
 - An active admission now has an explicit review of current reported home medicines, including continue, hold, or stop decisions, an empty-list attestation, a source-preserving snapshot, and patient audit. New medicines reported later can receive append-only follow-up decisions. This records the admission decisions without creating inpatient prescriptions; see the [admission review design](INPATIENT-ADMISSION-MEDICATION-REVIEW.md). Continuing a medicine at discharge after it was held or stopped at admission requires a documented explanation.
 - The patient timeline now includes reported home medicine intake and cessation, initial admission medication review, and follow-up review events. It shows an overview; source details and individual decisions remain in their clinical and inpatient views.
 - Bed occupancy and ward dashboards
+- Admission, bed transfer, nursing observation, medication administration, and care plan creation/closure now write attributed patient audit entries in the same transaction as the care record. Audit metadata uses record identifiers and decision/status fields; clinical free text stays in the underlying permission-controlled records. Earlier records are not backfilled.
 
 ### Phase 4: Billing and revenue cycle
 
