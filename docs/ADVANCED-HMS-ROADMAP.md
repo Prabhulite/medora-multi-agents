@@ -129,6 +129,7 @@ Finalized radiology reports now have a browser print view containing patient and
 - GitHub Actions CI now runs frontend and backend production builds, fresh database setup and seed, and the backend integration suite against a disposable MySQL 8 service on push and pull request. The workflow has not yet run on GitHub; deployment and browser tests remain separate gates.
 - Route-level frontend loading is implemented. The measured Vite entry JavaScript chunk decreased from 790.43 kB to 357.26 kB (uncompressed); the frontend production build passes. Browser timing and visual checks remain to be measured.
 - A repeatable local Chrome browser smoke check signs in with the configured development super admin and verifies the laboratory workbench, order list, and inpatient dashboard load. Run `npm run browser:smoke` from `backend` while the API and Vite server are running. Set `CHROME_PATH` if Chrome is outside its usual location. It uses an isolated temporary Chrome profile and does not export patient data. Broader browser workflows and visual accessibility checks remain outstanding.
+- When a finalized radiology order exists, the browser smoke check also opens its report, checks the print layout hides controls and the correction form, and generates a nonempty PDF in memory. It does not save the PDF or validate a signed report archive.
 - Security review, permission matrix review, rate limiting
 - Backup/restore procedures, observability, alerting
 - Performance testing, accessibility, browser verification

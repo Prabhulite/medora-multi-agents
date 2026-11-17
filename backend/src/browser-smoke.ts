@@ -102,6 +102,36 @@ try {
   assert.ok(radiologyWorklistReady, 'Radiology worklist did not finish loading');
   assert.equal(await evaluate('Boolean(document.querySelector(".radiology-worklist .ui-table-search input")) && Boolean(document.querySelector(".radiology-worklist .ui-table-toolbar__entries select"))'), true, 'Radiology worklist search and paging controls did not render');
   assert.equal(await evaluate('document.body.innerText.includes("Unable to load radiology worklist")'), false, 'Radiology worklist showed a load error');
+  const finalOrderLookup = await evaluate('fetch("/api/radiology/worklist?status=reported&page=1&pageSize=10", { credentials: "include" }).then(async response => ({ status: response.status, body: await response.json() }))') as { status: number; body: { data?: { items?: Array<{ orderNumber: string; reportedById: number | null; reportedByName: string | null; reportText: string | null }> } } };
+  assert.equal(finalOrderLookup.status, 200, `Finalized radiology worklist returned ${finalOrderLookup.status}`);
+  const finalOrder = finalOrderLookup.body.data?.items?.[0];
+  const finalOrderNumber = finalOrder?.orderNumber ?? null;
+  if (finalOrderNumber) {
+    assert.ok(finalOrder?.reportText, 'Finalized report has no report text');
+    if (finalOrder?.reportedById) assert.ok(finalOrder.reportedByName, 'Finalized report is missing reporting staff name');
+    await evaluate(`(() => { const input = document.querySelector('.radiology-worklist .ui-table-search input'); const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; setter.call(input, ${JSON.stringify(finalOrderNumber)}); input.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+    let reportRowReady = false;
+    for (let attempt = 0; attempt < 100; attempt++) {
+      reportRowReady = await evaluate(`Array.from(document.querySelectorAll('.radiology-worklist tbody tr')).some(row => row.innerText.includes(${JSON.stringify(finalOrderNumber)}) && row.innerText.includes('View final report'))`);
+      if (reportRowReady) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.ok(reportRowReady, 'Finalized report was absent from the radiology worklist');
+    await evaluate(`(() => { const row = Array.from(document.querySelectorAll('.radiology-worklist tbody tr')).find(item => item.innerText.includes(${JSON.stringify(finalOrderNumber)})); Array.from(row.querySelectorAll('button')).find(button => button.innerText.includes('View final report')).click(); return true; })()`);
+    let printReady = false;
+    for (let attempt = 0; attempt < 100; attempt++) {
+      printReady = await evaluate('Boolean(Array.from(document.querySelectorAll(".radiology-report__actions button")).find(button => button.innerText === "Print report" && !button.disabled))');
+      if (printReady) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.ok(printReady, 'Final report print action did not become ready');
+    await send('Emulation.setEmulatedMedia', { media: 'print' });
+    const printState = await evaluate(`({ reportVisible: getComputedStyle(document.querySelector(".radiology-report")).visibility === "visible", actionsHidden: getComputedStyle(document.querySelector(".radiology-report__actions")).display === "none", correctionHidden: !document.querySelector(".radiology-report__correction") || getComputedStyle(document.querySelector(".radiology-report__correction")).display === "none", content: document.querySelector(".radiology-report").innerText.includes(${JSON.stringify(finalOrder.reportText)}), order: document.querySelector(".radiology-report__details")?.innerText.includes(${JSON.stringify(finalOrderNumber)}), reporter: document.querySelector(".radiology-report__details")?.innerText.includes("Reporting staff") })`);
+    assert.deepEqual(printState, { reportVisible: true, actionsHidden: true, correctionHidden: true, content: true, order: true, reporter: true }, `Radiology print layout failed: ${JSON.stringify(printState)}`);
+    const printed = await send('Page.printToPDF', { printBackground: true });
+    assert.ok(printed.data?.startsWith('JVBERi0') && printed.data.length > 5000, 'Radiology report PDF print output was empty');
+    await send('Emulation.setEmulatedMedia', { media: 'screen' });
+  }
   await evaluate('history.pushState({}, "", "/inpatient"); window.dispatchEvent(new PopStateEvent("popstate")); true');
   let inpatientLoaded = false;
   for (let attempt = 0; attempt < 100; attempt++) {
@@ -112,7 +142,7 @@ try {
   const inpatientState = await evaluate('({ path: location.pathname, login: document.body.innerText.includes("Sign in"), inpatient: document.body.innerText.includes("Inpatient Management"), active: document.body.innerText.includes("Active admissions"), page: Boolean(document.querySelector(".inpatient-page")), kpis: Boolean(document.querySelector(".inpatient-kpis")), loadError: document.body.innerText.includes("Unable to load inpatient dashboard") })');
   assert.ok(inpatientLoaded, `Inpatient dashboard did not render: ${JSON.stringify(inpatientState)}`);
   assert.equal(await evaluate('document.body.innerText.includes("Unable to load inpatient dashboard")'), false, 'Inpatient dashboard showed a load error');
-  console.log('Browser smoke passed: authenticated laboratory and radiology worklists, communication queues, and inpatient dashboard rendered in headless Chrome.');
+  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, communication queues, inpatient dashboard${finalOrderNumber ? ', and finalized radiology report print output' : ''} rendered in headless Chrome.`);
   await send('Browser.close').catch(() => undefined);
   socket.close();
 } finally {
