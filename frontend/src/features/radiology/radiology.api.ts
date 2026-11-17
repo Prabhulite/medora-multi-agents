@@ -7,12 +7,14 @@ export interface RadiologyModality {
   description?: string | null;
   isActive?: boolean;
 }
+export interface RadiologyResource { id: number; code: string; name: string; location: string | null; modalityId: number; isActive: boolean }
 
 export type RadiologyOrderStatus = 'ordered' | 'scheduled' | 'performed' | 'reported' | 'cancelled';
 export interface ReferringDoctor { id: number; name: string; doctorCode: string; medicalRegistrationNumber: string }
 export interface RadiologyAddendum { id: number; reason: string; addendum: string; createdById: number | null; createdAt: string; authorName: string | null }
 export interface RadiologyCommunication { id: number; outcome: 'attempted' | 'delivered'; method: 'phone' | 'in_person' | 'secure_message' | 'other'; recipientName: string; findingSummary: string; note: string | null; occurredAt: string; recordedById: number | null; createdAt: string; recorderName: string | null }
 export type CreateRadiologyCommunicationPayload = Pick<RadiologyCommunication, 'outcome' | 'method' | 'recipientName' | 'findingSummary' | 'occurredAt'> & { note?: string | null };
+export interface RadiologyScheduleEvent { id: number; previousAt: string | null; scheduledAt: string; previousEndAt: string | null; scheduledEndAt: string | null; previousResourceId: number | null; resourceId: number | null; reason: string | null; createdById: number | null; createdAt: string; actorName: string | null }
 
 export interface RadiologyOrder {
   id: number;
@@ -30,6 +32,9 @@ export interface RadiologyOrder {
   clinicalNotes?: string | null;
   orderedAt?: string | null;
   scheduledAt?: string | null;
+  scheduledEndAt?: string | null;
+  resourceId?: number | null;
+  resourceName?: string | null;
   completedAt?: string | null;
   report?: string | null;
   findings?: string | null;
@@ -90,6 +95,9 @@ function mapOrder(row: any): RadiologyOrder {
     clinicalNotes: row.clinicalNotes || row.clinical_notes || row.notes || null,
     orderedAt: row.orderedAt || row.ordered_at || row.createdAt || null,
     scheduledAt: row.scheduledAt || row.scheduled_at || null,
+    scheduledEndAt: row.scheduledEndAt || row.scheduled_end_at || null,
+    resourceId: row.resourceId ?? row.resource_id ?? null,
+    resourceName: row.resource?.name ?? null,
     completedAt: row.completedAt || row.completed_at || null,
     report: row.report ?? row.reportText ?? row.report_text ?? null,
     findings: row.findings ?? null,
@@ -101,6 +109,26 @@ function mapOrder(row: any): RadiologyOrder {
 }
 
 export const radiologyApi = {
+  async listResources(): Promise<RadiologyResource[]> {
+    const response = await api.get<ApiEnvelope<RadiologyResource[]>>('/radiology/resources');
+    return response.data.data;
+  },
+  async createResource(payload: { modalityId: number; code: string; name: string; location?: string | null }): Promise<RadiologyResource> {
+    const response = await api.post<ApiEnvelope<RadiologyResource>>('/radiology/resources', payload);
+    return response.data.data;
+  },
+  async setResourceActive(id: number, isActive: boolean): Promise<RadiologyResource> {
+    const response = await api.patch<ApiEnvelope<RadiologyResource>>(`/radiology/resources/${id}/status`, { isActive });
+    return response.data.data;
+  },
+  async listScheduleEvents(orderId: number): Promise<RadiologyScheduleEvent[]> {
+    const response = await api.get<ApiEnvelope<RadiologyScheduleEvent[]>>(`/radiology/orders/${orderId}/schedule-events`);
+    return response.data.data;
+  },
+  async scheduleOrder(orderId: number, payload: { scheduledAt: string; durationMinutes: number; resourceId?: number | null; reason?: string | null }): Promise<RadiologyOrder> {
+    const response = await api.patch<ApiEnvelope<any>>(`/radiology/orders/${orderId}/schedule`, payload);
+    return mapOrder(response.data.data);
+  },
   async listCommunications(orderId: number): Promise<RadiologyCommunication[]> {
     const response = await api.get<ApiEnvelope<RadiologyCommunication[]>>(`/radiology/orders/${orderId}/communications`);
     return response.data.data;

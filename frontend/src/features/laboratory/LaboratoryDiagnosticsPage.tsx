@@ -2,18 +2,21 @@ import { useEffect, useMemo, useState } from 'react';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Input } from '../../components/ui/Input';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Select } from '../../components/ui/Select';
 import { Table, type TableColumn } from '../../components/ui/Table';
 import { getErrorMessage } from '../../lib/api';
+import { hasPermission } from '../../lib/permissions';
+import { useAuth } from '../auth/AuthContext';
 import { laboratoryApi, type CreateLaboratoryOrderPayload, type LaboratoryOrder, type LaboratoryTest, type UpdateLaboratoryResultPayload } from './laboratory.api';
 import './LaboratoryDiagnosticsPage.css';
 
-type Modal = 'order' | 'collect' | 'result' | null;
+type Modal = 'order' | 'collect' | 'result' | 'verify' | 'view' | null;
 
 const statusTone: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'neutral'> = {
-  ordered: 'info', collected: 'warning', processing: 'warning', completed: 'success', cancelled: 'danger',
+  ordered: 'info', collected: 'warning', processing: 'warning', verified: 'info', completed: 'success', cancelled: 'danger',
 };
 
 function dateLabel(value?: string | null) {
@@ -22,6 +25,11 @@ function dateLabel(value?: string | null) {
 }
 
 export function LaboratoryDiagnosticsPage() {
+  const { user } = useAuth();
+  const canCreate = hasPermission(user, 'laboratory.create');
+  const canUpdate = hasPermission(user, 'laboratory.update');
+  const canVerify = hasPermission(user, 'laboratory.verify');
+  const canRelease = hasPermission(user, 'laboratory.release');
   const [tests, setTests] = useState<LaboratoryTest[]>([]);
   const [orders, setOrders] = useState<LaboratoryOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,6 +38,7 @@ export function LaboratoryDiagnosticsPage() {
   const [notice, setNotice] = useState('');
   const [modal, setModal] = useState<Modal>(null);
   const [selectedOrder, setSelectedOrder] = useState<LaboratoryOrder | null>(null);
+  const [releaseTarget, setReleaseTarget] = useState<LaboratoryOrder | null>(null);
 
   const load = async () => {
     setLoading(true); setError('');
@@ -56,8 +65,14 @@ export function LaboratoryDiagnosticsPage() {
     { key: 'test', header: 'Investigation', render: (row) => <div><div className="ui-table__cell-title">{row.testName}</div><div className="ui-table__cell-sub">{row.testCode || 'Laboratory test'} · {row.priority || 'routine'}</div></div> },
     { key: 'result', header: 'Result', render: (row) => row.result ? <div><div className="ui-table__cell-title">{row.result} {row.resultUnit || ''}</div><div className="ui-table__cell-sub">{row.referenceRange ? `Reference: ${row.referenceRange}` : 'Result entered'}</div></div> : <span className="laboratory-muted">Awaiting result</span> },
     { key: 'status', header: 'Status', render: (row) => <Badge tone={statusTone[row.status] || 'neutral'}>{row.status.replace('_', ' ')}</Badge> },
-    { key: 'actions', header: 'Actions', render: (row) => row.status === 'ordered' ? <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('collect'); }}>Collect sample</Button> : ['collected', 'processing'].includes(row.status) ? <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('result'); }}>{row.result ? 'Update result' : 'Enter result'}</Button> : <span className="laboratory-muted">{row.status === 'completed' ? 'Result finalized' : 'No actions'}</span> },
-  ], []);
+    { key: 'actions', header: 'Actions', render: (row) => <div className="laboratory-actions">
+      {row.status === 'ordered' && canUpdate && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('collect'); }}>Collect sample</Button>}
+      {['collected', 'processing'].includes(row.status) && canUpdate && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('result'); }}>{row.result ? 'Edit draft' : 'Enter draft'}</Button>}
+      {row.status === 'processing' && canVerify && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('verify'); }}>Verify</Button>}
+      {row.status === 'verified' && canRelease && <Button size="sm" onClick={() => setReleaseTarget(row)}>Release</Button>}
+      {(row.status === 'completed' || row.status === 'verified' && (canUpdate || canVerify || canRelease)) && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('view'); }}>View result</Button>}
+    </div> },
+  ], [canUpdate, canVerify, canRelease]);
 
   const saveOrder = async (payload: CreateLaboratoryOrderPayload) => {
     setSaving(true); setError(''); setNotice('');
@@ -86,9 +101,23 @@ export function LaboratoryDiagnosticsPage() {
     } catch (err) { setError(getErrorMessage(err, 'Unable to collect sample')); }
     finally { setSaving(false); }
   };
+  const verifyResult = async () => {
+    if (!selectedOrder) return;
+    setSaving(true); setError(''); setNotice('');
+    try { const updated = await laboratoryApi.verifyResult(selectedOrder.id); setOrders((current) => current.map((row) => row.id === updated.id ? updated : row)); setModal(null); setSelectedOrder(null); setNotice('Result verified. It is ready for release.'); }
+    catch (err) { setError(getErrorMessage(err, 'Unable to verify result')); }
+    finally { setSaving(false); }
+  };
+  const releaseResult = async () => {
+    if (!releaseTarget) return;
+    setSaving(true); setError(''); setNotice('');
+    try { const updated = await laboratoryApi.releaseResult(releaseTarget.id); setOrders((current) => current.map((row) => row.id === updated.id ? updated : row)); setReleaseTarget(null); setNotice('Verified result released.'); }
+    catch (err) { setReleaseTarget(null); setError(getErrorMessage(err, 'Unable to release result')); }
+    finally { setSaving(false); }
+  };
 
   return <div className="laboratory-page">
-    <PageHeader title="Laboratory diagnostics" subtitle="Order investigations, track turnaround, and publish verified results." actions={<Button size="sm" onClick={() => setModal('order')}>Order a test</Button>} />
+    <PageHeader title="Laboratory diagnostics" subtitle="Order investigations, track turnaround, and publish verified results." actions={canCreate ? <Button size="sm" onClick={() => setModal('order')}>Order a test</Button> : undefined} />
     {error ? <Alert tone="error">{error}</Alert> : null}
     {notice ? <Alert tone="success">{notice}</Alert> : null}
     <div className="laboratory-kpis" aria-label="Laboratory summary">
@@ -104,6 +133,9 @@ export function LaboratoryDiagnosticsPage() {
     {modal === 'order' ? <OrderForm tests={tests} saving={saving} onClose={() => setModal(null)} onSubmit={(payload) => void saveOrder(payload)} /> : null}
     {modal === 'collect' && selectedOrder ? <CollectForm order={selectedOrder} saving={saving} onClose={() => { setModal(null); setSelectedOrder(null); }} onSubmit={(label) => void collectSample(label)} /> : null}
     {modal === 'result' && selectedOrder ? <ResultForm order={selectedOrder} saving={saving} onClose={() => { setModal(null); setSelectedOrder(null); }} onSubmit={(payload) => void saveResult(payload)} /> : null}
+    {modal === 'verify' && selectedOrder ? <VerifyForm order={selectedOrder} saving={saving} error={error} onClose={() => { setModal(null); setSelectedOrder(null); }} onSubmit={() => void verifyResult()} /> : null}
+    {modal === 'view' && selectedOrder ? <ResultView order={selectedOrder} onClose={() => { setModal(null); setSelectedOrder(null); }} /> : null}
+    <ConfirmDialog open={Boolean(releaseTarget)} title="Release laboratory result" message="Release this verified result to the care team? The released result cannot be edited in place." confirmLabel="Release result" confirming={saving} onConfirm={() => void releaseResult()} onCancel={() => setReleaseTarget(null)} />
   </div>;
 }
 
@@ -118,9 +150,33 @@ function OrderForm({ tests, saving, onClose, onSubmit }: { tests: LaboratoryTest
 }
 
 function ResultForm({ order, saving, onClose, onSubmit }: { order: LaboratoryOrder; saving: boolean; onClose: () => void; onSubmit: (payload: UpdateLaboratoryResultPayload) => void }) {
-  const [form, setForm] = useState({ result: order.result || '', resultUnit: order.resultUnit || '', referenceRange: order.referenceRange || '', remarks: order.remarks || '', status: 'completed' as UpdateLaboratoryResultPayload['status'] });
+  const [form, setForm] = useState({ result: order.result || '', resultUnit: order.resultUnit || '', referenceRange: order.referenceRange || '', remarks: order.remarks || '', status: 'processing' as const });
   const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
-  return <ModalShell title={`Result · ${order.testName}`} eyebrow={order.orderNumber} onClose={onClose}><form className="laboratory-form" onSubmit={(event) => { event.preventDefault(); onSubmit({ result: form.result, resultUnit: form.resultUnit || null, referenceRange: form.referenceRange || null, remarks: form.remarks || null, status: form.status }); }}><div className="laboratory-result-context"><strong>{order.patientName || `Patient #${order.patientId}`}</strong><span>{order.patientMrdNumber || `Patient ID ${order.patientId}`} · {order.priority || 'routine'} priority</span></div><label className="laboratory-textarea"><span>Result value</span><textarea rows={4} required value={form.result} onChange={(event) => update('result', event.target.value)} placeholder="Enter the observed result or interpretation" /></label><div className="laboratory-form__grid"><Input label="Unit" value={form.resultUnit} onChange={(event) => update('resultUnit', event.target.value)} placeholder="e.g. mg/dL" /><Input label="Reference range" value={form.referenceRange} onChange={(event) => update('referenceRange', event.target.value)} placeholder="e.g. 70–100 mg/dL" /><Select label="Workflow status" value={form.status} onChange={(event) => update('status', event.target.value)} options={[{ value: 'completed', label: 'Completed / verified' }, { value: 'processing', label: 'Processing / preliminary' }]} /></div><label className="laboratory-textarea"><span>Remarks</span><textarea rows={3} value={form.remarks} onChange={(event) => update('remarks', event.target.value)} placeholder="Add interpretation or quality notes" /></label><FormFooter saving={saving} onClose={onClose} submitLabel="Save result" /></form></ModalShell>;
+  return <ModalShell title={`Result · ${order.testName}`} eyebrow={order.orderNumber} onClose={onClose}><form className="laboratory-form" onSubmit={(event) => { event.preventDefault(); onSubmit({ result: form.result, resultUnit: form.resultUnit || null, referenceRange: form.referenceRange || null, remarks: form.remarks || null, status: form.status }); }}><div className="laboratory-result-context"><strong>{order.patientName || `Patient #${order.patientId}`}</strong><span>{order.patientMrdNumber || `Patient ID ${order.patientId}`} · {order.priority || 'routine'} priority</span></div><label className="laboratory-textarea"><span>Result value</span><textarea rows={4} required value={form.result} onChange={(event) => update('result', event.target.value)} placeholder="Enter the observed result or interpretation" /></label><div className="laboratory-form__grid"><Input label="Unit" value={form.resultUnit} onChange={(event) => update('resultUnit', event.target.value)} placeholder="e.g. mg/dL" /><Input label="Reference range" value={form.referenceRange} onChange={(event) => update('referenceRange', event.target.value)} placeholder="e.g. 70–100 mg/dL" /></div><label className="laboratory-textarea"><span>Remarks</span><textarea rows={3} value={form.remarks} onChange={(event) => update('remarks', event.target.value)} placeholder="Add interpretation or quality notes" /></label><FormFooter saving={saving} onClose={onClose} submitLabel="Save result" /></form></ModalShell>;
+}
+
+function VerifyForm({ order, saving, error, onClose, onSubmit }: { order: LaboratoryOrder; saving: boolean; error: string; onClose: () => void; onSubmit: () => void }) {
+  const [patientAndSpecimenChecked, setPatientAndSpecimenChecked] = useState(false);
+  const [qualityControlChecked, setQualityControlChecked] = useState(false);
+  return <ModalShell title={`Verify result · ${order.testName}`} eyebrow={order.orderNumber} onClose={onClose}><form className="laboratory-form" onSubmit={(event) => { event.preventDefault(); onSubmit(); }}>
+    <div className="laboratory-result-context"><strong>{order.patientName || `Patient #${order.patientId}`}</strong><span>{order.patientMrdNumber || `Patient ID ${order.patientId}`} · Specimen {order.specimenLabel || 'not labeled'}</span></div>
+    <section><h3>Draft result</h3><p>{order.result} {order.resultUnit || ''}</p><p>{order.referenceRange ? `Reference range: ${order.referenceRange}` : 'Reference range not recorded.'}</p>{order.remarks && <p>{order.remarks}</p>}</section>
+    <label><input type="checkbox" checked={patientAndSpecimenChecked} onChange={(event) => setPatientAndSpecimenChecked(event.target.checked)} /> I checked the patient, order, specimen, and transcribed result.</label>
+    <label><input type="checkbox" checked={qualityControlChecked} onChange={(event) => setQualityControlChecked(event.target.checked)} /> I reviewed the relevant quality-control information under our laboratory procedure.</label>
+    <Alert tone="warning">Verification requires a staff member other than the person who entered the draft. This records an internal review, not a regulated electronic signature.</Alert>
+    {error && <Alert tone="error">{error}</Alert>}
+    <FormFooter saving={saving} onClose={onClose} submitLabel="Verify result" disabled={!patientAndSpecimenChecked || !qualityControlChecked} />
+  </form></ModalShell>;
+}
+
+function ResultView({ order, onClose }: { order: LaboratoryOrder; onClose: () => void }) {
+  return <ModalShell title={`Result · ${order.testName}`} eyebrow={order.orderNumber} onClose={onClose}><div className="laboratory-form">
+    <div className="laboratory-result-context"><strong>{order.patientName || `Patient #${order.patientId}`}</strong><span>{order.patientMrdNumber || `Patient ID ${order.patientId}`} · {order.status}</span></div>
+    <section><h3>Result</h3><p>{order.result || 'No result recorded.'} {order.resultUnit || ''}</p>{order.referenceRange && <p>Reference range: {order.referenceRange}</p>}{order.remarks && <p>{order.remarks}</p>}</section>
+    {order.verifiedAt && <p>Verified {dateLabel(order.verifiedAt)} · staff #{order.verifiedById || 'unknown'}</p>}
+    {order.completedAt && <p>Released {dateLabel(order.completedAt)} · staff #{order.releasedById || 'unknown'}</p>}
+    <Button type="button" variant="secondary" onClick={onClose}>Close</Button>
+  </div></ModalShell>;
 }
 
 function FormFooter({ saving, onClose, submitLabel, disabled = false }: { saving: boolean; onClose: () => void; submitLabel: string; disabled?: boolean }) {

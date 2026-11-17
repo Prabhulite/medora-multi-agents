@@ -34,7 +34,7 @@ Verify the restored schema, migration history, row counts for key tables, and a 
 
 ## Automated verification
 
-Run `npm run db:backup-check` from `backend/` with MySQL available. It creates synthetic data in a uniquely named temporary database, backs it up with the compiled command, restores it to a new database, verifies the row, checks overwrite refusal and checksum rejection, then removes its temporary databases and files. It never selects the configured working `DB_NAME` database.
+Run `npm run db:backup-check` from `backend/` with MySQL available. It creates a uniquely named temporary database, runs all compiled Medora migrations and seed data, adds a probe row, backs it up, and restores it to another new database. It compares migration history and key table counts, verifies the probe and seeded user records, and checks overwrite refusal and checksum rejection. It then removes the temporary databases and files. It never selects the configured working `DB_NAME` database.
 
 ## Docker Compose note
 

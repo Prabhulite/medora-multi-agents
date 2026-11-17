@@ -2,6 +2,7 @@ import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGenerat
 import { Doctor } from './Doctor.js';
 import { Patient } from './Patient.js';
 import { RadiologyModality } from './RadiologyModality.js';
+import { RadiologyResource } from './RadiologyResource.js';
 import { User } from './User.js';
 
 @Entity({ name: 'radiology_orders' })
@@ -19,6 +20,10 @@ export class RadiologyOrder {
   @Column({ type: 'varchar', length: 30, default: 'routine' }) priority!: 'routine' | 'urgent' | 'stat';
   @Column({ name: 'clinical_notes', type: 'text', nullable: true }) clinicalNotes!: string | null;
   @Column({ name: 'ordered_at', type: 'timestamp' }) orderedAt!: Date;
+  @Column({ name: 'scheduled_at', type: 'datetime', precision: 6, nullable: true }) scheduledAt!: Date | null;
+  @Column({ name: 'scheduled_end_at', type: 'datetime', precision: 6, nullable: true }) scheduledEndAt!: Date | null;
+  @Column({ name: 'resource_id', type: 'int', unsigned: true, nullable: true }) resourceId!: number | null;
+  @ManyToOne(() => RadiologyResource, { onDelete: 'RESTRICT', nullable: true }) @JoinColumn({ name: 'resource_id' }) resource!: RadiologyResource | null;
   @Column({ name: 'performed_at', type: 'timestamp', nullable: true }) performedAt!: Date | null;
   @Column({ name: 'reported_at', type: 'timestamp', nullable: true }) reportedAt!: Date | null;
   @Column({ name: 'report_text', type: 'text', nullable: true }) reportText!: string | null;

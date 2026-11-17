@@ -41,6 +41,7 @@ export function InpatientDashboardPage() {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState('');
   const [dischargeTarget, setDischargeTarget] = useState<Admission | null>(null);
+  const [dischargeView, setDischargeView] = useState<Admission | null>(null);
   const [observationTarget, setObservationTarget] = useState<Admission | null>(null);
   const [transferTarget, setTransferTarget] = useState<Admission | null>(null);
   const [medicationTarget, setMedicationTarget] = useState<Admission | null>(null);
@@ -82,7 +83,7 @@ export function InpatientDashboardPage() {
     { key: 'doctor', header: 'Attending doctor', render: (row) => <span>{row.attendingDoctor}</span> },
     { key: 'type', header: 'Type', render: (row) => <span className="inpatient-capitalize">{row.admissionType.replace('_', ' ')}</span> },
     { key: 'status', header: 'Status', render: (row) => <Badge tone={admissionTone[row.status]}>{row.status}</Badge> },
-    { key: 'action', header: 'Action', render: (row) => <div className="inpatient-row-actions"><Button size="sm" variant="secondary" onClick={() => { setObservationTarget(row); void inpatientApi.listObservations(row.id).then(setObservations).catch((err) => setError(getErrorMessage(err))); }}>Observations</Button><Button size="sm" variant="secondary" onClick={() => setCarePlanTarget(row)}>Care plans</Button><Button size="sm" variant="secondary" onClick={() => setMedicationTarget(row)}>Medications</Button><Button size="sm" variant="secondary" onClick={() => { setTransferTarget(row); void inpatientApi.listTransfers(row.id).then(setTransfers).catch((err) => setError(getErrorMessage(err))); }}>Transfers</Button>{row.status === 'admitted' ? <Button size="sm" variant="secondary" onClick={() => setDischargeTarget(row)}>Discharge</Button> : row.dischargeSummary ? <span title={row.dischargeSummary}>Summary recorded</span> : null}</div> },
+    { key: 'action', header: 'Action', render: (row) => <div className="inpatient-row-actions"><Button size="sm" variant="secondary" onClick={() => { setObservationTarget(row); void inpatientApi.listObservations(row.id).then(setObservations).catch((err) => setError(getErrorMessage(err))); }}>Observations</Button><Button size="sm" variant="secondary" onClick={() => setCarePlanTarget(row)}>Care plans</Button><Button size="sm" variant="secondary" onClick={() => setMedicationTarget(row)}>Medications</Button><Button size="sm" variant="secondary" onClick={() => { setTransferTarget(row); void inpatientApi.listTransfers(row.id).then(setTransfers).catch((err) => setError(getErrorMessage(err))); }}>Transfers</Button>{row.status === 'admitted' ? <Button size="sm" variant="secondary" onClick={() => setDischargeTarget(row)}>Discharge</Button> : row.status === 'discharged' ? <Button size="sm" variant="secondary" onClick={() => setDischargeView(row)}>View discharge</Button> : null}</div> },
   ], []);
 
   const saveAdmission = async (payload: CreateAdmissionPayload) => {
@@ -125,6 +126,7 @@ export function InpatientDashboardPage() {
     {tab === 'admissions' ? <section className="inpatient-section"><div className="inpatient-section-heading"><div><h2>Admissions</h2><p>Review current and planned inpatient stays.</p></div><Button size="sm" onClick={() => setShowForm(true)}>New admission</Button></div><Table columns={admissionColumns} rows={admissions} rowKey={(row) => row.id} loading={loading} searchText={(row) => `${row.admissionNumber} ${row.patientName} ${row.patientMrdNumber} ${row.wardName}`} searchPlaceholder="Search admissions" emptyMessage="No admissions found." /></section> : null}
     {showForm ? <AdmissionForm wards={wards} beds={availableBeds} saving={saving} onClose={() => setShowForm(false)} onSubmit={(payload) => void saveAdmission(payload)} /> : null}
     {dischargeTarget ? <DischargeForm admission={dischargeTarget} saving={saving} onClose={() => setDischargeTarget(null)} onSubmit={(payload) => void saveDischarge(payload)} /> : null}
+    {dischargeView ? <DischargeSummaryView admission={dischargeView} onClose={() => setDischargeView(null)} /> : null}
     {observationTarget ? <ObservationPanel admission={observationTarget} observations={observations} onClose={() => setObservationTarget(null)} onSave={async (payload) => { await inpatientApi.addObservation(observationTarget.id, payload); setObservations(await inpatientApi.listObservations(observationTarget.id)); }} /> : null}
     {transferTarget ? <TransferPanel admission={transferTarget} availableBeds={availableBeds} transfers={transfers} onClose={() => setTransferTarget(null)} onSave={async (toBedId, reason) => { await inpatientApi.transfer(transferTarget.id, toBedId, reason); setTransfers(await inpatientApi.listTransfers(transferTarget.id)); await load(); }} /> : null}
     {medicationTarget ? <MedicationAdministrationPanel admission={medicationTarget} onClose={() => setMedicationTarget(null)} /> : null}
@@ -157,6 +159,22 @@ export default InpatientDashboardPage;
 function TransferPanel({ admission, availableBeds, transfers, onClose, onSave }: { admission: Admission; availableBeds: Bed[]; transfers: BedTransfer[]; onClose: () => void; onSave: (toBedId: number, reason: string) => Promise<void> }) {
   const [bedId, setBedId] = useState(''); const [reason, setReason] = useState(''); const [saving, setSaving] = useState(false); const [error, setError] = useState('');
   return <div className="inpatient-modal-backdrop" role="presentation" onClick={onClose}><section className="inpatient-modal" role="dialog" aria-modal="true" aria-labelledby="transfer-title" onClick={(event) => event.stopPropagation()}><div className="inpatient-modal__header"><div><span className="inpatient-eyebrow">BED TRANSFERS</span><h2 id="transfer-title">{admission.patientName}</h2><p>{admission.admissionNumber}</p></div><button type="button" onClick={onClose} aria-label="Close transfers">×</button></div>{error && <Alert tone="error">{error}</Alert>}{admission.status === 'admitted' && <form onSubmit={async (event) => { event.preventDefault(); setSaving(true); setError(''); try { await onSave(Number(bedId), reason); setBedId(''); setReason(''); } catch (err) { setError(getErrorMessage(err)); } finally { setSaving(false); } }}><div className="inpatient-form-grid"><Select label="Destination bed" required value={bedId} onChange={(event) => setBedId(event.target.value)} options={[{ value: '', label: 'Select available bed' }, ...availableBeds.map((bed) => ({ value: bed.id, label: `${bed.wardName} · ${bed.bedNumber}` }))]} /><Input label="Transfer reason" required minLength={2} maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} /></div><div className="inpatient-modal__footer"><Button type="submit" loading={saving} disabled={!availableBeds.length}>Transfer patient</Button></div></form>}<div className="inpatient-observations"><h3>Transfer history</h3>{transfers.length ? transfers.map((item) => <article key={item.id}><strong>{new Date(item.transferredAt).toLocaleString()}</strong><span>{item.fromBed.ward.name} · {item.fromBed.number} → {item.toBed.ward.name} · {item.toBed.number}</span><p>{item.reason}</p><small>{item.transferredBy?.fullName || 'Staff'}</small></article>) : <p>No transfers recorded.</p>}</div></section></div>;
+}
+
+function DischargeSummaryView({ admission, onClose }: { admission: Admission; onClose: () => void }) {
+  return <div className="inpatient-modal-backdrop" role="presentation" onClick={onClose}>
+    <section className="inpatient-modal inpatient-discharge-sheet" role="dialog" aria-modal="true" aria-labelledby="discharge-summary-title" onClick={(event) => event.stopPropagation()}>
+      <div className="inpatient-modal__header"><div><span className="inpatient-eyebrow">DISCHARGE RECORD</span><h2 id="discharge-summary-title">Discharge summary</h2><p>{admission.admissionNumber}</p></div><button type="button" onClick={onClose} aria-label="Close discharge summary">×</button></div>
+      <div className="inpatient-discharge-sheet__body">
+        <dl><div><dt>Patient</dt><dd>{admission.patientName}</dd></div><div><dt>MRD</dt><dd>{admission.patientMrdNumber}</dd></div><div><dt>Attending doctor</dt><dd>{admission.attendingDoctor}</dd></div><div><dt>Ward and bed</dt><dd>{admission.wardName} · {admission.bedNumber}</dd></div><div><dt>Admitted</dt><dd>{formatDate(admission.admittedAt)}</dd></div><div><dt>Discharged</dt><dd>{admission.dischargedAt ? new Date(admission.dischargedAt).toLocaleString('en-IN') : 'Date not recorded'}</dd></div></dl>
+        <section><h3>Clinical summary</h3><p>{admission.dischargeSummary || 'No clinical summary recorded.'}</p></section>
+        <section><h3>Discharge diagnosis</h3><p>{admission.dischargeDiagnosis || 'Not recorded.'}</p></section>
+        <section><h3>Medications on discharge</h3><p>{admission.dischargeMedications || 'Not recorded.'}</p></section>
+        <section><h3>Follow-up instructions</h3><p>{admission.followUpInstructions || 'Not recorded.'}</p></section>
+      </div>
+      <div className="inpatient-modal__footer inpatient-discharge-sheet__actions"><Button type="button" variant="secondary" onClick={onClose}>Close</Button><Button type="button" onClick={() => window.print()}>Print summary</Button></div>
+    </section>
+  </div>;
 }
 
 function DischargeForm({ admission, saving, onClose, onSubmit }: { admission: Admission; saving: boolean; onClose: () => void; onSubmit: (payload: DischargePayload) => void }) {

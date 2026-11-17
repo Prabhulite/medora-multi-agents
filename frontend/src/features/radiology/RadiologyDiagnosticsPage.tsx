@@ -9,10 +9,10 @@ import { Table, type TableColumn } from '../../components/ui/Table';
 import { getErrorMessage } from '../../lib/api';
 import { hasPermission } from '../../lib/permissions';
 import { useAuth } from '../auth/AuthContext';
-import { radiologyApi, type CreateRadiologyOrderPayload, type RadiologyAddendum, type RadiologyCommunication, type RadiologyModality, type RadiologyOrder, type ReferringDoctor, type UpdateRadiologyReportPayload } from './radiology.api';
+import { radiologyApi, type CreateRadiologyOrderPayload, type RadiologyAddendum, type RadiologyCommunication, type RadiologyModality, type RadiologyOrder, type RadiologyResource, type RadiologyScheduleEvent, type ReferringDoctor, type UpdateRadiologyReportPayload } from './radiology.api';
 import './RadiologyDiagnosticsPage.css';
 
-type Modal = 'order' | 'report' | 'communications' | null;
+type Modal = 'order' | 'report' | 'communications' | 'schedule' | 'resources' | null;
 const statusTone: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'neutral'> = {
   ordered: 'info', scheduled: 'warning', performed: 'warning', reported: 'success', cancelled: 'danger',
 };
@@ -27,6 +27,7 @@ export function RadiologyDiagnosticsPage() {
   const { user } = useAuth();
   const canCreate = hasPermission(user, 'radiology.create');
   const canUpdate = hasPermission(user, 'radiology.update');
+  const canManageResources = hasPermission(user, 'radiology.resources.manage');
   const [modalities, setModalities] = useState<RadiologyModality[]>([]);
   const [orders, setOrders] = useState<RadiologyOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,9 +58,10 @@ export function RadiologyDiagnosticsPage() {
     { key: 'order', header: 'Order', render: (row) => <div><div className="ui-table__cell-title">{row.orderNumber}</div><div className="ui-table__cell-sub">{dateLabel(row.orderedAt)}</div></div> },
     { key: 'patient', header: 'Patient', render: (row) => <div><div className="ui-table__cell-title">{row.patientName || `Patient #${row.patientId}`}</div><div className="ui-table__cell-sub">{row.patientMrdNumber || `ID ${row.patientId}`}</div></div> },
     { key: 'study', header: 'Study', render: (row) => <div><div className="ui-table__cell-title">{row.studyName}</div><div className="ui-table__cell-sub">{row.modalityCode || row.modalityName} · {row.priority || 'routine'}</div></div> },
+    { key: 'scheduled', header: 'Scheduled', render: (row) => row.scheduledAt ? <div><div>{dateLabel(row.scheduledAt)}</div><small>{row.resourceName || 'Unassigned resource'}</small></div> : 'Not scheduled' },
     { key: 'report', header: 'Report', render: (row) => row.report || row.impression ? <div><div className="ui-table__cell-title">Report available</div><div className="ui-table__cell-sub">{row.reportedAt ? dateLabel(row.reportedAt) : 'Draft report'}</div></div> : <span className="radiology-muted">Awaiting report</span> },
     { key: 'status', header: 'Status', render: (row) => <Badge tone={statusTone[row.status] || 'neutral'}>{row.status.replace('_', ' ')}</Badge> },
-    { key: 'actions', header: 'Actions', render: (row) => <div className="radiology-actions">{canUpdate && ['ordered', 'scheduled'].includes(row.status) && <Button size="sm" variant="secondary" onClick={() => void markPerformed(row)}>Mark performed</Button>}{(row.status === 'performed' && canUpdate || row.status === 'reported') && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('report'); }}>{row.status === 'reported' ? 'View final report' : row.report ? 'Edit draft' : 'Enter report'}</Button>}{['performed', 'reported'].includes(row.status) && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('communications'); }}>Communications</Button>}</div> },
+    { key: 'actions', header: 'Actions', render: (row) => <div className="radiology-actions">{canUpdate && ['ordered', 'scheduled'].includes(row.status) && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('schedule'); }}>{row.scheduledAt ? 'Reschedule' : 'Schedule'}</Button>}{canUpdate && ['ordered', 'scheduled'].includes(row.status) && <Button size="sm" variant="secondary" onClick={() => void markPerformed(row)}>Mark performed</Button>}{(row.status === 'performed' && canUpdate || row.status === 'reported') && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('report'); }}>{row.status === 'reported' ? 'View final report' : row.report ? 'Edit draft' : 'Enter report'}</Button>}{['performed', 'reported'].includes(row.status) && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('communications'); }}>Communications</Button>}</div> },
   ], [canUpdate]);
 
   const markPerformed = async (order: RadiologyOrder) => {
@@ -85,7 +87,7 @@ export function RadiologyDiagnosticsPage() {
   };
 
   return <div className="radiology-page">
-    <PageHeader title="Radiology diagnostics" subtitle="Coordinate imaging work, review the modality queue, and publish reports." actions={canCreate ? <Button size="sm" onClick={() => setModal('order')}>Order imaging</Button> : undefined} />
+    <PageHeader title="Radiology diagnostics" subtitle="Coordinate imaging work, review the modality queue, and publish reports." actions={<div className="radiology-actions">{canManageResources && <Button size="sm" variant="secondary" onClick={() => setModal('resources')}>Manage resources</Button>}{canCreate && <Button size="sm" onClick={() => setModal('order')}>Order imaging</Button>}</div>} />
     {error ? <Alert tone="error">{error}</Alert> : null}
     {notice ? <Alert tone="success">{notice}</Alert> : null}
     <div className="radiology-kpis" aria-label="Radiology summary">
@@ -101,6 +103,8 @@ export function RadiologyDiagnosticsPage() {
     {modal === 'order' ? <OrderForm modalities={modalities} saving={saving} onClose={() => setModal(null)} onSubmit={(payload) => void saveOrder(payload)} /> : null}
     {modal === 'report' && selectedOrder ? selectedOrder.status === 'reported' ? <FinalReportView order={selectedOrder} canUpdate={canUpdate} onClose={() => { setModal(null); setSelectedOrder(null); }} /> : <ReportForm order={selectedOrder} saving={saving} onClose={() => { setModal(null); setSelectedOrder(null); }} onSubmit={(payload) => void saveReport(payload)} /> : null}
     {modal === 'communications' && selectedOrder ? <CommunicationView order={selectedOrder} canUpdate={canUpdate} onClose={() => { setModal(null); setSelectedOrder(null); }} /> : null}
+    {modal === 'schedule' && selectedOrder ? <ScheduleView order={selectedOrder} onSaved={(updated) => { setOrders((current) => current.map((row) => row.id === updated.id ? updated : row)); setSelectedOrder(updated); setNotice('Study schedule saved.'); }} onClose={() => { setModal(null); setSelectedOrder(null); }} /> : null}
+    {modal === 'resources' ? <ResourceManager modalities={modalities} onClose={() => setModal(null)} /> : null}
   </div>;
 }
 
@@ -157,6 +161,110 @@ function FinalReportView({ order, canUpdate, onClose }: { order: RadiologyOrder;
       <section><h3>Addenda</h3>{loading ? <p>Loading addenda…</p> : addenda.length ? addenda.map((row) => <article key={row.id}><strong>{dateLabel(row.createdAt)} · {row.authorName || 'Former user'}</strong><p>Reason: {row.reason}</p><p>{row.addendum}</p></article>) : <p>No addenda recorded.</p>}</section>
       {error && <Alert tone="error">{error}</Alert>}
       {canUpdate && <form className="radiology-form" onSubmit={(event) => void saveAddendum(event)}><h3>Add a correction</h3><Input label="Reason" required minLength={5} maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} /><label className="radiology-textarea"><span>Addendum</span><textarea required rows={4} maxLength={10000} value={addendum} onChange={(event) => setAddendum(event.target.value)} /></label><Button type="submit" loading={saving} disabled={saving || reason.trim().length < 5 || !addendum.trim()}>Save addendum</Button></form>}
+      <Button type="button" variant="secondary" onClick={onClose}>Close</Button>
+    </div>
+  </ModalShell>;
+}
+
+function ResourceManager({ modalities, onClose }: { modalities: RadiologyModality[]; onClose: () => void }) {
+  const [resources, setResources] = useState<RadiologyResource[]>([]);
+  const [form, setForm] = useState({ modalityId: '', code: '', name: '', location: '' });
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let active = true;
+    radiologyApi.listResources().then((rows) => { if (active) setResources(rows); }).catch((err) => { if (active) setError(getErrorMessage(err, 'Unable to load resources')); }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+  const create = async (event: React.FormEvent) => {
+    event.preventDefault(); setBusy(true); setError('');
+    try {
+      const row = await radiologyApi.createResource({ modalityId: Number(form.modalityId), code: form.code.trim().toUpperCase(), name: form.name.trim(), location: form.location.trim() || null });
+      setResources((current) => [...current, row]); setForm({ modalityId: '', code: '', name: '', location: '' });
+    } catch (err) { setError(getErrorMessage(err, 'Unable to create resource')); }
+    finally { setBusy(false); }
+  };
+  const toggle = async (resource: RadiologyResource) => {
+    setBusy(true); setError('');
+    try { const updated = await radiologyApi.setResourceActive(resource.id, !resource.isActive); setResources((current) => current.map((row) => row.id === updated.id ? updated : row)); }
+    catch (err) { setError(getErrorMessage(err, 'Unable to update resource')); }
+    finally { setBusy(false); }
+  };
+  return <ModalShell title="Radiology resources" eyebrow="SCANNERS AND ROOMS" onClose={onClose}><div className="radiology-form">
+    {error && <Alert tone="error">{error}</Alert>}
+    <section><h3>Configured resources</h3>{loading ? <p>Loading…</p> : resources.length ? resources.map((resource) => <article key={resource.id}><strong>{resource.name} · {resource.code}</strong><p>{modalities.find((modality) => modality.id === resource.modalityId)?.name || `Modality #${resource.modalityId}`}{resource.location ? ` · ${resource.location}` : ''} · {resource.isActive ? 'Active' : 'Inactive'}</p><Button size="sm" variant="secondary" disabled={busy} onClick={() => void toggle(resource)}>{resource.isActive ? 'Deactivate' : 'Activate'}</Button></article>) : <p>No resources configured.</p>}</section>
+    <form className="radiology-form" onSubmit={(event) => void create(event)}><h3>Add scanner or room</h3><div className="radiology-form__grid"><Select label="Modality" required value={form.modalityId} onChange={(event) => setForm((current) => ({ ...current, modalityId: event.target.value }))} options={[{ value: '', label: 'Select modality' }, ...modalities.map((modality) => ({ value: modality.id, label: modality.name }))]} /><Input label="Resource code" required minLength={2} maxLength={40} value={form.code} onChange={(event) => setForm((current) => ({ ...current, code: event.target.value }))} placeholder="e.g. CT-ROOM-1" /><Input label="Name" required minLength={2} maxLength={160} value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="e.g. CT Scanner 1" /><Input label="Location" maxLength={160} value={form.location} onChange={(event) => setForm((current) => ({ ...current, location: event.target.value }))} placeholder="Building and room" /></div><Button type="submit" loading={busy} disabled={busy || !form.modalityId || !form.code.trim() || !form.name.trim()}>Add resource</Button></form>
+    <Button type="button" variant="secondary" onClick={onClose}>Close</Button>
+  </div></ModalShell>;
+}
+
+function ScheduleView({ order, onSaved, onClose }: { order: RadiologyOrder; onSaved: (order: RadiologyOrder) => void; onClose: () => void }) {
+  const localTime = (value: string | Date) => {
+    const date = new Date(value);
+    return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+  };
+  const [scheduledAt, setScheduledAt] = useState(localTime(order.scheduledAt || new Date(Date.now() + 24 * 60 * 60_000)));
+  const [durationMinutes, setDurationMinutes] = useState(order.scheduledAt && order.scheduledEndAt ? String(Math.round((new Date(order.scheduledEndAt).getTime() - new Date(order.scheduledAt).getTime()) / 60_000)) : '30');
+  const [resourceId, setResourceId] = useState(order.resourceId ? String(order.resourceId) : '');
+  const [resources, setResources] = useState<RadiologyResource[]>([]);
+  const [reason, setReason] = useState('');
+  const [events, setEvents] = useState<RadiologyScheduleEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let active = true;
+    Promise.all([radiologyApi.listScheduleEvents(order.id), radiologyApi.listResources()]).then(([rows, available]) => { if (active) { setEvents(rows); setResources(available); } }).catch((err) => { if (active) setError(getErrorMessage(err, 'Unable to load schedule details')); }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [order.id]);
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault(); setSaving(true); setError('');
+    try {
+      const updated = await radiologyApi.scheduleOrder(order.id, { scheduledAt: new Date(scheduledAt).toISOString(), durationMinutes: Number(durationMinutes), resourceId: resourceId ? Number(resourceId) : null, reason: reason.trim() || null });
+      onSaved(updated);
+      setEvents(await radiologyApi.listScheduleEvents(order.id));
+      setReason('');
+    } catch (err) { setError(getErrorMessage(err, 'Unable to save study schedule')); }
+    finally { setSaving(false); }
+  };
+  return <ModalShell title={`Schedule · ${order.studyName}`} eyebrow={order.orderNumber} onClose={onClose}><div className="radiology-form">
+    <div className="radiology-result-context"><strong>{order.patientName || `Patient #${order.patientId}`}</strong><span>{order.patientMrdNumber || `Patient ID ${order.patientId}`} · {order.modalityName}</span></div>
+    <Alert tone="info">Selecting a resource checks for overlapping booked studies. Unassigned bookings do not reserve equipment.</Alert>
+    {error && <Alert tone="error">{error}</Alert>}
+    <form className="radiology-form" onSubmit={(event) => void save(event)}><div className="radiology-form__grid"><Input label="Study date and time" type="datetime-local" required value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} /><Select label="Duration" value={durationMinutes} onChange={(event) => setDurationMinutes(event.target.value)} options={[15, 30, 45, 60, 90, 120, 180, 240].map((minutes) => ({ value: minutes, label: `${minutes} minutes` }))} /><Select label="Scanner or room" value={resourceId} onChange={(event) => setResourceId(event.target.value)} options={[{ value: '', label: 'Unassigned (no collision check)' }, ...resources.filter((resource) => resource.modalityId === order.modalityId && (resource.isActive || resource.id === order.resourceId)).map((resource) => ({ value: resource.id, label: `${resource.name}${resource.location ? ` · ${resource.location}` : ''}${resource.isActive ? '' : ' (inactive)'}` }))]} /></div>{order.scheduledAt && <Input label="Reason for rescheduling" required minLength={5} maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} />}<Button type="submit" loading={saving} disabled={loading || saving || !scheduledAt || Boolean(order.scheduledAt && reason.trim().length < 5)}>Save schedule</Button></form>
+    <section><h3>Schedule history</h3>{loading ? <p>Loading…</p> : events.length ? events.map((row) => <article key={row.id}><strong>{dateLabel(row.scheduledAt)} to {dateLabel(row.scheduledEndAt)}</strong><p>{row.resourceId ? resources.find((resource) => resource.id === row.resourceId)?.name || `Resource #${row.resourceId}` : 'Unassigned resource'} · {row.previousAt ? `Changed from ${dateLabel(row.previousAt)}` : 'Initial booking'}{row.reason ? ` · ${row.reason}` : ''}</p><small>{row.actorName || 'Former user'} · {dateLabel(row.createdAt)}</small></article>) : <p>No schedule recorded.</p>}</section>
+    <Button type="button" variant="secondary" onClick={onClose}>Close</Button>
+  </div></ModalShell>;
+}
+
+function CommunicationView({ order, canUpdate, onClose }: { order: RadiologyOrder; canUpdate: boolean; onClose: () => void }) {
+  const [rows, setRows] = useState<RadiologyCommunication[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [form, setForm] = useState({ outcome: 'attempted' as RadiologyCommunication['outcome'], method: 'phone' as RadiologyCommunication['method'], recipientName: '', findingSummary: '', note: '', occurredAt: new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16) });
+  useEffect(() => {
+    let active = true;
+    radiologyApi.listCommunications(order.id).then((items) => { if (active) setRows(items); }).catch((err) => { if (active) setError(getErrorMessage(err, 'Unable to load communications')); }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [order.id]);
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault(); setSaving(true); setError('');
+    try {
+      const row = await radiologyApi.recordCommunication(order.id, { outcome: form.outcome, method: form.method, recipientName: form.recipientName.trim(), findingSummary: form.findingSummary.trim(), note: form.note.trim() || null, occurredAt: new Date(form.occurredAt).toISOString() });
+      setRows((current) => [...current, row]);
+      setForm((current) => ({ ...current, note: '' }));
+    } catch (err) { setError(getErrorMessage(err, 'Unable to record communication')); }
+    finally { setSaving(false); }
+  };
+  return <ModalShell title={`Finding communications · ${order.studyName}`} eyebrow={order.orderNumber} onClose={onClose}>
+    <div className="radiology-form">
+      <div className="radiology-result-context"><strong>{order.patientName || `Patient #${order.patientId}`}</strong><span>{order.patientMrdNumber || `Patient ID ${order.patientId}`}</span></div>
+      <Alert tone="warning">Record actual contact attempts and confirmed delivery. An in-app report notification does not confirm that urgent findings were received.</Alert>
+      <section><h3>Communication history</h3>{loading ? <p>Loading…</p> : rows.length ? rows.map((row) => <article key={row.id}><strong>{row.outcome === 'delivered' ? 'Delivered' : 'Attempted'} · {dateLabel(row.occurredAt)}</strong><p>{row.method.replace('_', ' ')} · {row.recipientName}</p><p>{row.findingSummary}</p>{row.note && <p>{row.note}</p>}<small>Recorded by {row.recorderName || 'Former user'} · {dateLabel(row.createdAt)}</small></article>) : <p>No communication recorded.</p>}</section>
+      {error && <Alert tone="error">{error}</Alert>}
+      {canUpdate && <form className="radiology-form" onSubmit={(event) => void save(event)}><h3>Record contact</h3><div className="radiology-form__grid"><Select label="Outcome" value={form.outcome} onChange={(event) => setForm((current) => ({ ...current, outcome: event.target.value as RadiologyCommunication['outcome'] }))} options={[{ value: 'attempted', label: 'Attempted contact' }, { value: 'delivered', label: 'Delivered to recipient' }]} /><Select label="Method" value={form.method} onChange={(event) => setForm((current) => ({ ...current, method: event.target.value as RadiologyCommunication['method'] }))} options={[{ value: 'phone', label: 'Phone' }, { value: 'in_person', label: 'In person' }, { value: 'secure_message', label: 'Secure message with receipt' }, { value: 'other', label: 'Other' }]} /><Input label="Recipient name" required maxLength={160} value={form.recipientName} onChange={(event) => setForm((current) => ({ ...current, recipientName: event.target.value }))} /><Input label="Contact time" type="datetime-local" required value={form.occurredAt} onChange={(event) => setForm((current) => ({ ...current, occurredAt: event.target.value }))} /></div><label className="radiology-textarea"><span>Finding communicated</span><textarea required minLength={5} maxLength={1000} rows={3} value={form.findingSummary} onChange={(event) => setForm((current) => ({ ...current, findingSummary: event.target.value }))} /></label><label className="radiology-textarea"><span>Notes (optional)</span><textarea maxLength={1000} rows={2} value={form.note} onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))} /></label><Button type="submit" loading={saving} disabled={saving || !form.occurredAt || form.recipientName.trim().length < 2 || form.findingSummary.trim().length < 5}>Record communication</Button></form>}
       <Button type="button" variant="secondary" onClick={onClose}>Close</Button>
     </div>
   </ModalShell>;

@@ -87,13 +87,45 @@ try {
   assert.equal((await ok('POST', '/api/doctors/1/account-link', { userId: 3, doctorCode: 'IT-DOC-1', reason: 'Verified staff identity again for test' })).account.id, 3);
 
   await dataSource.query("INSERT INTO radiology_modalities (modality_code,modality_name) VALUES ('IT-RAD','Integration imaging')");
+  assert.equal((await request('POST', '/api/radiology/resources', { modalityId: 1, code: 'bad code', name: 'Test scanner' })).status, 422);
+  const scanner = await ok('POST', '/api/radiology/resources', { modalityId: 1, code: 'it-scan-1', name: 'Integration scanner', location: 'Room 1' }, 201);
+  assert.equal(scanner.code, 'IT-SCAN-1');
+  token = (await ok('POST', '/api/auth/login', { username: 'integration_doctor', password: 'Temporary!Pass123' })).token;
+  assert.equal((await request('POST', '/api/radiology/resources', { modalityId: 1, code: 'IT-SCAN-2', name: 'Unauthorized scanner' })).status, 403);
+  token = adminToken;
+  assert.equal((await request('POST', '/api/radiology/resources', { modalityId: 1, code: 'IT-SCAN-1', name: 'Duplicate scanner' })).status, 409);
+  assert.equal((await ok('GET', '/api/radiology/resources')).some((row: { id: number }) => row.id === scanner.id), true);
   assert.equal((await ok('GET', '/api/radiology/doctors?search=IT-DOC-1'))[0].id, 1);
   assert.equal((await request('POST', '/api/radiology/orders', { patientId: 1, modalityId: 1 })).status, 422);
   const imaging = await ok('POST', '/api/radiology/orders', { patientId: 1, modalityId: 1, doctorId: 1, studyName: 'Integration chest image', priority: 'routine' }, 201);
   assert.equal(imaging.studyName, 'Integration chest image');
+  const firstSlot = new Date(Date.now() + 2 * 60 * 60_000).toISOString();
+  const secondSlot = new Date(Date.now() + 3 * 60 * 60_000).toISOString();
+  assert.equal((await request('PATCH', `/api/radiology/orders/${imaging.id}/schedule`, { scheduledAt: new Date(Date.now() - 60_000).toISOString() })).status, 422);
+  assert.equal((await ok('PATCH', `/api/radiology/orders/${imaging.id}/schedule`, { scheduledAt: firstSlot, resourceId: scanner.id, durationMinutes: 45 })).resourceId, scanner.id);
+  assert.equal((await request('PATCH', `/api/radiology/orders/${imaging.id}/schedule`, { scheduledAt: secondSlot })).status, 422);
+  assert.equal((await ok('PATCH', `/api/radiology/orders/${imaging.id}/schedule`, { scheduledAt: secondSlot, resourceId: scanner.id, durationMinutes: 45, reason: 'Patient requested later slot' })).status, 'scheduled');
+  assert.equal((await ok('GET', `/api/radiology/orders/${imaging.id}/schedule-events`)).length, 2);
+  const competingStudy = await ok('POST', '/api/radiology/orders', { patientId: 1, modalityId: 1, studyName: 'Competing scan' }, 201);
+  assert.equal((await request('PATCH', `/api/radiology/orders/${competingStudy.id}/schedule`, { scheduledAt: new Date(new Date(secondSlot).getTime() + 15 * 60_000).toISOString(), resourceId: scanner.id, durationMinutes: 30 })).status, 409);
+  assert.equal((await ok('PATCH', `/api/radiology/orders/${competingStudy.id}/schedule`, { scheduledAt: new Date(new Date(secondSlot).getTime() + 60 * 60_000).toISOString(), resourceId: scanner.id, durationMinutes: 30 })).status, 'scheduled');
+  assert.equal((await request('PATCH', `/api/radiology/resources/${scanner.id}/status`, { isActive: false })).status, 409);
+  const collisionSlot = new Date(Date.now() + 8 * 60 * 60_000).toISOString();
+  const concurrentResourceBookings = await Promise.all([1, 2].map(async (number) => {
+    const study = await ok('POST', '/api/radiology/orders', { patientId: 1, modalityId: 1, studyName: `Concurrent resource scan ${number}` }, 201);
+    return request('PATCH', `/api/radiology/orders/${study.id}/schedule`, { scheduledAt: collisionSlot, resourceId: scanner.id, durationMinutes: 30 });
+  }));
+  assert.deepEqual(concurrentResourceBookings.map((result) => result.status).sort(), [200, 409]);
+  assert.equal((await request('POST', `/api/radiology/orders/${imaging.id}/communications`, { outcome: 'attempted', method: 'phone', recipientName: 'Dr Test', findingSummary: 'Urgent finding', occurredAt: new Date().toISOString() })).status, 409);
   assert.equal((await request('POST', `/api/radiology/orders/${imaging.id}/addenda`, { reason: 'Clarify finding', addendum: 'Additional description' })).status, 409);
   assert.equal((await request('PATCH', `/api/radiology/orders/${imaging.id}/report`, { status: 'reported', reportText: 'Final image report' })).status, 409);
   assert.equal((await ok('PATCH', `/api/radiology/orders/${imaging.id}/report`, { status: 'performed', reportText: 'Preliminary image report' })).status, 'performed');
+  assert.equal((await request('PATCH', `/api/radiology/orders/${imaging.id}/schedule`, { scheduledAt: firstSlot, reason: 'Cannot move performed study' })).status, 409);
+  const callAttempt = await ok('POST', `/api/radiology/orders/${imaging.id}/communications`, { outcome: 'attempted', method: 'phone', recipientName: 'Dr Test', findingSummary: 'Urgent finding discussed', occurredAt: new Date().toISOString() }, 201);
+  assert.equal(callAttempt.outcome, 'attempted');
+  assert.equal((await request('POST', `/api/radiology/orders/${imaging.id}/communications`, { outcome: 'delivered', method: 'phone', recipientName: 'Dr Test', findingSummary: 'Urgent finding discussed', occurredAt: new Date(Date.now() + 10 * 60_000).toISOString() })).status, 422);
+  const callDelivered = await ok('POST', `/api/radiology/orders/${imaging.id}/communications`, { outcome: 'delivered', method: 'phone', recipientName: 'Dr Test', findingSummary: 'Urgent finding discussed', occurredAt: new Date().toISOString() }, 201);
+  assert.equal((await ok('GET', `/api/radiology/orders/${imaging.id}/communications`)).map((row: { id: number }) => row.id).join(','), `${callAttempt.id},${callDelivered.id}`);
   assert.equal((await ok('PATCH', `/api/radiology/orders/${imaging.id}/report`, { status: 'reported', reportText: 'Final image report' })).status, 'reported');
   assert.equal((await request('PATCH', `/api/radiology/orders/${imaging.id}/report`, { status: 'reported', reportText: 'Changed final report' })).status, 409);
   assert.equal((await request('POST', `/api/radiology/orders/${imaging.id}/addenda`, { reason: 'Bad', addendum: 'Additional description' })).status, 422);
@@ -284,6 +316,9 @@ try {
   assert.equal(amendedEncounter.assessment, 'Integration assessment');
   assert.equal(amendedEncounter.addenda.length, 2);
   assert.equal(amendedEncounter.addenda[0].createdBy.fullName, 'Integration Admin');
+  for (const author of [amendedEncounter.createdBy, amendedEncounter.signedBy, amendedEncounter.addenda[0].createdBy]) {
+    assert.deepEqual(Object.keys(author).sort(), ['fullName', 'id']);
+  }
   assert.equal((await ok('GET', '/api/patients/1/audit-logs')).some((row: { action: string }) => row.action === 'encounter_signed'), true);
   const signedCopy = `data:application/pdf;base64,${Buffer.from('%PDF-1.4\nIntegration signed copy\n%%EOF').toString('base64')}`;
   const consentPayload = { consentType: 'procedure', subject: 'Integration procedure', risksExplained: 'Risks and alternatives discussed', treatingDoctorName: 'Integration Surgeon One', doctorRegistrationNumber: 'IT-REG-1', language: 'English', signatoryName: 'Integration Patient', signatoryRole: 'patient', signedAt: '2026-11-16T10:00:00.000Z', fileName: 'signed-consent.pdf', mimeType: 'application/pdf', fileData: signedCopy };
@@ -315,7 +350,9 @@ try {
   assert.equal((await request('POST', '/api/inpatient/admissions', { patientId: 1, bedId: 2 })).status, 409);
   const transfer = await ok('POST', `/api/inpatient/admissions/${admission.id}/transfers`, { toBedId: 2, reason: 'Integration transfer' }, 201);
   assert.equal(transfer.toBedId, 2);
+  assert.deepEqual(Object.keys(transfer.transferredBy).sort(), ['fullName', 'id']);
   await ok('POST', `/api/inpatient/admissions/${admission.id}/observations`, { pulseBpm: 80 }, 201);
+  assert.deepEqual(Object.keys((await ok('GET', `/api/inpatient/admissions/${admission.id}/observations`))[0].recordedBy).sort(), ['fullName', 'id']);
   const prescription = await ok('POST', '/api/pharmacy/prescriptions', { patientId: 1, medicationId: 1, medicineName: 'Integration Medicine', dosage: '5 mg', quantityPrescribed: 6 }, 201);
   const allergy = await ok('POST', '/api/clinical/patients/1/allergies', { allergen: 'Integration Medicine', reaction: 'Rash', severity: 'moderate' }, 201);
   assert.equal((await ok('GET', '/api/clinical/patients/1/allergies')).length, 1);
@@ -341,10 +378,12 @@ try {
   await ok('POST', '/api/pharmacy/inventory/dispense', { batchId: stock.id, patientId: 1, prescriptionId: prescription.id, quantity: 2 });
   const dispenses = await ok('GET', '/api/pharmacy/inventory/dispenses?patientId=1');
   assert.equal(dispenses.filter((row: { prescriptionId: number | null }) => row.prescriptionId === prescription.id).length, 2);
+  assert.deepEqual(Object.keys(dispenses[0].createdBy).sort(), ['fullName', 'id']);
   const administered = await ok('POST', `/api/inpatient/admissions/${admission.id}/medication-administrations`, { prescriptionId: prescription.id, outcome: 'given', doseGiven: '5 mg' }, 201);
   assert.equal(administered.prescriptionId, prescription.id);
   assert.equal('passwordHash' in administered.administeredBy, false);
   assert.equal('sessionVersion' in administered.administeredBy, false);
+  assert.deepEqual(Object.keys(administered.administeredBy).sort(), ['fullName', 'id']);
   assert.equal((await ok('PATCH', `/api/emergency/cases/${emergency.id}/status`, { status: 'admitted', dispositionNote: 'Inpatient admission confirmed' })).status, 'admitted');
   await ok('PATCH', `/api/inpatient/admissions/${admission.id}/discharge`, { dischargeSummary: 'Integration discharge' });
   assert.equal((await request('POST', `/api/inpatient/admissions/${admission.id}/care-plans`, { problem: 'New problem', goal: 'New goal', interventions: 'New intervention' })).status, 409);
@@ -371,7 +410,8 @@ try {
   assert.equal((await request('POST', `/api/billing/invoices/${invoice.id}/refunds`, { paymentId: insurancePaymentId, amount: 1, method: 'bank_transfer', reason: 'Should be blocked' })).status, 409);
   const paidInvoice = await ok('POST', `/api/billing/invoices/${invoice.id}/payments`, { amount: 100, method: 'cash' });
   const paymentId = paidInvoice.payments.find((payment: { method: string }) => payment.method === 'cash').id;
-  await ok('POST', `/api/billing/invoices/${invoice.id}/refunds`, { paymentId, amount: 40, method: 'cash', reason: 'Integration refund' }, 201);
+  const refund = await ok('POST', `/api/billing/invoices/${invoice.id}/refunds`, { paymentId, amount: 40, method: 'cash', reason: 'Integration refund' }, 201);
+  assert.deepEqual(Object.keys(refund.createdBy).sort(), ['fullName', 'id']);
   assert.equal((await request('POST', `/api/billing/invoices/${invoice.id}/refunds`, { paymentId, amount: 70, method: 'cash', reason: 'Over refund' })).status, 422);
   const invoiceList = await ok('GET', '/api/billing/invoices?patientId=1');
   assert.equal(invoiceList[0].paidAmount, '100.00');
@@ -492,7 +532,9 @@ try {
   assert.equal(operations.kpis.appointmentsWaiting, 13);
   assert.equal(operations.kpis.admissionsActive, 11);
   assert.equal(operations.kpis.labPending, 11);
-  assert.equal(operations.kpis.radiologyPending, 11);
+  const [radiologyPendingCount] = await dataSource.query("SELECT COUNT(*) AS total FROM radiology_orders WHERE status IN ('ordered','scheduled','performed')");
+  assert.equal(operations.kpis.radiologyPending, Number(radiologyPendingCount.total));
+  assert.ok(operations.kpis.radiologyPending > 10);
   assert.equal(operations.queues.appointments.length, 12);
   assert.equal(operations.queues.admissions.length, 10);
   assert.equal(operations.queues.billing.length, 10);
@@ -509,6 +551,10 @@ try {
   const csvText = await csvResponse.text();
   assert.ok(csvText.includes('kpi,appointmentsToday,13'));
   assert.ok(csvText.includes("'=1+1 Patient"));
+  const systemAudit = await ok('GET', '/api/audit-logs?limit=20&page=1');
+  const actorEntry = systemAudit.rows.find((row: { user?: { id: number } | null }) => row.user);
+  assert.ok(actorEntry, 'Expected an audit event attributed to a staff user');
+  assert.deepEqual(Object.keys(actorEntry.user).sort(), ['fullName', 'id', 'username']);
 
   assert.equal((await request('POST', '/api/auth/change-password', { currentPassword: 'wrong', newPassword: 'NewTemporary!Pass456' })).status, 401);
   await ok('POST', '/api/auth/change-password', { currentPassword: 'Temporary!Pass123', newPassword: 'NewTemporary!Pass456' });
@@ -517,7 +563,7 @@ try {
   assert.equal((await request('POST', '/api/auth/login', { username: 'integration_admin', password: 'Temporary!Pass123' })).status, 401);
   token = (await ok('POST', '/api/auth/login', { username: 'integration_admin', password: 'NewTemporary!Pass456' })).token;
   assert.ok(token);
-  console.log('Integration checks passed: duty roster, ambulance dispatch, surgery, emergency, inpatient, medication administration, pharmacy fulfillment, billing and insurance claims, laboratory, and password rotation.');
+  console.log('Integration checks passed: radiology scheduling, reporting and communication; blood bank; notifications; duty roster; ambulance; surgery; emergency; inpatient; medication administration; pharmacy; billing and insurance; laboratory; and password rotation.');
 } finally {
   if (server) await new Promise<void>((resolve, reject) => server!.close((error) => error ? reject(error) : resolve()));
   if (dataSource?.isInitialized) await dataSource.destroy();

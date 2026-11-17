@@ -303,6 +303,19 @@
   width: min(360px, 100%);
 }
 
+.app-shell__header-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.app-shell__header-right .patient-search-field {
+  width: min(360px, 100%);
+}
+
 @media (max-width: 900px) {
   .app-shell__header {
     flex-wrap: wrap;
@@ -316,6 +329,11 @@
 
   .app-shell__patient-search .patient-search-field {
     width: 100%;
+  }
+
+  .app-shell__header-right {
+    width: 100%;
+    order: 3;
   }
 }
 

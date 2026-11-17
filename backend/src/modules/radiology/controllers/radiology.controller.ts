@@ -10,4 +10,9 @@ export const radiologyController = {
   addAddendum: async (req: Request, res: Response) => res.status(201).json({ success: true, data: await radiologyService.addAddendum(Number(req.params.id), req.body, req.user?.id ?? null) }),
   listCommunications: async (req: Request, res: Response) => res.json({ success: true, data: await radiologyService.listCommunications(Number(req.params.id)) }),
   recordCommunication: async (req: Request, res: Response) => res.status(201).json({ success: true, data: await radiologyService.recordCommunication(Number(req.params.id), req.body, req.user?.id ?? null) }),
+  listScheduleEvents: async (req: Request, res: Response) => res.json({ success: true, data: await radiologyService.listScheduleEvents(Number(req.params.id)) }),
+  scheduleOrder: async (req: Request, res: Response) => res.json({ success: true, data: await radiologyService.scheduleOrder(Number(req.params.id), req.body, req.user?.id ?? null) }),
+  listResources: async (_req: Request, res: Response) => res.json({ success: true, data: await radiologyService.listResources() }),
+  createResource: async (req: Request, res: Response) => res.status(201).json({ success: true, data: await radiologyService.createResource(req.body) }),
+  setResourceActive: async (req: Request, res: Response) => res.json({ success: true, data: await radiologyService.setResourceActive(Number(req.params.id), req.body.isActive) }),
 };

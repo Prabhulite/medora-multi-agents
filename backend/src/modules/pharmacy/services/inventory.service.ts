@@ -5,8 +5,9 @@ import type { DispenseStockInput, ReceiveStockInput } from '../validators/invent
 import { assertNoRecordedAllergy } from '../../clinical/services/allergy-check.js';
 
 export const inventoryService = {
-  dispenses(patientId: number) {
-    return AppDataSource.getRepository(StockTransaction).find({ where: { patientId, type: 'dispense' }, relations: { batch: { medication: true }, prescription: true, createdBy: true }, order: { createdAt: 'DESC' }, take: 200 });
+  async dispenses(patientId: number) {
+    const rows = await AppDataSource.getRepository(StockTransaction).find({ where: { patientId, type: 'dispense' }, relations: { batch: { medication: true }, prescription: true, createdBy: true }, order: { createdAt: 'DESC' }, take: 200 });
+    return rows.map((row) => ({ ...row, createdBy: row.createdBy ? { id: row.createdBy.id, fullName: row.createdBy.fullName } : null }));
   },
   list(filters: { medicationId?: number; lowStock?: boolean }) {
     return AppDataSource.getRepository(InventoryBatch).find({ where: { ...(filters.medicationId ? { medicationId: filters.medicationId } : {}), isActive: true }, relations: { medication: true }, order: { expiryDate: 'ASC', updatedAt: 'DESC' } }).then((rows) => filters.lowStock ? rows.filter((row) => row.quantity <= row.reorderLevel) : rows);

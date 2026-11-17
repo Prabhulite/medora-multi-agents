@@ -1,9 +1,10 @@
 import { z } from 'zod';
 const positiveInt = z.number().int().positive();
-export const laboratoryOrderListSchema = z.object({ patientId: z.coerce.number().int().positive().optional(), status: z.enum(['ordered', 'collected', 'processing', 'completed', 'cancelled']).optional() });
+export const laboratoryOrderListSchema = z.object({ patientId: z.coerce.number().int().positive().optional(), status: z.enum(['ordered', 'collected', 'processing', 'verified', 'completed', 'cancelled']).optional() });
 export const createLaboratoryOrderSchema = z.object({ patientId: positiveInt, testId: positiveInt, doctorId: positiveInt.nullable().optional() });
 export const collectLaboratorySampleSchema = z.object({ specimenLabel: z.string().trim().min(2).max(80) });
-export const updateLaboratoryResultSchema = z.object({ status: z.enum(['processing', 'completed']), resultValue: z.string().trim().min(1).max(5000), resultUnit: z.string().trim().max(60).nullable().optional(), referenceRange: z.string().trim().max(120).nullable().optional(), resultNotes: z.string().trim().max(5000).nullable().optional() });
+export const updateLaboratoryResultSchema = z.object({ status: z.literal('processing').optional(), resultValue: z.string().trim().min(1).max(5000), resultUnit: z.string().trim().max(60).nullable().optional(), referenceRange: z.string().trim().max(120).nullable().optional(), resultNotes: z.string().trim().max(5000).nullable().optional() });
+export const verifyLaboratoryResultSchema = z.object({ patientAndSpecimenChecked: z.literal(true), qualityControlChecked: z.literal(true) });
 export const laboratoryOrderIdParamSchema = z.object({ id: z.coerce.number().int().positive() });
 export type CreateLaboratoryOrderInput = z.infer<typeof createLaboratoryOrderSchema>;
 export type UpdateLaboratoryResultInput = z.infer<typeof updateLaboratoryResultSchema>;

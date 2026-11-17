@@ -12,8 +12,15 @@ export const clinicalService = {
       relations: { doctor: true, visit: true, createdBy: true, signedBy: true, addenda: { createdBy: true } },
       order: { createdAt: 'DESC' },
     });
-    for (const row of rows) row.addenda?.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-    return rows;
+    return rows.map((row) => ({
+      ...row,
+      createdBy: row.createdBy ? { id: row.createdBy.id, fullName: row.createdBy.fullName } : null,
+      signedBy: row.signedBy ? { id: row.signedBy.id, fullName: row.signedBy.fullName } : null,
+      addenda: row.addenda?.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).map((item) => ({
+        ...item,
+        createdBy: item.createdBy ? { id: item.createdBy.id, fullName: item.createdBy.fullName } : null,
+      })),
+    }));
   },
 
   async create(input: CreateClinicalEncounterInput, userId: number | null) {

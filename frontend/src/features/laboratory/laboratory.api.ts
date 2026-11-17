@@ -11,7 +11,7 @@ export interface LaboratoryTest {
   isActive?: boolean;
 }
 
-export type LaboratoryOrderStatus = 'ordered' | 'collected' | 'processing' | 'completed' | 'cancelled' | string;
+export type LaboratoryOrderStatus = 'ordered' | 'collected' | 'processing' | 'verified' | 'completed' | 'cancelled';
 
 export interface LaboratoryOrder {
   id: number;
@@ -29,6 +29,9 @@ export interface LaboratoryOrder {
   specimenLabel?: string | null;
   collectedBy?: string | null;
   completedAt?: string | null;
+  verifiedAt?: string | null;
+  verifiedById?: number | null;
+  releasedById?: number | null;
   result?: string | null;
   resultUnit?: string | null;
   referenceRange?: string | null;
@@ -48,7 +51,7 @@ export interface UpdateLaboratoryResultPayload {
   resultUnit?: string | null;
   referenceRange?: string | null;
   remarks?: string | null;
-  status?: 'completed' | 'processing';
+  status?: 'processing';
 }
 
 interface ApiEnvelope<T> { data: T; }
@@ -91,6 +94,9 @@ function mapOrder(row: any): LaboratoryOrder {
     specimenLabel: row.specimenLabel || null,
     collectedBy: row.collectedBy?.fullName || null,
     completedAt: row.completedAt || row.completed_at || null,
+    verifiedAt: row.verifiedAt || row.verified_at || null,
+    verifiedById: row.verifiedById ?? row.verified_by_id ?? null,
+    releasedById: row.releasedById ?? row.released_by_id ?? null,
     result: row.result ?? row.resultValue ?? null,
     resultUnit: row.resultUnit || row.result_unit || null,
     referenceRange: row.referenceRange || row.reference_range || null,
@@ -100,6 +106,14 @@ function mapOrder(row: any): LaboratoryOrder {
 }
 
 export const laboratoryApi = {
+  async verifyResult(orderId: number): Promise<LaboratoryOrder> {
+    const response = await api.post<ApiEnvelope<any>>(`/laboratory/orders/${orderId}/verify`, { patientAndSpecimenChecked: true, qualityControlChecked: true });
+    return mapOrder(response.data.data);
+  },
+  async releaseResult(orderId: number): Promise<LaboratoryOrder> {
+    const response = await api.post<ApiEnvelope<any>>(`/laboratory/orders/${orderId}/release`);
+    return mapOrder(response.data.data);
+  },
   async listTests(): Promise<LaboratoryTest[]> {
     const response = await api.get<ApiEnvelope<any[]> | any[]>('/laboratory/tests');
     const rows = unwrap(response.data) || [];

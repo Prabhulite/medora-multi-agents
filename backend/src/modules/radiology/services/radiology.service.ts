@@ -1,12 +1,78 @@
 import { AppDataSource } from '../../../config/data-source.js';
-import { Doctor, Patient, RadiologyCommunication, RadiologyModality, RadiologyOrder, RadiologyReportAddendum, User, UserNotification } from '../../../database/entities/index.js';
+import { Doctor, Patient, RadiologyCommunication, RadiologyModality, RadiologyOrder, RadiologyReportAddendum, RadiologyResource, RadiologyScheduleEvent, User, UserNotification } from '../../../database/entities/index.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { nextSequenceNumber } from '../../patients/services/number-sequence.service.js';
-import type { CreateRadiologyAddendumInput, CreateRadiologyCommunicationInput, CreateRadiologyOrderInput, UpdateRadiologyReportInput } from '../validators/radiology.validators.js';
+import type { CreateRadiologyAddendumInput, CreateRadiologyCommunicationInput, CreateRadiologyOrderInput, CreateRadiologyResourceInput, ScheduleRadiologyOrderInput, UpdateRadiologyReportInput } from '../validators/radiology.validators.js';
 
-const orderRelations = { patient: true, modality: true, doctor: true } as const;
+const orderRelations = { patient: true, modality: true, doctor: true, resource: true } as const;
 
 export const radiologyService = {
+  listResources() {
+    return AppDataSource.getRepository(RadiologyResource).find({ relations: { modality: true }, order: { name: 'ASC' } });
+  },
+  async createResource(input: CreateRadiologyResourceInput) {
+    if (!await AppDataSource.getRepository(RadiologyModality).exist({ where: { id: input.modalityId, isActive: true } })) throw new NotFoundError('Active radiology modality not found');
+    const repo = AppDataSource.getRepository(RadiologyResource);
+    try {
+      return await repo.save(repo.create({ modalityId: input.modalityId, code: input.code, name: input.name, location: input.location ?? null, isActive: true }));
+    } catch (error) {
+      if ((error as { driverError?: { code?: string } }).driverError?.code === 'ER_DUP_ENTRY') throw new ConflictError('Radiology resource code already exists');
+      throw error;
+    }
+  },
+  async setResourceActive(resourceId: number, isActive: boolean) {
+    return AppDataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(RadiologyResource);
+      const resource = await repo.createQueryBuilder('resource').setLock('pessimistic_write').where('resource.id = :id', { id: resourceId }).getOne();
+      if (!resource) throw new NotFoundError('Radiology resource not found');
+      if (!isActive) {
+        const futureBooking = await manager.getRepository(RadiologyOrder).createQueryBuilder('order').where('order.resource_id = :resourceId AND order.status = :status AND order.scheduled_at > :now', { resourceId, status: 'scheduled', now: new Date() }).getExists();
+        if (futureBooking) throw new ConflictError('Move upcoming bookings before deactivating this resource');
+      }
+      resource.isActive = isActive;
+      return repo.save(resource);
+    });
+  },
+  async listScheduleEvents(orderId: number) {
+    if (!await AppDataSource.getRepository(RadiologyOrder).exist({ where: { id: orderId } })) throw new NotFoundError('Radiology order not found');
+    const rows = await AppDataSource.getRepository(RadiologyScheduleEvent).find({ where: { orderId }, relations: { createdBy: true }, order: { id: 'ASC' } });
+    return rows.map(({ id, previousAt, scheduledAt, previousEndAt, scheduledEndAt, previousResourceId, resourceId, reason, createdById, createdAt, createdBy }) => ({ id, previousAt, scheduledAt, previousEndAt, scheduledEndAt, previousResourceId, resourceId, reason, createdById, createdAt, actorName: createdBy?.fullName ?? null }));
+  },
+  async scheduleOrder(orderId: number, input: ScheduleRadiologyOrderInput, userId: number | null) {
+    const scheduledAt = new Date(input.scheduledAt);
+    const scheduledEndAt = new Date(scheduledAt.getTime() + input.durationMinutes * 60_000);
+    if (scheduledAt.getTime() <= Date.now()) throw new ValidationError('Study time must be in the future');
+    if (scheduledAt.getTime() > Date.now() + 366 * 24 * 60 * 60_000) throw new ValidationError('Study time must be within one year');
+    return AppDataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(RadiologyOrder);
+      const order = await repo.createQueryBuilder('order').setLock('pessimistic_write').where('order.id = :id', { id: orderId }).getOne();
+      if (!order) throw new NotFoundError('Radiology order not found');
+      if (!['ordered', 'scheduled'].includes(order.status)) throw new ConflictError('Only pending studies can be scheduled');
+      if (order.scheduledAt && !input.reason) throw new ValidationError('Rescheduling requires a reason');
+      const previousAt = order.scheduledAt;
+      const previousEndAt = order.scheduledEndAt;
+      const previousResourceId = order.resourceId;
+      const resourceId = input.resourceId === undefined ? order.resourceId : input.resourceId;
+      if (order.scheduledAt?.getTime() === scheduledAt.getTime() && order.scheduledEndAt?.getTime() === scheduledEndAt.getTime() && resourceId === order.resourceId) throw new ConflictError('Study already has this booking');
+      if (resourceId) {
+        const resource = await manager.getRepository(RadiologyResource).createQueryBuilder('resource').setLock('pessimistic_write').where('resource.id = :id', { id: resourceId }).getOne();
+        if (!resource || !resource.isActive) throw new NotFoundError('Active radiology resource not found');
+        if (resource.modalityId !== order.modalityId) throw new ValidationError('Resource does not support this modality');
+        const overlaps = await repo.createQueryBuilder('booking')
+          .where('booking.resource_id = :resourceId AND booking.status = :status AND booking.id <> :orderId', { resourceId, status: 'scheduled', orderId })
+          .andWhere('booking.scheduled_at < :endAt AND booking.scheduled_end_at > :startAt', { startAt: scheduledAt, endAt: scheduledEndAt })
+          .getExists();
+        if (overlaps) throw new ConflictError('Resource already has a study during this time');
+      }
+      order.scheduledAt = scheduledAt;
+      order.scheduledEndAt = scheduledEndAt;
+      order.resourceId = resourceId;
+      order.status = 'scheduled';
+      await repo.save(order);
+      await manager.getRepository(RadiologyScheduleEvent).save({ orderId, previousAt, scheduledAt, previousEndAt, scheduledEndAt, previousResourceId, resourceId, reason: input.reason ?? null, createdById: userId });
+      return repo.findOne({ where: { id: orderId }, relations: orderRelations });
+    });
+  },
   async listCommunications(orderId: number) {
     if (!await AppDataSource.getRepository(RadiologyOrder).exist({ where: { id: orderId } })) throw new NotFoundError('Radiology order not found');
     const rows = await AppDataSource.getRepository(RadiologyCommunication).find({ where: { orderId }, relations: { recordedBy: true }, order: { id: 'ASC' } });

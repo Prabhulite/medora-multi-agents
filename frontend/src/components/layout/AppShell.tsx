@@ -4,6 +4,8 @@ import medoraLogo from '../../assets/medora/medora-horizontal.png';
 import { useAuth } from '../../features/auth/AuthContext';
 import { getMenuIcon } from '../../features/menus/menuIcons';
 import { menusApi } from '../../features/menus/menus.api';
+import { notificationsApi } from '../../features/notifications/notifications.api';
+import { hasPermission } from '../../lib/permissions';
 import type { MenuItem } from '../../types';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { PatientSearchField } from '../ui/PatientSearchField';
@@ -277,6 +279,10 @@ export function AppShell() {
               </svg>
             </button>
             <img src={medoraLogo} alt="Medora" className="app-shell__header-logo" />
+          </div>
+          <div className="app-shell__header-right">
+            {canSearchPatients && <PatientSearchField required={false} label="Patient" onSelect={(patient) => navigate(`/patients/${patient.id}`)} />}
+            <NavLink to="/notifications" className="app-shell__notification-link">Notifications {unreadNotifications > 0 && <span>{unreadNotifications}</span>}</NavLink>
           </div>
         </header>
 

@@ -1,5 +1,5 @@
 import { AppDataSource } from '../../../config/data-source.js';
-import { Admission, Bed, BedTransfer, Department, Doctor, MedicationAdministration, NursingCarePlan, NursingObservation, Patient, Prescription, Ward, Medication } from '../../../database/entities/index.js';
+import { Admission, Bed, BedTransfer, Department, Doctor, MedicationAdministration, NursingCarePlan, NursingObservation, Patient, Prescription, Ward, Medication, User } from '../../../database/entities/index.js';
 import { assertNoRecordedAllergy } from '../../clinical/services/allergy-check.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { nextSequenceNumber } from '../../patients/services/number-sequence.service.js';
@@ -12,6 +12,11 @@ function carePlanResponse(plan: NursingCarePlan | null) {
   const { createdBy, closedBy, ...fields } = plan;
   return { ...fields, createdBy: createdBy ? { fullName: createdBy.fullName } : null, closedBy: closedBy ? { fullName: closedBy.fullName } : null };
 }
+
+const staffReference = (user: User | null | undefined) => user ? { id: user.id, fullName: user.fullName } : null;
+const medicationAdministrationResponse = (row: MedicationAdministration | null) => row ? { ...row, administeredBy: staffReference(row.administeredBy) } : null;
+const transferResponse = (row: BedTransfer | null) => row ? { ...row, transferredBy: staffReference(row.transferredBy) } : null;
+const observationResponse = (row: NursingObservation) => ({ ...row, recordedBy: staffReference(row.recordedBy) });
 
 export const inpatientService = {
   async carePlans(admissionId: number) {
@@ -47,7 +52,7 @@ export const inpatientService = {
   },
   async medicationAdministrations(admissionId: number) {
     if (!(await AppDataSource.getRepository(Admission).exist({ where: { id: admissionId } }))) throw new NotFoundError('Admission not found');
-    return AppDataSource.getRepository(MedicationAdministration).find({ where: { admissionId }, relations: { prescription: true, administeredBy: true }, order: { recordedAt: 'DESC' }, take: 200 });
+    return (await AppDataSource.getRepository(MedicationAdministration).find({ where: { admissionId }, relations: { prescription: true, administeredBy: true }, order: { recordedAt: 'DESC' }, take: 200 })).map(medicationAdministrationResponse);
   },
   async addMedicationAdministration(admissionId: number, input: z.infer<typeof medicationAdministrationSchema>, userId: number | null) {
     return AppDataSource.transaction(async (manager) => {
@@ -61,12 +66,12 @@ export const inpatientService = {
         await assertNoRecordedAllergy(manager, admission.patientId, [prescription.medicineName, medication?.brandName, medication?.genericName]);
       }
       const record = await manager.getRepository(MedicationAdministration).save(manager.getRepository(MedicationAdministration).create({ admissionId, prescriptionId: prescription.id, outcome: input.outcome, doseGiven: input.outcome === 'given' ? input.doseGiven ?? null : null, route: input.outcome === 'given' ? input.route ?? prescription.route : null, notes: input.notes ?? null, administeredById: userId }));
-      return manager.getRepository(MedicationAdministration).findOne({ where: { id: record.id }, relations: { prescription: true, administeredBy: true } });
+      return medicationAdministrationResponse(await manager.getRepository(MedicationAdministration).findOne({ where: { id: record.id }, relations: { prescription: true, administeredBy: true } }));
     });
   },
   async transfers(admissionId: number) {
     if (!(await AppDataSource.getRepository(Admission).exist({ where: { id: admissionId } }))) throw new NotFoundError('Admission not found');
-    return AppDataSource.getRepository(BedTransfer).find({ where: { admissionId }, relations: { fromBed: { ward: true }, toBed: { ward: true }, transferredBy: true }, order: { transferredAt: 'DESC' } });
+    return (await AppDataSource.getRepository(BedTransfer).find({ where: { admissionId }, relations: { fromBed: { ward: true }, toBed: { ward: true }, transferredBy: true }, order: { transferredAt: 'DESC' } })).map(transferResponse);
   },
   async transfer(id: number, input: z.infer<typeof transferBedSchema>, userId: number | null) {
     return AppDataSource.transaction(async (manager) => {
@@ -89,12 +94,12 @@ export const inpatientService = {
       await manager.getRepository(Bed).save([fromBed, toBed]);
       await manager.getRepository(Admission).save(admission);
       const transfer = await manager.getRepository(BedTransfer).save(manager.getRepository(BedTransfer).create({ admissionId: id, fromBedId: fromBed.id, toBedId: toBed.id, reason: input.reason, transferredById: userId }));
-      return manager.getRepository(BedTransfer).findOne({ where: { id: transfer.id }, relations: { fromBed: { ward: true }, toBed: { ward: true }, transferredBy: true } });
+      return transferResponse(await manager.getRepository(BedTransfer).findOne({ where: { id: transfer.id }, relations: { fromBed: { ward: true }, toBed: { ward: true }, transferredBy: true } }));
     });
   },
   async observations(admissionId: number) {
     if (!(await AppDataSource.getRepository(Admission).exist({ where: { id: admissionId } }))) throw new NotFoundError('Admission not found');
-    return AppDataSource.getRepository(NursingObservation).find({ where: { admissionId }, relations: { recordedBy: true }, order: { observedAt: 'DESC' }, take: 100 });
+    return (await AppDataSource.getRepository(NursingObservation).find({ where: { admissionId }, relations: { recordedBy: true }, order: { observedAt: 'DESC' }, take: 100 })).map(observationResponse);
   },
   async addObservation(admissionId: number, input: z.infer<typeof nursingObservationSchema>, userId: number | null) {
     return AppDataSource.transaction(async (manager) => {

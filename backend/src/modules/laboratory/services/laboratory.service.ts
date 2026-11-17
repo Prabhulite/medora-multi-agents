@@ -6,8 +6,9 @@ import type { CollectLaboratorySampleInput, CreateLaboratoryOrderInput, UpdateLa
 
 export const laboratoryService = {
   listTests() { return AppDataSource.getRepository(LaboratoryTest).find({ where: { isActive: true }, order: { category: 'ASC', testName: 'ASC' } }); },
-  async listOrders(filters: { patientId?: number; status?: LaboratoryOrder['status'] }) {
-    return AppDataSource.getRepository(LaboratoryOrder).find({ where: { ...(filters.patientId ? { patientId: filters.patientId } : {}), ...(filters.status ? { status: filters.status } : {}) }, relations: { patient: true, test: true, doctor: true }, order: { orderedAt: 'DESC' } });
+  async listOrders(filters: { patientId?: number; status?: LaboratoryOrder['status'] }, canViewDraft: boolean) {
+    const rows = await AppDataSource.getRepository(LaboratoryOrder).find({ where: { ...(filters.patientId ? { patientId: filters.patientId } : {}), ...(filters.status ? { status: filters.status } : {}) }, relations: { patient: true, test: true, doctor: true }, order: { orderedAt: 'DESC' } });
+    return rows.map((row) => canViewDraft || row.status === 'completed' ? row : { ...row, resultValue: null, resultUnit: null, referenceRange: null, resultNotes: null });
   },
   async createOrder(input: CreateLaboratoryOrderInput, userId: number | null) {
     return AppDataSource.transaction(async (manager) => {
@@ -35,16 +36,39 @@ export const laboratoryService = {
       if (!order) throw new NotFoundError('Laboratory order not found');
       if (order.status === 'cancelled') throw new ValidationError('Cancelled laboratory order cannot be updated');
       if (order.status === 'ordered') throw new ConflictError('Collect the sample before entering a result');
-      if (order.status === 'completed') throw new ConflictError('Completed results require an amendment workflow');
-      order.status = input.status; order.resultValue = input.resultValue; order.resultUnit = input.resultUnit ?? null; order.referenceRange = input.referenceRange ?? null; order.resultNotes = input.resultNotes ?? null; order.completedAt = input.status === 'completed' ? new Date() : null; order.resultedById = userId;
+      if (order.status === 'verified' || order.status === 'completed') throw new ConflictError('Verified and released results cannot be edited');
+      order.status = 'processing'; order.resultValue = input.resultValue; order.resultUnit = input.resultUnit ?? null; order.referenceRange = input.referenceRange ?? null; order.resultNotes = input.resultNotes ?? null; order.resultedById = userId;
       await repo.save(order);
-      if (input.status === 'completed' && order.doctorId) {
+      return repo.findOne({ where: { id: orderId }, relations: { patient: true, test: true, doctor: true, collectedBy: true } });
+    });
+  },
+  async verifyResult(orderId: number, userId: number) {
+    return AppDataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(LaboratoryOrder);
+      const order = await repo.createQueryBuilder('order').setLock('pessimistic_write').where('order.id = :id', { id: orderId }).getOne();
+      if (!order) throw new NotFoundError('Laboratory order not found');
+      if (order.status !== 'processing' || !order.resultValue?.trim()) throw new ConflictError('Only a completed draft result can be verified');
+      if (order.resultedById === userId) throw new ConflictError('A second staff member must verify this result');
+      order.status = 'verified'; order.verifiedAt = new Date(); order.verifiedById = userId;
+      await repo.save(order);
+      return repo.findOne({ where: { id: orderId }, relations: { patient: true, test: true, doctor: true } });
+    });
+  },
+  async releaseResult(orderId: number, userId: number) {
+    return AppDataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(LaboratoryOrder);
+      const order = await repo.createQueryBuilder('order').setLock('pessimistic_write').where('order.id = :id', { id: orderId }).getOne();
+      if (!order) throw new NotFoundError('Laboratory order not found');
+      if (order.status !== 'verified' || !order.verifiedAt) throw new ConflictError('Verify the result before release');
+      order.status = 'completed'; order.completedAt = new Date(); order.releasedById = userId;
+      await repo.save(order);
+      if (order.doctorId) {
         const doctor = await manager.getRepository(Doctor).findOne({ where: { id: order.doctorId, isActive: true } });
         if (doctor?.accountUserId && await manager.getRepository(User).exist({ where: { id: doctor.accountUserId, isActive: true } })) {
           await manager.getRepository(UserNotification).save({ recipientId: doctor.accountUserId, kind: 'lab_result_completed', sourceId: order.id, title: 'Laboratory result completed', message: `Laboratory order ${order.orderNumber} has a completed result. Open the laboratory module to review it.`, route: '/laboratory' });
         }
       }
-      return repo.findOne({ where: { id: orderId }, relations: { patient: true, test: true, doctor: true, collectedBy: true } });
+      return repo.findOne({ where: { id: orderId }, relations: { patient: true, test: true, doctor: true } });
     });
   },
 };

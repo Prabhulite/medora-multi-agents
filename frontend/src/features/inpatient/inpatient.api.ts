@@ -40,6 +40,7 @@ export interface Admission {
   attendingDoctor: string;
   admissionType: 'elective' | 'emergency' | 'day_care';
   admittedAt: string;
+  dischargedAt: string | null;
   expectedDischargeAt: string | null;
   status: AdmissionStatus;
   diagnosis: string | null;
@@ -98,7 +99,7 @@ function mapBed(row: any): Bed {
 
 function mapAdmission(row: any): Admission {
   if ('admissionNumber' in row && 'patientName' in row) return row as Admission;
-  return { id: row.id, admissionNumber: row.admissionNumber, patientId: row.patientId, patientName: row.patient?.fullName || [row.patient?.firstName, row.patient?.middleName, row.patient?.lastName].filter(Boolean).join(' ') || 'Patient', patientMrdNumber: row.patient?.mrdNumber || '', wardId: row.bed?.wardId || 0, wardName: row.bed?.ward?.name || 'Unknown ward', bedId: row.bedId, bedNumber: row.bed?.number || '', attendingDoctor: row.doctor?.name || 'Not assigned', admissionType: 'elective', admittedAt: row.admittedAt, expectedDischargeAt: null, status: row.status, diagnosis: row.reason || null, dischargeSummary: row.dischargeSummary ?? null, dischargeDiagnosis: row.dischargeDiagnosis ?? null, dischargeMedications: row.dischargeMedications ?? null, followUpInstructions: row.followUpInstructions ?? null };
+  return { id: row.id, admissionNumber: row.admissionNumber, patientId: row.patientId, patientName: row.patient?.fullName || [row.patient?.firstName, row.patient?.middleName, row.patient?.lastName].filter(Boolean).join(' ') || 'Patient', patientMrdNumber: row.patient?.mrdNumber || '', wardId: row.bed?.wardId || 0, wardName: row.bed?.ward?.name || 'Unknown ward', bedId: row.bedId, bedNumber: row.bed?.number || '', attendingDoctor: row.doctor?.name || 'Not assigned', admissionType: 'elective', admittedAt: row.admittedAt, dischargedAt: row.dischargedAt ?? null, expectedDischargeAt: null, status: row.status, diagnosis: row.reason || null, dischargeSummary: row.dischargeSummary ?? null, dischargeDiagnosis: row.dischargeDiagnosis ?? null, dischargeMedications: row.dischargeMedications ?? null, followUpInstructions: row.followUpInstructions ?? null };
 }
 
 export const inpatientApi = {

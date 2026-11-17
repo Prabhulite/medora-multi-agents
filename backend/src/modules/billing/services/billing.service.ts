@@ -5,6 +5,7 @@ import { nextSequenceNumber } from '../../patients/services/number-sequence.serv
 import type { CreateInvoiceInput, PaymentInput, RefundInput } from '../validators/billing.validators.js';
 
 const cents = (value: number | string) => Math.round(Number(value) * 100);
+const refundResponse = (row: Refund | null) => row ? { ...row, createdBy: row.createdBy ? { id: row.createdBy.id, fullName: row.createdBy.fullName } : null } : null;
 
 export const billingService = {
   list(filters: { patientId?: number; status?: string }) {
@@ -12,7 +13,7 @@ export const billingService = {
   },
   async refunds(invoiceId: number) {
     if (!(await AppDataSource.getRepository(Invoice).exist({ where: { id: invoiceId } }))) throw new NotFoundError('Invoice not found');
-    return AppDataSource.getRepository(Refund).find({ where: { invoiceId }, relations: { payment: true, createdBy: true }, order: { refundedAt: 'DESC' } });
+    return (await AppDataSource.getRepository(Refund).find({ where: { invoiceId }, relations: { payment: true, createdBy: true }, order: { refundedAt: 'DESC' } })).map(refundResponse);
   },
   async create(input: CreateInvoiceInput, userId: number | null) {
     const patient = await AppDataSource.getRepository(Patient).findOne({ where: { id: input.patientId } });
@@ -70,7 +71,7 @@ export const billingService = {
       invoice.balanceAmount = (balanceCents / 100).toFixed(2);
       invoice.status = paidCents === 0 ? 'open' : balanceCents === 0 ? 'paid' : 'partially_paid';
       await invoiceRepo.save(invoice);
-      return manager.getRepository(Refund).findOne({ where: { id: refund.id }, relations: { payment: true, createdBy: true } });
+      return refundResponse(await manager.getRepository(Refund).findOne({ where: { id: refund.id }, relations: { payment: true, createdBy: true } }));
     });
   },
 };
