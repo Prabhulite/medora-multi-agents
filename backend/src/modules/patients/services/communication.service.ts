@@ -18,7 +18,8 @@ export const communicationService = {
   },
   async create(patientId: number, input: CreateCommunicationInput, userId: number | null) {
     return AppDataSource.transaction(async (manager) => {
-      if (!await manager.getRepository(Patient).exist({ where: { id: patientId, isActive: true } })) throw new NotFoundError('Patient not found');
+      const patient = await manager.getRepository(Patient).createQueryBuilder('patient').setLock('pessimistic_write').where('patient.id = :patientId', { patientId }).getOne();
+      if (!patient || !patient.isActive || patient.mergedIntoPatientId) throw new NotFoundError('Active patient not found');
       const record = await manager.getRepository(PatientCommunication).save(manager.getRepository(PatientCommunication).create({ patientId, channel: input.channel, direction: input.direction, subject: input.subject, summary: input.summary, occurredAt: new Date(input.occurredAt), followUpDueAt: input.followUpDueAt ? new Date(input.followUpDueAt) : null, followUpCompletedAt: null, followUpCompletedById: null, followUpCompletionNote: null, recordedById: userId }));
       await manager.getRepository(PatientAuditLog).save(manager.getRepository(PatientAuditLog).create({ patientId, action: 'communication_recorded', changedById: userId, changeSummary: `Communication recorded: ${record.channel} ${record.direction}`, beforeData: null, afterData: JSON.stringify({ id: record.id, channel: record.channel, direction: record.direction, occurredAt: record.occurredAt }) }));
       return record;

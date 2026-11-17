@@ -33,7 +33,8 @@ export const consentService = {
   async create(patientId: number, input: CreateConsentInput, userId: number | null) {
     const signedAt = validateSignedCopy(input);
     return AppDataSource.transaction(async (manager) => {
-      if (!await manager.getRepository(Patient).exist({ where: { id: patientId, isActive: true } })) throw new NotFoundError('Patient not found');
+      const patient = await manager.getRepository(Patient).createQueryBuilder('patient').setLock('pessimistic_write').where('patient.id = :patientId', { patientId }).getOne();
+      if (!patient || !patient.isActive || patient.mergedIntoPatientId) throw new NotFoundError('Active patient not found');
       const record = await manager.getRepository(PatientConsent).save(manager.getRepository(PatientConsent).create({ ...input, patientId, signedAt, treatingDoctorName: input.treatingDoctorName ?? null, doctorRegistrationNumber: input.doctorRegistrationNumber ?? null, admissionDate: input.admissionDate ?? null, status: 'active', recordedById: userId, revokedAt: null, revokedById: null, revocationReason: null }));
       await manager.getRepository(PatientAuditLog).save(manager.getRepository(PatientAuditLog).create({ patientId, action: 'consent_recorded', changedById: userId, changeSummary: `Signed consent recorded: ${record.subject}`, beforeData: null, afterData: JSON.stringify({ id: record.id, consentType: record.consentType, subject: record.subject, signatoryName: record.signatoryName, signedAt: record.signedAt, fileName: record.fileName }) }));
       return publicConsent(record);
