@@ -39,6 +39,9 @@ export class Patient {
   @Column({ name: 'mrd_number', type: 'varchar', length: 40, unique: true })
   mrdNumber!: string;
 
+  @Column({ name: 'family_id', type: 'varchar', length: 40, nullable: true })
+  familyId!: string | null;
+
   @Column({ name: 'registration_at', type: 'timestamp' })
   registrationAt!: Date;
 

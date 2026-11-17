@@ -1,12 +1,14 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../features/auth/AuthContext';
-import { hasPermission } from '../lib/permissions';
+import { hasAnyPermission, hasPermission } from '../lib/permissions';
 
 interface ProtectedRouteProps {
   permission?: string;
+  /** Allow access when the user has any of these permissions. */
+  permissions?: string[];
 }
 
-export function ProtectedRoute({ permission }: ProtectedRouteProps) {
+export function ProtectedRoute({ permission, permissions }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -21,7 +23,13 @@ export function ProtectedRoute({ permission }: ProtectedRouteProps) {
     return <Navigate to="/login" replace />;
   }
 
-  if (permission && !hasPermission(user, permission)) {
+  const allowed = permissions?.length
+    ? hasAnyPermission(user, permissions)
+    : permission
+      ? hasPermission(user, permission)
+      : true;
+
+  if (!allowed) {
     return <Navigate to="/" replace />;
   }
 

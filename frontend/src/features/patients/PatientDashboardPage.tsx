@@ -141,7 +141,7 @@ export function PatientDashboardPage() {
     return (
       <div className="pd-page">
         <Alert tone="error">{error || 'Patient not found'}</Alert>
-        <Button variant="secondary" size="sm" onClick={() => navigate('/patients')}>
+        <Button variant="back" size="sm" onClick={() => navigate('/patients')}>
           Back to Patients
         </Button>
       </div>
@@ -161,7 +161,7 @@ export function PatientDashboardPage() {
               Edit Patient
             </Button>
           ) : null}
-          <Button variant="secondary" size="sm" onClick={() => navigate('/patients')}>
+          <Button variant="back" size="sm" onClick={() => navigate('/patients')}>
             Back
           </Button>
         </div>

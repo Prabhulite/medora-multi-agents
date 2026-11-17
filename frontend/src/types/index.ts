@@ -389,6 +389,7 @@ export type EmergencyRelationship =
 export interface Patient {
   id: number;
   mrdNumber: string;
+  familyId?: string | null;
   registrationAt: string;
   fullName: string;
   gender: PatientGender;
@@ -684,4 +685,62 @@ export interface UpdateAppointmentStatusPayload {
   appointmentTime?: string;
   doctorId?: number;
   departmentId?: number;
+}
+
+export interface OpCheckinVisit {
+  id: number;
+  visitNumber: string;
+  opNumber: string | null;
+  patientId: number;
+  patientName: string;
+  patientMrdNumber: string | null;
+  patientFamilyId: string | null;
+  patientMobile: string | null;
+  doctorId: number | null;
+  doctorName: string | null;
+  departmentId: number | null;
+  departmentName: string | null;
+  natureOfVisit: string | null;
+  purposeOfVisit: string | null;
+  referredBy: string | null;
+  appointmentId: number | null;
+  appointmentNumber: string | null;
+  isMlc: boolean;
+  hadFood: boolean;
+  tokenNumber: number | null;
+  checkedInAt: string;
+  checkedInByName: string | null;
+  checkedOutAt: string | null;
+  checkedOutByName: string | null;
+  visitDuration: string;
+  visitState: 'inside' | 'done';
+  status: string;
+  billAmount: number | null;
+  nextAppointmentAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OpCheckinAppointmentOption {
+  id: number;
+  appointmentNumber: string;
+  appointmentDate: string;
+  appointmentTime: string;
+  doctorId: number;
+  doctorName: string | null;
+  status: string;
+  reason: string | null;
+}
+
+export interface CreateOpCheckinPayload {
+  patientId: number;
+  doctorId: number;
+  natureOfVisit: string;
+  purposeOfVisit: string;
+  referredBy?: string | null;
+  appointmentId?: number | null;
+  isMlc?: boolean;
+  hadFood?: boolean;
+  makeNewCheckin?: boolean;
+  familyId?: string | null;
 }

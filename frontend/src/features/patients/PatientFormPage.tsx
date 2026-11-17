@@ -426,7 +426,7 @@ export function PatientFormPage() {
     return (
       <div className="patient-form-page">
         <Alert tone="error">{error}</Alert>
-        <Button variant="secondary" onClick={() => navigate('/patients')}>
+        <Button variant="back" onClick={() => navigate('/patients')}>
           Back
         </Button>
       </div>
@@ -443,7 +443,7 @@ export function PatientFormPage() {
             additional sections.
           </p>
         </div>
-        <Button type="button" variant="secondary" size="sm" onClick={() => navigate('/patients')}>
+        <Button type="button" variant="back" size="sm" onClick={() => navigate('/patients')}>
           Back
         </Button>
       </div>

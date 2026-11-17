@@ -189,7 +189,7 @@ export function UserFormPage() {
       <div className="um-form-page">
         <Alert tone="error">{error}</Alert>
         <div className="um-form-footer">
-          <Button variant="secondary" size="sm" onClick={() => navigate('/users')}>
+          <Button variant="back" size="sm" onClick={() => navigate('/users')}>
             Back to Users
           </Button>
         </div>

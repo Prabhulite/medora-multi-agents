@@ -18,6 +18,7 @@ import { nextSequenceNumber } from '../services/number-sequence.service.js';
 export interface PatientListView {
   id: number;
   mrdNumber: string;
+  familyId: string | null;
   registrationAt: Date;
   fullName: string;
   gender: PatientGender;
@@ -121,6 +122,7 @@ function toListView(patient: Patient): PatientListView {
   return {
     id: patient.id,
     mrdNumber: patient.mrdNumber,
+    familyId: patient.familyId,
     registrationAt: patient.registrationAt,
     fullName: fullName(patient),
     gender: patient.gender,

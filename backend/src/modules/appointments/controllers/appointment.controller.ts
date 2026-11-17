@@ -9,6 +9,8 @@ export const appointmentController = {
       res,
       await appointmentService.list({
         date: typeof req.query.date === 'string' ? req.query.date : undefined,
+        fromDate: typeof req.query.fromDate === 'string' ? req.query.fromDate : undefined,
+        toDate: typeof req.query.toDate === 'string' ? req.query.toDate : undefined,
         doctorId: req.query.doctorId ? Number(req.query.doctorId) : undefined,
         patientId: req.query.patientId ? Number(req.query.patientId) : undefined,
         status:

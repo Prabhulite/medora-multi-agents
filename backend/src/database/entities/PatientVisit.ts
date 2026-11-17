@@ -46,6 +46,16 @@ export class PatientVisit {
   @Column({ name: 'visit_at', type: 'timestamp' })
   visitAt!: Date;
 
+  @Column({ name: 'checked_out_at', type: 'timestamp', nullable: true })
+  checkedOutAt!: Date | null;
+
+  @Column({ name: 'checked_out_by_id', type: 'int', unsigned: true, nullable: true })
+  checkedOutById!: number | null;
+
+  @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'checked_out_by_id' })
+  checkedOutBy!: User | null;
+
   @Column({ name: 'department_id', type: 'int', unsigned: true, nullable: true })
   departmentId!: number | null;
 
@@ -59,6 +69,27 @@ export class PatientVisit {
   @ManyToOne(() => Doctor, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'doctor_id' })
   doctor!: Doctor | null;
+
+  @Column({ name: 'nature_of_visit', type: 'varchar', length: 60, nullable: true })
+  natureOfVisit!: string | null;
+
+  @Column({ name: 'purpose_of_visit', type: 'varchar', length: 255, nullable: true })
+  purposeOfVisit!: string | null;
+
+  @Column({ name: 'visit_referred_by', type: 'varchar', length: 120, nullable: true })
+  visitReferredBy!: string | null;
+
+  @Column({ name: 'appointment_id', type: 'int', unsigned: true, nullable: true })
+  appointmentId!: number | null;
+
+  @Column({ name: 'is_mlc', type: 'boolean', default: false })
+  isMlc!: boolean;
+
+  @Column({ name: 'had_food', type: 'boolean', default: false })
+  hadFood!: boolean;
+
+  @Column({ name: 'token_number', type: 'int', unsigned: true, nullable: true })
+  tokenNumber!: number | null;
 
   @Column({ type: 'varchar', length: 30, default: 'registered' })
   status!: PatientVisitStatus;

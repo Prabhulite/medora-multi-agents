@@ -89,6 +89,18 @@
   border-color: #b91c1c;
 }
 
+.ui-btn--back {
+  color: var(--color-back);
+  background: var(--color-back-bg);
+  border-color: var(--color-back-border);
+}
+
+.ui-btn--back:hover:not(:disabled) {
+  background: var(--color-back-hover);
+  border-color: #1e40af;
+  color: #ffffff;
+}
+
 .ui-btn__spinner {
   width: 14px;
   height: 14px;

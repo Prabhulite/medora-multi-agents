@@ -246,6 +246,8 @@ async function appendHistory(
 export const appointmentService = {
   async list(filters: {
     date?: string;
+    fromDate?: string;
+    toDate?: string;
     doctorId?: number;
     patientId?: number;
     status?: AppointmentStatus;

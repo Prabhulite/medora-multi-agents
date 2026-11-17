@@ -27,6 +27,10 @@
   --color-info-bg: #dbeafe;
   --color-success: #168447;
   --color-success-bg: #e9f6ed;
+  --color-back: #ffffff;
+  --color-back-bg: #2563eb;
+  --color-back-border: #1d4ed8;
+  --color-back-hover: #1d4ed8;
 
   --gradient-primary: linear-gradient(135deg, #62b947 0%, #168447 100%);
   --gradient-brand: linear-gradient(145deg, #015b2d 0%, #168447 55%, #62b947 100%);

@@ -15,11 +15,11 @@ export class SurgeryCase {
   @Column({ name: 'room_id', type: 'int', unsigned: true }) roomId!: number;
   @ManyToOne(() => OperatingRoom, { onDelete: 'RESTRICT' }) @JoinColumn({ name: 'room_id' }) room!: OperatingRoom;
   @Column({ type: 'varchar', length: 255 }) procedure!: string;
-  @Column({ name: 'planned_start', type: 'timestamp' }) plannedStart!: Date;
-  @Column({ name: 'planned_end', type: 'timestamp' }) plannedEnd!: Date;
+  @Column({ name: 'planned_start', type: 'datetime' }) plannedStart!: Date;
+  @Column({ name: 'planned_end', type: 'datetime' }) plannedEnd!: Date;
   @Column({ type: 'varchar', length: 20, default: 'scheduled' }) status!: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
-  @Column({ name: 'started_at', type: 'timestamp', nullable: true }) startedAt!: Date | null;
-  @Column({ name: 'completed_at', type: 'timestamp', nullable: true }) completedAt!: Date | null;
+  @Column({ name: 'started_at', type: 'datetime', nullable: true }) startedAt!: Date | null;
+  @Column({ name: 'completed_at', type: 'datetime', nullable: true }) completedAt!: Date | null;
   @Column({ name: 'outcome_note', type: 'text', nullable: true }) outcomeNote!: string | null;
   @Column({ name: 'cancel_reason', type: 'varchar', length: 1000, nullable: true }) cancelReason!: string | null;
   @Column({ name: 'created_by_id', type: 'int', unsigned: true, nullable: true }) createdById!: number | null;

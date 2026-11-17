@@ -5,8 +5,7 @@ import { useAuth } from '../../features/auth/AuthContext';
 import { getMenuIcon } from '../../features/menus/menuIcons';
 import { menusApi } from '../../features/menus/menus.api';
 import type { MenuItem } from '../../types';
-import { Button } from '../ui/Button';
-import { Modal } from '../ui/Modal';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import './AppShell.css';
 
 function isRouteActive(pathname: string, route: string) {
@@ -15,7 +14,7 @@ function isRouteActive(pathname: string, route: string) {
 }
 
 export function AppShell() {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshProfile } = useAuth();
   const location = useLocation();
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
@@ -25,6 +24,9 @@ export function AppShell() {
 
   useEffect(() => {
     let active = true;
+
+    // Keep AuthContext permissions in sync with nav (new menus/permissions after seed).
+    void refreshProfile();
 
     menusApi
       .listNav()
@@ -38,7 +40,7 @@ export function AppShell() {
     return () => {
       active = false;
     };
-  }, [user?.id]);
+  }, [user?.id, refreshProfile]);
 
   const searchQuery = menuSearch.trim().toLowerCase();
 
@@ -272,25 +274,15 @@ export function AppShell() {
         </main>
       </div>
 
-      <Modal
+      <ConfirmDialog
         open={logoutConfirmOpen}
         title="Confirm logout"
-        size="sm"
-        squared
-        onClose={() => setLogoutConfirmOpen(false)}
-        footer={
-          <>
-            <Button variant="ghost" size="sm" onClick={() => setLogoutConfirmOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="danger" size="sm" onClick={confirmLogout}>
-              Logout
-            </Button>
-          </>
-        }
-      >
-        <p>Are you sure you want to logout?</p>
-      </Modal>
+        message="Are you sure you want to logout?"
+        confirmLabel="Logout"
+        tone="danger"
+        onCancel={() => setLogoutConfirmOpen(false)}
+        onConfirm={confirmLogout}
+      />
     </div>
   );
 }
