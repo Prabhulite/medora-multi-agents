@@ -1,3 +1,51 @@
+.patient-mrd-lookup {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 18px;
+  padding: 14px 16px;
+  border: 1px solid #dbe8df;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.patient-mrd-lookup label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #254b35;
+}
+
+.patient-mrd-lookup__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.patient-mrd-lookup input {
+  flex: 1 1 220px;
+  min-width: 0;
+  padding: 8px 11px;
+  border: 1px solid #bfcec4;
+  border-radius: 8px;
+  font: inherit;
+}
+
+.patient-mrd-lookup__results {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.patient-mrd-lookup__results button {
+  padding: 7px 10px;
+  border: 1px solid #bad6c4;
+  border-radius: 8px;
+  background: #f3faf5;
+  color: #015b2d;
+  font: inherit;
+  cursor: pointer;
+}
+
 .patient-cell {
   display: flex;
   align-items: center;

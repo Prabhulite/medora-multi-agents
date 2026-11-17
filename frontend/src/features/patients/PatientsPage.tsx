@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ActionMenu } from '../../components/ui/ActionMenu';
 import { Alert } from '../../components/ui/Alert';
@@ -52,6 +52,9 @@ export function PatientsPage() {
   const [auditError, setAuditError] = useState('');
   const [auditPatient, setAuditPatient] = useState<Patient | null>(null);
   const [auditLogs, setAuditLogs] = useState<PatientAuditLog[]>([]);
+  const [mrdLookup, setMrdLookup] = useState('');
+  const [mrdMatches, setMrdMatches] = useState<Patient[] | null>(null);
+  const [mrdLookupLoading, setMrdLookupLoading] = useState(false);
 
   const canCreate = hasPermission(user, 'patients.create');
   const canView = hasPermission(user, 'patients.view');
@@ -105,6 +108,22 @@ export function PatientsPage() {
       setAuditError(getErrorMessage(err, 'Unable to load audit history'));
     } finally {
       setAuditLoading(false);
+    }
+  };
+
+  const onMrdLookup = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const value = mrdLookup.trim();
+    if (!value) return;
+    setMrdLookupLoading(true);
+    setError('');
+    try {
+      setMrdMatches(await patientsApi.search({ mrdNumber: value }));
+    } catch (err) {
+      setMrdMatches(null);
+      setError(getErrorMessage(err, 'Unable to search MRD numbers'));
+    } finally {
+      setMrdLookupLoading(false);
     }
   };
 
@@ -269,6 +288,18 @@ export function PatientsPage() {
         }
       />
       {error ? <Alert tone="error">{error}</Alert> : null}
+      <form className="patient-mrd-lookup" onSubmit={(event) => void onMrdLookup(event)}>
+        <label htmlFor="patient-mrd-lookup">Find current chart by MRD, including merged numbers</label>
+        <div className="patient-mrd-lookup__controls">
+          <input id="patient-mrd-lookup" value={mrdLookup} onChange={(event) => { setMrdLookup(event.target.value); setMrdMatches(null); }} placeholder="Enter an MRD number" />
+          <Button type="submit" size="sm" disabled={mrdLookupLoading || !mrdLookup.trim()}>{mrdLookupLoading ? 'Searching...' : 'Find chart'}</Button>
+        </div>
+        {mrdMatches ? <div className="patient-mrd-lookup__results" aria-live="polite">
+          {mrdMatches.length === 0 ? 'No matching chart found.' : mrdMatches.map((match) => (
+            <button key={match.id} type="button" onClick={() => navigate(`/patients/${match.id}`)}>{match.fullName} · {match.mrdNumber}</button>
+          ))}
+        </div> : null}
+      </form>
       <Table
         columns={columns}
         rows={rows}

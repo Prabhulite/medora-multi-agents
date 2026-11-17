@@ -291,7 +291,11 @@ export const patientRepository = {
     }
 
     if (input.mrdNumber) {
-      qb.andWhere('patient.mrd_number LIKE :mrd', { mrd: `%${input.mrdNumber}%` });
+      qb.andWhere(
+        new Brackets((where) => where
+          .where('patient.mrd_number LIKE :mrd', { mrd: `%${input.mrdNumber}%` })
+          .orWhere('EXISTS (SELECT 1 FROM patients merged WHERE merged.merged_into_patient_id = patient.id AND merged.mrd_number LIKE :mrd)', { mrd: `%${input.mrdNumber}%` })),
+      );
     }
     if (input.mobileNumber) {
       qb.andWhere('contact.mobile_number LIKE :mobile', {
@@ -313,6 +317,7 @@ export const patientRepository = {
         new Brackets((where) => {
           where
             .where('patient.mrd_number LIKE :q', { q })
+            .orWhere('EXISTS (SELECT 1 FROM patients merged WHERE merged.merged_into_patient_id = patient.id AND merged.mrd_number LIKE :q)', { q })
             .orWhere('patient.first_name LIKE :q', { q })
             .orWhere('patient.middle_name LIKE :q', { q })
             .orWhere('patient.last_name LIKE :q', { q })
