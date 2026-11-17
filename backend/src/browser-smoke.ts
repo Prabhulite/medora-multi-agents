@@ -104,6 +104,22 @@ try {
   assert.equal(await evaluate('document.body.innerText.includes("Unable to load radiology worklist")'), false, 'Radiology worklist showed a load error');
   await evaluate('Array.from(document.querySelectorAll("button")).find(button => button.innerText === "Order imaging")?.click(); true');
   assert.equal(await evaluate('document.querySelector(".radiology-modal")?.innerText.includes("Search patient by name or MRD") && Boolean(document.querySelector(".radiology-modal button[type=submit]:disabled"))'), true, 'Radiology order form did not require patient selection');
+  const patientLookup = await evaluate('fetch("/api/radiology/patients?search=MRD", { credentials: "include" }).then(async response => ({ status: response.status, body: await response.json() }))') as { status: number; body: { data?: Array<{ id: number; mrdNumber: string }> } };
+  assert.equal(patientLookup.status, 200, 'Radiology patient lookup failed');
+  if (patientLookup.body.data?.length) {
+    const patient = patientLookup.body.data[0];
+    await evaluate(`(() => { const input = document.querySelector('#search-patient-by-name-or-mrd'); const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; setter.call(input, ${JSON.stringify(patient.mrdNumber)}); input.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+    let matchReady = false;
+    for (let attempt = 0; attempt < 100; attempt++) {
+      matchReady = await evaluate(`Boolean(document.querySelector('.radiology-modal #matching-patients option[value=${JSON.stringify(String(patient.id))}]'))`);
+      if (matchReady) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.ok(matchReady, 'Patient search result did not appear in radiology order form');
+    await evaluate(`(() => { const select = document.querySelector('#matching-patients'); select.value = ${JSON.stringify(String(patient.id))}; select.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+    await evaluate('(() => { const input = document.querySelector("#study-name"); const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set; setter.call(input, "Browser smoke study"); input.dispatchEvent(new Event("input", { bubbles: true })); return true; })()');
+    assert.equal(await evaluate('Boolean(document.querySelector(".radiology-modal button[type=submit]:not(:disabled)"))'), true, 'Patient selection did not enable radiology order submission');
+  }
   await evaluate('document.querySelector(".radiology-modal__header button").click(); true');
   const finalOrderLookup = await evaluate('fetch("/api/radiology/worklist?status=reported&page=1&pageSize=10", { credentials: "include" }).then(async response => ({ status: response.status, body: await response.json() }))') as { status: number; body: { data?: { items?: Array<{ orderNumber: string; reportedById: number | null; reportedByName: string | null; reportText: string | null }> } } };
   assert.equal(finalOrderLookup.status, 200, `Finalized radiology worklist returned ${finalOrderLookup.status}`);
@@ -145,7 +161,7 @@ try {
   const inpatientState = await evaluate('({ path: location.pathname, login: document.body.innerText.includes("Sign in"), inpatient: document.body.innerText.includes("Inpatient Management"), active: document.body.innerText.includes("Active admissions"), page: Boolean(document.querySelector(".inpatient-page")), kpis: Boolean(document.querySelector(".inpatient-kpis")), loadError: document.body.innerText.includes("Unable to load inpatient dashboard") })');
   assert.ok(inpatientLoaded, `Inpatient dashboard did not render: ${JSON.stringify(inpatientState)}`);
   assert.equal(await evaluate('document.body.innerText.includes("Unable to load inpatient dashboard")'), false, 'Inpatient dashboard showed a load error');
-  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, communication queues, inpatient dashboard${finalOrderNumber ? ', and finalized radiology report print output' : ''} rendered in headless Chrome.`);
+  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, communication queues, inpatient dashboard${patientLookup.body.data?.length ? ', radiology patient selection' : ''}${finalOrderNumber ? ', and finalized radiology report print output' : ''} rendered in headless Chrome.`);
   await send('Browser.close').catch(() => undefined);
   socket.close();
 } finally {

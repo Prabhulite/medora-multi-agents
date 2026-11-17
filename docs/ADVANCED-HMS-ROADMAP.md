@@ -114,6 +114,7 @@ Finalized radiology reports now have a browser print view containing patient and
 Finalizing a new radiology report requires an explicit reporting-staff review confirmation for the patient identifier, study, report, and impression. The API rejects finalization without it and records the confirmation in the patient audit event. This is an internal attestation; independent image review, regulated signatures, and external PACS remain outstanding.
 
 Radiology order entry now searches active, unmerged patients by MRD or name and requires the staff member to select a result. The lookup returns only ID, MRD, and name under `radiology.create`; entering an unchecked numeric patient ID in the form is no longer possible.
+The local browser smoke check exercises the patient search and selection when an active patient exists, without submitting a new order.
 
 ### Phase 7: Operations and integrations
 
