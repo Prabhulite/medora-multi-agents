@@ -1,5 +1,7 @@
 # Radiology Diagnostics Vertical Slice
 
+View-only access to a performed study does not expose draft report text or impression through the order list or worklist. Contact history shows outcome, recipient, method, time, and attribution before finalization, but withholds finding summary and notes from view-only staff. Users with `radiology.update` can see draft content for reporting and direct communication; finalized content is visible to `radiology.view`.
+
 ## Scope
 
 Provide an imaging modality catalog, patient-linked radiology orders, priority and clinical notes, and a report workflow from ordered through performed/reported.

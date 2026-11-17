@@ -13,10 +13,10 @@ export type RadiologyOrderStatus = 'ordered' | 'scheduled' | 'performed' | 'repo
 export interface RadiologyWorklist { items: RadiologyOrder[]; total: number; page: number; pageSize: number; summary: { total: number; pending: number; inProgress: number; reported: number } }
 export interface ReferringDoctor { id: number; name: string; doctorCode: string; medicalRegistrationNumber: string }
 export interface RadiologyAddendum { id: number; reason: string; addendum: string; createdById: number | null; createdAt: string; authorName: string | null }
-export interface RadiologyCommunication { id: number; outcome: 'attempted' | 'delivered'; method: 'phone' | 'in_person' | 'secure_message' | 'other'; recipientName: string; findingSummary: string; note: string | null; occurredAt: string; recordedById: number | null; createdAt: string; recorderName: string | null }
+export interface RadiologyCommunication { id: number; outcome: 'attempted' | 'delivered'; method: 'phone' | 'in_person' | 'secure_message' | 'other'; recipientName: string; findingSummary: string | null; note: string | null; occurredAt: string; recordedById: number | null; createdAt: string; recorderName: string | null }
 export interface RadiologyCommunicationQueueItem { id: number; orderNumber: string; patientId: number; patientMrdNumber: string; patientName: string; studyName: string; modalityId: number; priority: 'routine' | 'urgent' | 'stat'; status: 'performed' | 'reported'; performedAt: string | null; reportedAt: string | null; latestAddendumAt: string | null; attemptCount: number; lastAttemptAt: string | null }
 export interface RadiologyCommunicationQueue { items: RadiologyCommunicationQueueItem[]; total: number; page: number; pageSize: number }
-export type CreateRadiologyCommunicationPayload = Pick<RadiologyCommunication, 'outcome' | 'method' | 'recipientName' | 'findingSummary' | 'occurredAt'> & { note?: string | null };
+export type CreateRadiologyCommunicationPayload = Pick<RadiologyCommunication, 'outcome' | 'method' | 'recipientName' | 'occurredAt'> & { findingSummary: string; note?: string | null };
 export interface RadiologyScheduleEvent { id: number; previousAt: string | null; scheduledAt: string; previousEndAt: string | null; scheduledEndAt: string | null; previousResourceId: number | null; resourceId: number | null; reason: string | null; createdById: number | null; createdAt: string; actorName: string | null }
 
 export interface RadiologyOrder {

@@ -6,6 +6,9 @@ import { nextSequenceNumber } from '../../patients/services/number-sequence.serv
 import type { CreateRadiologyAddendumInput, CreateRadiologyCommunicationInput, CreateRadiologyOrderInput, CreateRadiologyResourceInput, RadiologyCommunicationQueueInput, RadiologyWorklistInput, ScheduleRadiologyOrderInput, UpdateRadiologyReportInput } from '../validators/radiology.validators.js';
 
 const orderRelations = { patient: true, modality: true, doctor: true, resource: true } as const;
+function orderResponse(order: RadiologyOrder, canViewDraft: boolean) {
+  return !canViewDraft && order.status !== 'reported' ? { ...order, reportText: null, impression: null } : order;
+}
 
 export const radiologyService = {
   async communicationQueue({ page, pageSize, search }: RadiologyCommunicationQueueInput) {
@@ -113,10 +116,11 @@ export const radiologyService = {
       return repo.findOne({ where: { id: orderId }, relations: orderRelations });
     });
   },
-  async listCommunications(orderId: number) {
-    if (!await AppDataSource.getRepository(RadiologyOrder).exist({ where: { id: orderId } })) throw new NotFoundError('Radiology order not found');
+  async listCommunications(orderId: number, canViewDraft: boolean) {
+    const order = await AppDataSource.getRepository(RadiologyOrder).findOne({ where: { id: orderId } });
+    if (!order) throw new NotFoundError('Radiology order not found');
     const rows = await AppDataSource.getRepository(RadiologyCommunication).find({ where: { orderId }, relations: { recordedBy: true }, order: { id: 'ASC' } });
-    return rows.map(({ id, outcome, method, recipientName, findingSummary, note, occurredAt, recordedById, createdAt, recordedBy }) => ({ id, outcome, method, recipientName, findingSummary, note, occurredAt, recordedById, createdAt, recorderName: recordedBy?.fullName ?? null }));
+    return rows.map(({ id, outcome, method, recipientName, findingSummary, note, occurredAt, recordedById, createdAt, recordedBy }) => ({ id, outcome, method, recipientName, findingSummary: order.status === 'reported' || canViewDraft ? findingSummary : null, note: order.status === 'reported' || canViewDraft ? note : null, occurredAt, recordedById, createdAt, recorderName: recordedBy?.fullName ?? null }));
   },
   async recordCommunication(orderId: number, input: CreateRadiologyCommunicationInput, userId: number | null) {
     const occurredAt = new Date(input.occurredAt);
@@ -157,10 +161,11 @@ export const radiologyService = {
   listModalities() {
     return AppDataSource.getRepository(RadiologyModality).find({ where: { isActive: true }, order: { category: 'ASC', modalityName: 'ASC' } });
   },
-  listOrders(filters: { patientId?: number; status?: RadiologyOrder['status'] }) {
-    return AppDataSource.getRepository(RadiologyOrder).find({ where: { ...(filters.patientId ? { patientId: filters.patientId } : {}), ...(filters.status ? { status: filters.status } : {}) }, relations: orderRelations, order: { orderedAt: 'DESC', id: 'DESC' }, take: filters.patientId ? undefined : 100 });
+  async listOrders(filters: { patientId?: number; status?: RadiologyOrder['status'] }, canViewDraft: boolean) {
+    const rows = await AppDataSource.getRepository(RadiologyOrder).find({ where: { ...(filters.patientId ? { patientId: filters.patientId } : {}), ...(filters.status ? { status: filters.status } : {}) }, relations: orderRelations, order: { orderedAt: 'DESC', id: 'DESC' }, take: filters.patientId ? undefined : 100 });
+    return rows.map((row) => orderResponse(row, canViewDraft));
   },
-  async worklist(input: RadiologyWorklistInput) {
+  async worklist(input: RadiologyWorklistInput, canViewDraft: boolean) {
     const repo = AppDataSource.getRepository(RadiologyOrder);
     const query = repo.createQueryBuilder('study')
       .leftJoinAndSelect('study.patient', 'patient').leftJoinAndSelect('study.modality', 'modality')
@@ -188,7 +193,7 @@ export const radiologyService = {
       if (status === 'performed') summary.inProgress += amount;
       if (status === 'reported') summary.reported += amount;
     }
-    return { items: rows, total, page: input.page, pageSize: input.pageSize, summary };
+    return { items: rows.map((row) => orderResponse(row, canViewDraft)), total, page: input.page, pageSize: input.pageSize, summary };
   },
   async doctorCandidates(search: string) {
     const escaped = search.replace(/[%_\\]/g, '\\$&');

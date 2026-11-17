@@ -103,6 +103,8 @@ The radiology workbench now has a paginated [finding communication queue](RADIOL
 
 The radiology order worklist now pages and searches on the server, filters by status, and computes KPI counts across all orders. Pages are limited to 100 rows. The legacy unscoped order list is capped at 100 for compatibility, while the patient-scoped history endpoint remains available to the patient chart.
 
+View-only radiology staff now see draft study status without draft report text or impression in order lists and the worklist. Free-text finding summaries and notes in communication history are also withheld from view-only staff until the report is final. Staff with `radiology.update` can review draft content to complete reporting and direct contact. Finalized content remains available to `radiology.view`.
+
 ### Phase 7: Operations and integrations
 
 - Operations dashboard KPI totals now use full database counts and billing balance aggregation; preview queues remain bounded. Waiting appointments count checked-in patients. The CSV export includes KPI and alert totals and escapes spreadsheet formula prefixes in patient-entered text. The isolated integration suite covers values beyond the preview limits.
