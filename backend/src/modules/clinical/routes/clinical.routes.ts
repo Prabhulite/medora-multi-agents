@@ -4,7 +4,7 @@ import { authorize } from '../../../middleware/authorize.js';
 import { validate } from '../../../middleware/validate.js';
 import { asyncHandler } from '../../../shared/utils/asyncHandler.js';
 import { clinicalController } from '../controllers/clinical.controller.js';
-import { allergyParamSchema, ceaseHomeMedicationSchema, clinicalEncounterIdParamSchema, consentParamSchema, createAllergySchema, createClinicalEncounterSchema, createConsentSchema, createDiagnosisTermSchema, createEncounterAddendumSchema, createHomeMedicationSchema, createMedicalHistorySchema, diagnosisTermParamSchema, diagnosisTermQuerySchema, homeMedicationParamSchema, medicalHistoryParamSchema, patientClinicalParamSchema, revokeConsentSchema } from '../validators/clinical.validators.js';
+import { allergyParamSchema, ceaseHomeMedicationSchema, clinicalEncounterIdParamSchema, consentParamSchema, createAllergySchema, createClinicalEncounterSchema, createConsentSchema, createDiagnosisTermSchema, createEncounterAddendumSchema, createHomeMedicationSchema, createMedicalHistorySchema, diagnosisTermParamSchema, diagnosisTermQuerySchema, homeMedicationParamSchema, medicalHistoryParamSchema, patientClinicalParamSchema, revokeConsentSchema, updateClinicalEncounterSchema } from '../validators/clinical.validators.js';
 
 const router = Router();
 router.use(authenticate);
@@ -27,6 +27,7 @@ router.post('/patients/:patientId/allergies', authorize('clinical.create'), vali
 router.delete('/patients/:patientId/allergies/:allergyId', authorize('clinical.create'), validate(allergyParamSchema, 'params'), asyncHandler(clinicalController.removeAllergy));
 router.get('/patients/:patientId/encounters', authorize('clinical.view'), validate(patientClinicalParamSchema, 'params'), asyncHandler(clinicalController.listByPatient));
 router.post('/encounters', authorize('clinical.create'), validate(createClinicalEncounterSchema), asyncHandler(clinicalController.create));
+router.patch('/encounters/:id', authorize('clinical.update'), validate(clinicalEncounterIdParamSchema, 'params'), validate(updateClinicalEncounterSchema), asyncHandler(clinicalController.updateEncounter));
 router.post('/encounters/:id/sign', authorize('clinical.update'), validate(clinicalEncounterIdParamSchema, 'params'), asyncHandler(clinicalController.signEncounter));
 router.post('/encounters/:id/addenda', authorize('clinical.update'), validate(clinicalEncounterIdParamSchema, 'params'), validate(createEncounterAddendumSchema), asyncHandler(clinicalController.addEncounterAddendum));
 export default router;

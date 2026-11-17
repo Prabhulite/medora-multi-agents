@@ -532,6 +532,7 @@ export interface PatientAuditLog {
 
 export interface ClinicalEncounter {
   id: number;
+  revision: number;
   patientId: number;
   visitId: number | null;
   doctorId: number | null;
@@ -567,6 +568,17 @@ export interface CreateClinicalEncounterPayload {
   diagnosisCode?: string | null;
   diagnosisName?: string | null;
   diagnosisTermId?: number | null;
+  vitals?: Record<string, string | number | null> | null;
+}
+
+export interface UpdateClinicalEncounterPayload {
+  expectedRevision: number;
+  complaints?: string | null;
+  examination?: string | null;
+  assessment?: string | null;
+  plan?: string | null;
+  diagnosisTermId?: number | null;
+  diagnosisName?: string | null;
   vitals?: Record<string, string | number | null> | null;
 }
 

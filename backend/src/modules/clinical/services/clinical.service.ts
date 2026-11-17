@@ -1,7 +1,7 @@
 import { AppDataSource } from '../../../config/data-source.js';
 import { ClinicalEncounter, ClinicalEncounterAddendum, DiagnosisTerm, Doctor, Patient, PatientAuditLog, PatientVisit } from '../../../database/entities/index.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
-import type { CreateClinicalEncounterInput, CreateEncounterAddendumInput } from '../validators/clinical.validators.js';
+import type { CreateClinicalEncounterInput, CreateEncounterAddendumInput, UpdateClinicalEncounterInput } from '../validators/clinical.validators.js';
 
 export const clinicalService = {
   async listByPatient(patientId: number) {
@@ -64,6 +64,50 @@ export const clinicalService = {
         beforeData: null,
         afterData: JSON.stringify({ id: encounter.id, visitId: encounter.visitId, doctorId: encounter.doctorId, diagnosisTermId: encounter.diagnosisTermId, diagnosisCode: encounter.diagnosisCode, diagnosisSystem: encounter.diagnosisSystem, diagnosisVersion: encounter.diagnosisVersion, diagnosisName: encounter.diagnosisName, status: encounter.status }),
       }));
+      return encounter;
+    });
+  },
+  async update(id: number, input: UpdateClinicalEncounterInput, userId: number | null) {
+    return AppDataSource.transaction(async (manager) => {
+      const repository = manager.getRepository(ClinicalEncounter);
+      const encounter = await repository.createQueryBuilder('encounter').setLock('pessimistic_write').where('encounter.id = :id', { id }).getOne();
+      if (!encounter) throw new NotFoundError('Clinical encounter not found');
+      if (encounter.status !== 'draft') throw new ConflictError('Clinical encounter is finalized');
+      if (encounter.revision !== input.expectedRevision) throw new ConflictError('Clinical encounter revision is stale');
+      const fields = ['complaints', 'examination', 'assessment', 'plan', 'diagnosisTermId', 'diagnosisName', 'vitals'] as const;
+      const beforeValues = Object.fromEntries(fields.map((field) => [field, encounter[field]]));
+      const beforeDiagnosis = { diagnosisTermId: encounter.diagnosisTermId, diagnosisCode: encounter.diagnosisCode, diagnosisSystem: encounter.diagnosisSystem, diagnosisVersion: encounter.diagnosisVersion };
+      for (const field of ['complaints', 'examination', 'assessment', 'plan'] as const) {
+        if (input[field] !== undefined) encounter[field] = input[field];
+      }
+      if (input.vitals !== undefined) encounter.vitals = input.vitals;
+      if (input.diagnosisTermId === null) {
+        encounter.diagnosisTermId = null;
+        encounter.diagnosisCode = null;
+        encounter.diagnosisSystem = null;
+        encounter.diagnosisVersion = null;
+        encounter.diagnosisName = input.diagnosisName ?? null;
+      } else if (input.diagnosisTermId !== undefined && input.diagnosisTermId !== encounter.diagnosisTermId) {
+        const term = await manager.getRepository(DiagnosisTerm).findOne({ where: { id: input.diagnosisTermId, isActive: true } });
+        if (!term) throw new ValidationError('Diagnosis term is invalid or inactive');
+        encounter.diagnosisTermId = term.id;
+        encounter.diagnosisCode = term.code;
+        encounter.diagnosisSystem = term.system;
+        encounter.diagnosisVersion = term.version;
+        encounter.diagnosisName = term.name;
+      } else if (input.diagnosisName !== undefined && encounter.diagnosisTermId === null) {
+        encounter.diagnosisName = input.diagnosisName;
+      }
+      const changedFields = fields.filter((field) => JSON.stringify(beforeValues[field]) !== JSON.stringify(encounter[field]));
+      if (!changedFields.length) throw new ValidationError('No draft changes to save');
+      encounter.revision += 1;
+      await repository.save(encounter);
+      await manager.getRepository(PatientAuditLog).save({
+        patientId: encounter.patientId, action: 'encounter_updated', changedById: userId,
+        changeSummary: `Clinical encounter updated: ${encounter.id}`,
+        beforeData: JSON.stringify({ encounterId: id, revision: input.expectedRevision, ...beforeDiagnosis }),
+        afterData: JSON.stringify({ encounterId: id, revision: encounter.revision, changedFields, diagnosisTermId: encounter.diagnosisTermId, diagnosisCode: encounter.diagnosisCode, diagnosisSystem: encounter.diagnosisSystem, diagnosisVersion: encounter.diagnosisVersion }),
+      });
       return encounter;
     });
   },

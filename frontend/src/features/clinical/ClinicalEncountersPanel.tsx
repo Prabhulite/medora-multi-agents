@@ -12,6 +12,7 @@ import { useAuth } from '../auth/AuthContext';
 import { clinicalApi } from './clinical.api';
 import { prescriptionsApi } from './prescriptions.api';
 import { ConsentPanel } from './ConsentPanel';
+import { DraftEncounterEditor } from './DraftEncounterEditor';
 
 function dateTime(value: string) {
   return new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
@@ -25,6 +26,7 @@ export function ClinicalEncountersPanel({ patientId, onAllergiesChanged }: { pat
   const canViewPharmacy = hasPermission(user, 'pharmacy.view') || hasPermission(user, 'pharmacy.inventory.update');
   const canCreatePharmacy = hasPermission(user, 'pharmacy.create');
   const [rows, setRows] = useState<ClinicalEncounter[]>([]);
+  const [editingDraft, setEditingDraft] = useState<ClinicalEncounter | null>(null);
   const [addendumEncounterId, setAddendumEncounterId] = useState<number | null>(null);
   const [addendumReason, setAddendumReason] = useState('');
   const [addendumText, setAddendumText] = useState('');
@@ -237,7 +239,7 @@ export function ClinicalEncountersPanel({ patientId, onAllergiesChanged }: { pat
           <div key={row.id}>
             <div className="pd-visit-row">
               <div><div className="ui-table__cell-title">{row.diagnosisName || 'Clinical consultation'} · {row.status}</div>{row.diagnosisSystem && row.diagnosisCode ? <div className="ui-table__cell-sub">{row.diagnosisSystem} {row.diagnosisCode}{row.diagnosisVersion ? ` · ${row.diagnosisVersion}` : ''}</div> : null}<div className="ui-table__cell-sub">{row.complaints || row.assessment || 'No narrative recorded'}</div><div className="ui-table__cell-sub">{row.signedAt ? `Signed ${dateTime(row.signedAt)}${row.signedBy?.fullName ? ` by ${row.signedBy.fullName}` : ''}` : 'Draft encounter'}</div></div>
-              <div><strong>{dateTime(row.createdAt)}</strong>{canSignClinical && row.status === 'draft' ? <Button size="sm" disabled={busy} onClick={() => void signEncounter(row.id)}>Sign</Button> : null}{canSignClinical && row.status !== 'draft' ? <Button size="sm" variant="secondary" disabled={busy} onClick={() => setAddendumEncounterId(addendumEncounterId === row.id ? null : row.id)}>Add addendum</Button> : null}</div>
+              <div><strong>{dateTime(row.createdAt)}</strong>{canSignClinical && row.status === 'draft' ? <><Button size="sm" variant="secondary" disabled={busy} onClick={() => setEditingDraft(row)}>Edit draft</Button><Button size="sm" disabled={busy} onClick={() => void signEncounter(row.id)}>Sign</Button></> : null}{canSignClinical && row.status !== 'draft' ? <Button size="sm" variant="secondary" disabled={busy} onClick={() => setAddendumEncounterId(addendumEncounterId === row.id ? null : row.id)}>Add addendum</Button> : null}</div>
             </div>
             {row.addenda?.map((item) => <div key={item.id} className="pd-visit-row"><div><div className="ui-table__cell-title">Addendum: {item.reason}</div><div className="ui-table__cell-sub">{item.addendum}</div></div><strong>{dateTime(item.createdAt)}{item.createdBy?.fullName ? ` · ${item.createdBy.fullName}` : ''}</strong></div>)}
             {addendumEncounterId === row.id ? <div className="clinical-prescription-form"><Input label="Reason for addendum" value={addendumReason} onChange={(event) => setAddendumReason(event.target.value)} /><label className="ui-field"><span className="ui-field__label">Addendum text</span><textarea className="ui-field__input clinical-encounter-textarea" value={addendumText} onChange={(event) => setAddendumText(event.target.value)} /></label><Button size="sm" loading={busy} onClick={() => void saveAddendum(row.id)}>Save addendum</Button></div> : null}
@@ -258,6 +260,7 @@ export function ClinicalEncountersPanel({ patientId, onAllergiesChanged }: { pat
         </div> : null}
         {prescriptions.length ? prescriptions.map((item) => <div key={item.id} className="pd-visit-row"><div><div className="ui-table__cell-title">{item.medicineName}</div><div className="ui-table__cell-sub">{[item.dosage, item.frequency, item.route, item.durationDays ? `${item.durationDays} days` : null, item.quantityPrescribed ? `${item.quantityPrescribed} units` : null].filter(Boolean).join(' · ')}</div></div><strong>{item.instructions || 'Active'}</strong></div>) : <p className="pd-empty">No prescriptions recorded yet.</p>}
       </div> : null}
+      {editingDraft && <DraftEncounterEditor encounter={editingDraft} onClose={() => setEditingDraft(null)} onSaved={async () => { setEditingDraft(null); await load(); }} onReload={async () => { setEditingDraft(null); await load(); }} />}
     </section>
   );
 }

@@ -58,6 +58,17 @@ export const createClinicalEncounterSchema = z.object({
   diagnosisTermId: z.number().int().positive().nullable().optional(),
   vitals: z.record(z.union([z.string().max(80), z.number(), z.null()])).nullable().optional(),
 });
+export const updateClinicalEncounterSchema = z.object({
+  expectedRevision: z.number().int().positive(),
+  complaints: optionalText(5000),
+  examination: optionalText(5000),
+  assessment: optionalText(5000),
+  plan: optionalText(5000),
+  diagnosisTermId: z.number().int().positive().nullable().optional(),
+  diagnosisName: optionalText(160),
+  vitals: z.record(z.union([z.string().max(80), z.number(), z.null()])).nullable().optional(),
+}).strict().refine((value) => Object.keys(value).some((key) => key !== 'expectedRevision'), 'Provide at least one editable field');
+export type UpdateClinicalEncounterInput = z.infer<typeof updateClinicalEncounterSchema>;
 export const clinicalEncounterIdParamSchema = z.object({ id: z.coerce.number().int().positive() });
 export const createEncounterAddendumSchema = z.object({ reason: z.string().trim().min(2).max(255), addendum: z.string().trim().min(2).max(10000) });
 export type CreateEncounterAddendumInput = z.infer<typeof createEncounterAddendumSchema>;

@@ -21,6 +21,9 @@ export const clinicalController = {
   async deactivateDiagnosis(req: Request, res: Response) {
     return sendSuccess(res, await diagnosisService.deactivate(Number(req.params.id)), 'Diagnosis term deactivated');
   },
+  async updateEncounter(req: Request, res: Response) {
+    return sendSuccess(res, await clinicalService.update(Number(req.params.id), req.body, req.user?.id ?? null), 'Clinical encounter updated');
+  },
   async signEncounter(req: Request, res: Response) {
     return sendSuccess(res, await clinicalService.sign(Number(req.params.id), req.user?.id ?? null), 'Clinical encounter signed');
   },

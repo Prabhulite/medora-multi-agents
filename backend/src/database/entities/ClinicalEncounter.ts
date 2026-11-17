@@ -25,6 +25,7 @@ export class ClinicalEncounter {
   @Column({ name: 'doctor_id', type: 'int', unsigned: true, nullable: true }) doctorId!: number | null;
   @ManyToOne(() => Doctor, { onDelete: 'SET NULL', nullable: true }) @JoinColumn({ name: 'doctor_id' }) doctor!: Doctor | null;
   @Column({ name: 'encounter_type', type: 'varchar', length: 30, default: 'consultation' }) encounterType!: string;
+  @Column({ type: 'int', default: 1 }) revision!: number;
   @Column({ type: 'varchar', length: 30, default: 'draft' }) status!: 'draft' | 'signed' | 'amended';
   @Column({ type: 'text', nullable: true }) complaints!: string | null;
   @Column({ type: 'text', nullable: true }) examination!: string | null;

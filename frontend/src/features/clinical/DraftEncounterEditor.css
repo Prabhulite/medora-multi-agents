@@ -1,0 +1,15 @@
+.draft-editor-backdrop { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 20px; background: rgb(15 23 42 / 55%); }
+.draft-editor { width: min(760px, 100%); max-height: 90vh; overflow: auto; border-radius: var(--radius-md); background: var(--color-surface); box-shadow: 0 20px 60px rgb(15 23 42 / 24%); }
+.draft-editor__header { position: sticky; top: 0; z-index: 1; display: flex; align-items: start; justify-content: space-between; gap: 16px; padding: 20px 24px; border-bottom: 1px solid var(--color-border); background: var(--color-surface); }
+.draft-editor__header small { color: var(--color-brand-deep); font-weight: 700; }
+.draft-editor__header h2 { margin: 4px 0 0; font-size: 21px; }
+.draft-editor__header button { border: 0; background: transparent; color: var(--color-text-secondary); font-size: 25px; cursor: pointer; }
+.draft-editor__body { display: grid; gap: 16px; padding: 20px 24px; }
+.draft-editor__body > p { margin: 0; color: var(--color-text-secondary); }
+.draft-editor__textarea { min-height: 80px; resize: vertical; }
+.draft-editor__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.draft-editor__diagnosis { display: grid; gap: 7px; }
+.draft-editor__diagnosis label { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.draft-editor__diagnosis small { color: var(--color-text-secondary); }
+.draft-editor__footer { display: flex; justify-content: flex-end; gap: 10px; padding-top: 6px; }
+@media (max-width: 600px) { .draft-editor__grid { grid-template-columns: 1fr; } }

@@ -1,7 +1,11 @@
 import { api } from '../../lib/api';
-import type { ApiResponse, ClinicalEncounter, CreateClinicalEncounterPayload } from '../../types';
+import type { ApiResponse, ClinicalEncounter, CreateClinicalEncounterPayload, UpdateClinicalEncounterPayload } from '../../types';
 
 export const clinicalApi = {
+  updateDraft: async (id: number, payload: UpdateClinicalEncounterPayload) => {
+    const { data } = await api.patch<ApiResponse<ClinicalEncounter>>(`/clinical/encounters/${id}`, payload);
+    return data.data;
+  },
   listDiagnoses: async (search = '') => {
     const { data } = await api.get<ApiResponse<Array<{ id: number; system: string; code: string; name: string; version: string }>>>('/clinical/diagnoses', { params: { search } });
     return data.data;
