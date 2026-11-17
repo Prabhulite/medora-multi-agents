@@ -152,6 +152,10 @@ export const inpatientService = {
       const reviewRepo = manager.getRepository(DischargeMedicationReview);
       for (const prescription of activePrescriptions) {
         const decision = decisions.get(prescription.id)!;
+        if (decision.decision === 'continue') {
+          const medication = prescription.medicationId ? await manager.getRepository(Medication).findOne({ where: { id: prescription.medicationId } }) : null;
+          await assertNoRecordedAllergy(manager, admission.patientId, [prescription.medicineName, medication?.brandName, medication?.genericName]);
+        }
         await reviewRepo.save(reviewRepo.create({ admissionId: id, prescriptionId: prescription.id, medicineName: prescription.medicineName, dosage: prescription.dosage, frequency: prescription.frequency, route: prescription.route, decision: decision.decision, instructions: decision.decision === 'continue' ? decision.instructions : null, reason: decision.decision === 'stop' ? decision.reason : null, reviewedById: userId, reviewedAt }));
         if (decision.decision === 'stop') { prescription.status = 'stopped'; await prescriptionRepo.save(prescription); }
       }

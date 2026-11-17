@@ -395,6 +395,12 @@ try {
   assert.equal((await request('PATCH', `/api/inpatient/admissions/${admission.id}/discharge`, { dischargeSummary: 'Unauthorized discharge', medicationsReviewed: true, medicationReview: dischargeReview })).status, 403);
   assert.equal((await request('GET', `/api/inpatient/admissions/${admission.id}/discharge-medication-review`)).status, 403);
   token = adminToken;
+  const dischargeAllergy = await ok('POST', '/api/clinical/patients/1/allergies', { allergen: 'Integration Continuing Medicine', reaction: 'Rash', severity: 'moderate' }, 201);
+  assert.equal((await request('PATCH', `/api/inpatient/admissions/${admission.id}/discharge`, { dischargeSummary: 'Unsafe continuation', medicationsReviewed: true, medicationReview: dischargeReview })).status, 409);
+  assert.equal((await dataSource.query('SELECT status FROM prescriptions WHERE id = ?', [prescription.id]))[0].status, 'active');
+  assert.equal((await dataSource.query('SELECT status FROM admissions WHERE id = ?', [admission.id]))[0].status, 'admitted');
+  assert.equal(Number((await dataSource.query('SELECT COUNT(*) AS total FROM discharge_medication_reviews WHERE admission_id = ?', [admission.id]))[0].total), 0);
+  await ok('DELETE', `/api/clinical/patients/1/allergies/${dischargeAllergy.id}`);
   await ok('PATCH', `/api/inpatient/admissions/${admission.id}/discharge`, { dischargeSummary: 'Integration discharge', medicationsReviewed: true, medicationReview: dischargeReview });
   const savedDischargeReview = await ok('GET', `/api/inpatient/admissions/${admission.id}/discharge-medication-review`);
   assert.ok(savedDischargeReview.medicationsReviewedAt);

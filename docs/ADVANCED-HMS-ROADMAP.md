@@ -54,6 +54,7 @@ Current patient chart tabs: Profile and MRD show identity details and audit hist
 - Nursing station, care plans, observations, medication administration
 - Discharge summaries and follow-up instructions
 - Completed admissions expose a read-only discharge view with diagnosis, clinical summary, medication review, follow-up instructions, admission/discharge dates, and a print layout. Discharge now requires a clinician with inpatient and clinical update permissions to review every active recorded prescription, choose continue with instructions or stop with a reason, and attest even when none are active. The server rechecks the list, stops selected prescriptions, saves an immutable decision snapshot, and audits the discharge in the same transaction as bed release. This is a review of Medora's active prescriptions, not a complete reconciliation of outside/home medicines, a new take-home prescription, or a certified signature. See [discharge review design](INPATIENT-DISCHARGE-REVIEW.md).
+- Continuing a recorded prescription at discharge now rechecks the recorded allergy list against the prescription name and any linked catalog brand/generic name; a match rejects the discharge and rolls back the review. This is limited to exact normalized names and still requires clinical judgment.
 - Bed occupancy and ward dashboards
 
 ### Phase 4: Billing and revenue cycle
