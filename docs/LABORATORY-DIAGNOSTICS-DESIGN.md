@@ -21,6 +21,7 @@ Provide a manageable laboratory test catalog, patient-linked investigation order
 - After release, staff with `laboratory.release` can record actual result contact attempts and confirmed delivery with method, recipient, summary, time, and recorder. Entries are append-only and patient-audited; in-app notification alone does not count as delivered. Staff must follow their escalation SOP for urgent or critical results.
 - Users with `laboratory.view` alone see completed values; unreleased values and notes are masked. Staff with update, verify, or release permission can review drafts.
 - Order list and mutation responses project patient name/MRD, test identity, referring doctor name, and collector name instead of serializing full patient, doctor, or staff records.
+- The workbench uses a bounded `GET /api/laboratory/worklist` with page, page size, status, and order/patient/test search. It returns exact matching totals and unfiltered status summary counts. The older patient-scoped order list remains available for chart history; unscoped legacy lists return at most 100 orders.
 - This is an internal authorization workflow. Staff must follow their laboratory's approved SOP, including actual QC review, urgent-result escalation, and any legal signature requirements. The system does not validate analyzer output, QC evidence, or accreditation compliance.
 - All endpoints require authentication and laboratory-specific permissions.
 - Staff with `laboratory.catalog.manage` can add validated catalog tests, retire them from future ordering, and reactivate retired tests. Existing orders keep their test reference and display name.
@@ -28,6 +29,7 @@ Provide a manageable laboratory test catalog, patient-linked investigation order
 ## API
 
 - `GET /api/laboratory/tests`
+- `GET /api/laboratory/worklist?page=1&pageSize=25&search=...&status=...` (`laboratory.view`)
 - `POST /api/laboratory/tests` (`laboratory.catalog.manage`)
 - `POST /api/laboratory/tests/:id/retire` (`laboratory.catalog.manage`)
 - `GET /api/laboratory/tests/all` (`laboratory.catalog.manage`)

@@ -18,6 +18,7 @@ interface TableProps<T> {
   onRefresh?: () => void;
   showIndex?: boolean;
   loading?: boolean;
+  serverPagination?: { page: number; pageSize: number; total: number; search: string; onPageChange: (page: number) => void; onPageSizeChange: (size: number) => void; onSearchChange: (search: string) => void };
 }
 
 const PAGE_SIZES = [10, 25, 50, 100];
@@ -32,18 +33,23 @@ export function Table<T>({
   onRefresh,
   showIndex = true,
   loading = false,
+  serverPagination,
 }: TableProps<T>) {
   const [query, setQuery] = useState('');
   const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(1);
 
   const filteredRows = useMemo(() => {
+    if (serverPagination) return rows;
     const normalized = query.trim().toLowerCase();
     if (!normalized || !searchText) return rows;
     return rows.filter((row) => searchText(row).toLowerCase().includes(normalized));
-  }, [query, rows, searchText]);
+  }, [query, rows, searchText, serverPagination]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
+  const effectivePage = serverPagination?.page ?? page;
+  const effectivePageSize = serverPagination?.pageSize ?? pageSize;
+  const effectiveTotal = serverPagination?.total ?? filteredRows.length;
+  const totalPages = Math.max(1, Math.ceil(effectiveTotal / effectivePageSize));
 
   useEffect(() => {
     setPage(1);
@@ -54,12 +60,13 @@ export function Table<T>({
   }, [page, totalPages]);
 
   const pageRows = useMemo(() => {
+    if (serverPagination) return filteredRows;
     const start = (page - 1) * pageSize;
     return filteredRows.slice(start, start + pageSize);
-  }, [filteredRows, page, pageSize]);
+  }, [filteredRows, page, pageSize, serverPagination]);
 
-  const rangeStart = filteredRows.length === 0 ? 0 : (page - 1) * pageSize + 1;
-  const rangeEnd = Math.min(page * pageSize, filteredRows.length);
+  const rangeStart = effectiveTotal === 0 ? 0 : (effectivePage - 1) * effectivePageSize + 1;
+  const rangeEnd = Math.min(effectivePage * effectivePageSize, effectiveTotal);
 
   return (
     <div className="ui-table-panel">
@@ -68,8 +75,8 @@ export function Table<T>({
           <label className="ui-table-toolbar__entries">
             Show
             <select
-              value={pageSize}
-              onChange={(event) => setPageSize(Number(event.target.value))}
+              value={effectivePageSize}
+              onChange={(event) => serverPagination ? serverPagination.onPageSizeChange(Number(event.target.value)) : setPageSize(Number(event.target.value))}
             >
               {PAGE_SIZES.map((size) => (
                 <option key={size} value={size}>
@@ -79,11 +86,11 @@ export function Table<T>({
             </select>
             entries
           </label>
-          <span className="ui-table-toolbar__count">{filteredRows.length} records.</span>
+          <span className="ui-table-toolbar__count">{effectiveTotal} records.</span>
         </div>
 
         <div className="ui-table-toolbar__right">
-          {searchText ? (
+          {searchText || serverPagination ? (
             <div className="ui-table-search">
               <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
                 <path
@@ -92,8 +99,8 @@ export function Table<T>({
                 />
               </svg>
               <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                value={serverPagination?.search ?? query}
+                onChange={(event) => serverPagination ? serverPagination.onSearchChange(event.target.value) : setQuery(event.target.value)}
                 placeholder={searchPlaceholder}
                 aria-label="Search table"
               />
@@ -134,7 +141,7 @@ export function Table<T>({
               </thead>
               <tbody>
                 {pageRows.map((row, rowIndex) => {
-                  const absoluteIndex = (page - 1) * pageSize + rowIndex;
+                  const absoluteIndex = (effectivePage - 1) * effectivePageSize + rowIndex;
                   return (
                     <tr key={rowKey(row)}>
                       {showIndex ? (
@@ -155,19 +162,19 @@ export function Table<T>({
           <div className="ui-table-footer">
             <span>
               Showing <strong>{rangeStart}</strong> to <strong>{rangeEnd}</strong> of{' '}
-              <strong>{filteredRows.length}</strong> entries
+              <strong>{effectiveTotal}</strong> entries
             </span>
             <div className="ui-table-pager">
-              <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+              <button type="button" disabled={effectivePage <= 1} onClick={() => serverPagination ? serverPagination.onPageChange(effectivePage - 1) : setPage((p) => p - 1)}>
                 Prev
               </button>
               <button type="button" className="is-active">
-                {page}
+                {effectivePage}
               </button>
               <button
                 type="button"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
+                disabled={effectivePage >= totalPages}
+                onClick={() => serverPagination ? serverPagination.onPageChange(effectivePage + 1) : setPage((p) => p + 1)}
               >
                 Next
               </button>

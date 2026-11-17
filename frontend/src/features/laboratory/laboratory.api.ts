@@ -13,6 +13,7 @@ export interface LaboratoryTest {
 export interface CreateLaboratoryTestPayload { testCode: string; testName: string; category: string | null; priority: 'routine' | 'urgent' | 'stat'; turnaroundHours: number; price: number; }
 
 export type LaboratoryOrderStatus = 'ordered' | 'collected' | 'processing' | 'verified' | 'completed' | 'cancelled';
+export interface LaboratoryWorklist { items: LaboratoryOrder[]; total: number; page: number; pageSize: number; summary: { total: number; pending: number; processing: number; completed: number }; }
 
 export interface LaboratoryAddendum { id: number; reason: string; addendum: string; createdAt: string; createdById: number | null; authorName: string | null; }
 export interface LaboratoryCommunication { id: number; outcome: 'attempted' | 'delivered'; method: 'phone' | 'in_person' | 'secure_message' | 'other'; recipientName: string; resultSummary: string; note: string | null; occurredAt: string; recordedById: number | null; recorderName: string | null; createdAt: string; }
@@ -122,6 +123,10 @@ function mapOrder(row: any): LaboratoryOrder {
 }
 
 export const laboratoryApi = {
+  async worklist(params: { page: number; pageSize: number; search?: string; status?: LaboratoryOrderStatus }): Promise<LaboratoryWorklist> {
+    const response = await api.get<ApiEnvelope<{ items: any[]; total: number; page: number; pageSize: number; summary: LaboratoryWorklist['summary'] }>>('/laboratory/worklist', { params });
+    return { ...response.data.data, items: response.data.data.items.map(mapOrder) };
+  },
   async listCommunications(orderId: number): Promise<LaboratoryCommunication[]> {
     const response = await api.get<ApiEnvelope<LaboratoryCommunication[]>>(`/laboratory/orders/${orderId}/communications`);
     return response.data.data;

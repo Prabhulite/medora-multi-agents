@@ -1,8 +1,9 @@
 import { AppDataSource } from '../../../config/data-source.js';
+import { Brackets } from 'typeorm';
 import { Doctor, LaboratoryCommunication, LaboratoryOrder, LaboratoryResultAddendum, LaboratoryTest, Patient, PatientAuditLog, User, UserNotification } from '../../../database/entities/index.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { nextSequenceNumber } from '../../patients/services/number-sequence.service.js';
-import type { CollectLaboratorySampleInput, CreateLaboratoryAddendumInput, CreateLaboratoryCommunicationInput, CreateLaboratoryOrderInput, CreateLaboratoryTestInput, UpdateLaboratoryResultInput } from '../validators/laboratory.validators.js';
+import type { CollectLaboratorySampleInput, CreateLaboratoryAddendumInput, CreateLaboratoryCommunicationInput, CreateLaboratoryOrderInput, CreateLaboratoryTestInput, LaboratoryWorklistInput, UpdateLaboratoryResultInput } from '../validators/laboratory.validators.js';
 
 const orderRelations = { patient: true, test: true, doctor: true, collectedBy: true } as const;
 function orderResponse(order: LaboratoryOrder, canViewDraft = true) {
@@ -122,8 +123,34 @@ export const laboratoryService = {
     });
   },
   async listOrders(filters: { patientId?: number; status?: LaboratoryOrder['status'] }, canViewDraft: boolean) {
-    const rows = await AppDataSource.getRepository(LaboratoryOrder).find({ where: { ...(filters.patientId ? { patientId: filters.patientId } : {}), ...(filters.status ? { status: filters.status } : {}) }, relations: orderRelations, order: { orderedAt: 'DESC' } });
+    const rows = await AppDataSource.getRepository(LaboratoryOrder).find({ where: { ...(filters.patientId ? { patientId: filters.patientId } : {}), ...(filters.status ? { status: filters.status } : {}) }, relations: orderRelations, order: { orderedAt: 'DESC', id: 'DESC' }, take: filters.patientId ? undefined : 100 });
     return rows.map((row) => orderResponse(row, canViewDraft));
+  },
+  async worklist(input: LaboratoryWorklistInput, canViewDraft: boolean) {
+    const repo = AppDataSource.getRepository(LaboratoryOrder);
+    const query = repo.createQueryBuilder('lab').leftJoinAndSelect('lab.patient', 'patient').leftJoinAndSelect('lab.test', 'test').leftJoinAndSelect('lab.doctor', 'doctor').leftJoinAndSelect('lab.collectedBy', 'collectedBy');
+    if (input.status) query.andWhere('lab.status = :status', { status: input.status });
+    if (input.search) {
+      const search = `%${input.search.replace(/[%_\\]/g, '\\$&')}%`;
+      query.andWhere(new Brackets((terms) => {
+        terms.where('lab.orderNumber LIKE :search', { search })
+          .orWhere('patient.mrdNumber LIKE :search', { search })
+          .orWhere("CONCAT_WS(' ', patient.firstName, patient.middleName, patient.lastName) LIKE :search", { search })
+          .orWhere('test.testCode LIKE :search', { search })
+          .orWhere('test.testName LIKE :search', { search });
+      }));
+    }
+    const [rows, total] = await query.orderBy('lab.orderedAt', 'DESC').addOrderBy('lab.id', 'DESC').skip((input.page - 1) * input.pageSize).take(input.pageSize).getManyAndCount();
+    const counts = await repo.createQueryBuilder('lab').select('lab.status', 'status').addSelect('COUNT(*)', 'count').groupBy('lab.status').getRawMany<{ status: LaboratoryOrder['status']; count: string }>();
+    const summary = { total: 0, pending: 0, processing: 0, completed: 0 };
+    for (const { status, count } of counts) {
+      const amount = Number(count);
+      summary.total += amount;
+      if (!['completed', 'cancelled'].includes(status)) summary.pending += amount;
+      if (['collected', 'processing', 'verified'].includes(status)) summary.processing += amount;
+      if (status === 'completed') summary.completed += amount;
+    }
+    return { items: rows.map((row) => orderResponse(row, canViewDraft)), total, page: input.page, pageSize: input.pageSize, summary };
   },
   async createOrder(input: CreateLaboratoryOrderInput, userId: number | null) {
     return AppDataSource.transaction(async (manager) => {

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 const positiveInt = z.number().int().positive();
 export const laboratoryOrderListSchema = z.object({ patientId: z.coerce.number().int().positive().optional(), status: z.enum(['ordered', 'collected', 'processing', 'verified', 'completed', 'cancelled']).optional() });
+export const laboratoryWorklistSchema = z.object({ page: z.coerce.number().int().min(1).max(100000).default(1), pageSize: z.coerce.number().int().min(10).max(100).default(25), search: z.string().trim().min(2).max(80).optional(), status: z.enum(['ordered', 'collected', 'processing', 'verified', 'completed', 'cancelled']).optional() });
 export const laboratoryPatientLookupSchema = z.object({ search: z.string().trim().min(2).max(80) });
 export const laboratoryDoctorLookupSchema = z.object({ search: z.string().trim().min(2).max(80) });
 export const createLaboratoryTestSchema = z.object({ testCode: z.string().trim().min(2).max(40).regex(/^[A-Za-z0-9_-]+$/), testName: z.string().trim().min(2).max(180), category: z.string().trim().max(80).nullable().optional(), priority: z.enum(['routine', 'urgent', 'stat']).default('routine'), turnaroundHours: z.number().int().min(1).max(8760), price: z.number().min(0).max(9999999999.99) });
@@ -19,3 +20,4 @@ export type CollectLaboratorySampleInput = z.infer<typeof collectLaboratorySampl
 export type CreateLaboratoryAddendumInput = z.infer<typeof createLaboratoryAddendumSchema>;
 export type CreateLaboratoryTestInput = z.infer<typeof createLaboratoryTestSchema>;
 export type CreateLaboratoryCommunicationInput = z.infer<typeof createLaboratoryCommunicationSchema>;
+export type LaboratoryWorklistInput = z.infer<typeof laboratoryWorklistSchema>;

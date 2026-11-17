@@ -1,10 +1,12 @@
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { Doctor } from './Doctor.js';
 import { LaboratoryTest } from './LaboratoryTest.js';
 import { Patient } from './Patient.js';
 import { User } from './User.js';
 
 @Entity({ name: 'laboratory_orders' })
+@Index('IDX_laboratory_orders_worklist', ['orderedAt', 'id'])
+@Index('IDX_laboratory_orders_status_worklist', ['status', 'orderedAt', 'id'])
 export class LaboratoryOrder {
   @PrimaryGeneratedColumn({ unsigned: true }) id!: number;
   @Column({ name: 'order_number', type: 'varchar', length: 40, unique: true }) orderNumber!: string;

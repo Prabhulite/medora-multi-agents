@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -10,7 +10,7 @@ import { Table, type TableColumn } from '../../components/ui/Table';
 import { getErrorMessage } from '../../lib/api';
 import { hasPermission } from '../../lib/permissions';
 import { useAuth } from '../auth/AuthContext';
-import { laboratoryApi, type CreateLaboratoryOrderPayload, type CreateLaboratoryTestPayload, type LaboratoryAddendum, type LaboratoryCommunication, type LaboratoryDoctorCandidate, type LaboratoryOrder, type LaboratoryPatientCandidate, type LaboratoryTest, type UpdateLaboratoryResultPayload } from './laboratory.api';
+import { laboratoryApi, type CreateLaboratoryOrderPayload, type CreateLaboratoryTestPayload, type LaboratoryAddendum, type LaboratoryCommunication, type LaboratoryDoctorCandidate, type LaboratoryOrder, type LaboratoryOrderStatus, type LaboratoryPatientCandidate, type LaboratoryTest, type UpdateLaboratoryResultPayload } from './laboratory.api';
 import './LaboratoryDiagnosticsPage.css';
 
 type Modal = 'order' | 'catalog' | 'collect' | 'result' | 'verify' | 'view' | 'communications' | null;
@@ -36,6 +36,14 @@ export function LaboratoryDiagnosticsPage() {
   const [tests, setTests] = useState<LaboratoryTest[]>([]);
   const [catalogTests, setCatalogTests] = useState<LaboratoryTest[]>([]);
   const [orders, setOrders] = useState<LaboratoryOrder[]>([]);
+  const [worklistTotal, setWorklistTotal] = useState(0);
+  const [summary, setSummary] = useState({ total: 0, pending: 0, processing: 0, completed: 0 });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [status, setStatus] = useState<LaboratoryOrderStatus | ''>('');
+  const requestId = useRef(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -48,23 +56,19 @@ export function LaboratoryDiagnosticsPage() {
   const [retireTarget, setRetireTarget] = useState<LaboratoryTest | null>(null);
 
   const load = async () => {
+    const currentRequest = ++requestId.current;
     setLoading(true); setError('');
     try {
-      const [testRows, orderRows] = await Promise.all([laboratoryApi.listTests(), laboratoryApi.listOrders()]);
-      setTests(testRows); setOrders(orderRows);
+      const [testRows, worklist] = await Promise.all([laboratoryApi.listTests(), laboratoryApi.worklist({ page, pageSize, search: debouncedSearch || undefined, status: status || undefined })]);
+      if (currentRequest !== requestId.current) return;
+      setTests(testRows); setOrders(worklist.items); setWorklistTotal(worklist.total); setSummary(worklist.summary);
     } catch (err) {
-      setError(getErrorMessage(err, 'Unable to load laboratory diagnostics'));
-    } finally { setLoading(false); }
+      if (currentRequest === requestId.current) setError(getErrorMessage(err, 'Unable to load laboratory diagnostics'));
+    } finally { if (currentRequest === requestId.current) setLoading(false); }
   };
 
-  useEffect(() => { void load(); }, []);
-
-  const summary = useMemo(() => ({
-    total: orders.length,
-    pending: orders.filter((order) => !['completed', 'cancelled'].includes(order.status)).length,
-    processing: orders.filter((order) => ['collected', 'processing', 'verified'].includes(order.status)).length,
-    completed: orders.filter((order) => order.status === 'completed').length,
-  }), [orders]);
+  useEffect(() => { const timer = setTimeout(() => setDebouncedSearch(search.trim().length >= 2 ? search.trim() : ''), 300); return () => clearTimeout(timer); }, [search]);
+  useEffect(() => { void load(); }, [page, pageSize, debouncedSearch, status]);
 
   const columns = useMemo<TableColumn<LaboratoryOrder>[]>(() => [
     { key: 'order', header: 'Order', render: (row) => <div><div className="ui-table__cell-title">{row.orderNumber}</div><div className="ui-table__cell-sub">{dateLabel(row.orderedAt)}</div></div> },
@@ -87,7 +91,7 @@ export function LaboratoryDiagnosticsPage() {
     setSaving(true); setError(''); setNotice('');
     try {
       const created = await laboratoryApi.createOrder(payload);
-      setOrders((current) => [created, ...current]); setModal(null); setNotice('Laboratory order created successfully.');
+      setModal(null); setNotice(`Laboratory order ${created.orderNumber} created successfully.`); if (page === 1) void load(); else setPage(1);
     } catch (err) { setError(getErrorMessage(err, 'Unable to create laboratory order')); }
     finally { setSaving(false); }
   };
@@ -121,7 +125,7 @@ export function LaboratoryDiagnosticsPage() {
     setSaving(true); setError(''); setNotice('');
     try {
       const updated = await laboratoryApi.updateResult(selectedOrder.id, payload);
-      setOrders((current) => current.map((order) => order.id === updated.id ? updated : order)); setModal(null); setSelectedOrder(null); setNotice('Laboratory draft saved successfully.');
+      setOrders((current) => current.map((order) => order.id === updated.id ? updated : order)); setModal(null); setSelectedOrder(null); setNotice('Laboratory draft saved successfully.'); void load();
     } catch (err) { setError(getErrorMessage(err, 'Unable to save laboratory result')); }
     finally { setSaving(false); }
   };
@@ -130,28 +134,28 @@ export function LaboratoryDiagnosticsPage() {
     setSaving(true); setError(''); setNotice('');
     try {
       const updated = await laboratoryApi.collectSample(selectedOrder.id, specimenLabel);
-      setOrders((current) => current.map((order) => order.id === updated.id ? updated : order)); setModal(null); setSelectedOrder(null); setNotice('Sample collection recorded.');
+      setOrders((current) => current.map((order) => order.id === updated.id ? updated : order)); setModal(null); setSelectedOrder(null); setNotice('Sample collection recorded.'); void load();
     } catch (err) { setError(getErrorMessage(err, 'Unable to collect sample')); }
     finally { setSaving(false); }
   };
   const verifyResult = async () => {
     if (!selectedOrder) return;
     setSaving(true); setError(''); setNotice('');
-    try { const updated = await laboratoryApi.verifyResult(selectedOrder.id); setOrders((current) => current.map((row) => row.id === updated.id ? updated : row)); setModal(null); setSelectedOrder(null); setNotice('Result verified. It is ready for release.'); }
+    try { const updated = await laboratoryApi.verifyResult(selectedOrder.id); setOrders((current) => current.map((row) => row.id === updated.id ? updated : row)); setModal(null); setSelectedOrder(null); setNotice('Result verified. It is ready for release.'); void load(); }
     catch (err) { setError(getErrorMessage(err, 'Unable to verify result')); }
     finally { setSaving(false); }
   };
   const releaseResult = async () => {
     if (!releaseTarget) return;
     setSaving(true); setError(''); setNotice('');
-    try { const updated = await laboratoryApi.releaseResult(releaseTarget.id); setOrders((current) => current.map((row) => row.id === updated.id ? updated : row)); setReleaseTarget(null); setNotice('Verified result released.'); }
+    try { const updated = await laboratoryApi.releaseResult(releaseTarget.id); setOrders((current) => current.map((row) => row.id === updated.id ? updated : row)); setReleaseTarget(null); setNotice('Verified result released.'); void load(); }
     catch (err) { setReleaseTarget(null); setError(getErrorMessage(err, 'Unable to release result')); }
     finally { setSaving(false); }
   };
   const cancelOrder = async () => {
     if (!cancelTarget) return;
     setSaving(true); setError('');
-    try { const updated = await laboratoryApi.cancelOrder(cancelTarget.id, cancelReason.trim()); setOrders((current) => current.map((row) => row.id === updated.id ? updated : row)); setCancelTarget(null); setNotice('Laboratory order cancelled.'); }
+    try { const updated = await laboratoryApi.cancelOrder(cancelTarget.id, cancelReason.trim()); setOrders((current) => current.map((row) => row.id === updated.id ? updated : row)); setCancelTarget(null); setNotice('Laboratory order cancelled.'); void load(); }
     catch (err) { setError(getErrorMessage(err, 'Unable to cancel laboratory order')); }
     finally { setSaving(false); }
   };
@@ -167,8 +171,8 @@ export function LaboratoryDiagnosticsPage() {
       <article className="laboratory-kpi--green"><span>Completed</span><strong>{summary.completed}</strong><small>Results available to care teams</small></article>
     </div>
     <section className="laboratory-section">
-      <div className="laboratory-section__heading"><div><span className="laboratory-eyebrow">DIAGNOSTICS WORKBENCH</span><h2>Laboratory orders</h2><p>Review requests and enter results when the lab completes an investigation.</p></div><Button variant="secondary" size="sm" onClick={() => void load()}>Refresh</Button></div>
-      <Table columns={columns} rows={orders} rowKey={(row) => row.id} loading={loading} searchText={(row) => `${row.orderNumber} ${row.patientName || ''} ${row.patientMrdNumber || ''} ${row.testName} ${row.testCode || ''} ${row.status}`} searchPlaceholder="Search orders, patients, or tests" emptyMessage="No laboratory orders found. Create an order to start the diagnostics workflow." />
+      <div className="laboratory-section__heading"><div><span className="laboratory-eyebrow">DIAGNOSTICS WORKBENCH</span><h2>Laboratory orders</h2><p>Review requests and enter results when the lab completes an investigation.</p></div><div className="laboratory-actions"><Select label="Status" value={status} onChange={(event) => { setStatus(event.target.value as LaboratoryOrderStatus | ''); setPage(1); }} options={[{ value: '', label: 'All statuses' }, ...(['ordered', 'collected', 'processing', 'verified', 'completed', 'cancelled'] as const).map((value) => ({ value, label: value[0].toUpperCase() + value.slice(1) }))]} /><Button variant="secondary" size="sm" onClick={() => void load()}>Refresh</Button></div></div>
+      <Table columns={columns} rows={orders} rowKey={(row) => row.id} loading={loading} searchPlaceholder="Search order, patient, or test (2+ characters)" emptyMessage="No matching laboratory orders found." serverPagination={{ page, pageSize, total: worklistTotal, search, onPageChange: setPage, onPageSizeChange: (size) => { setPageSize(size); setPage(1); }, onSearchChange: (value) => { setSearch(value); setPage(1); } }} />
     </section>
     {modal === 'order' ? <OrderForm tests={tests} saving={saving} error={error} onClose={() => setModal(null)} onSubmit={(payload) => void saveOrder(payload)} /> : null}
     {modal === 'catalog' && <CatalogForm tests={catalogTests} saving={saving} error={error} onClose={() => setModal(null)} onSubmit={(payload) => void saveTest(payload)} onRetire={(test) => setRetireTarget(test)} onReactivate={(test) => void reactivateTest(test)} />}

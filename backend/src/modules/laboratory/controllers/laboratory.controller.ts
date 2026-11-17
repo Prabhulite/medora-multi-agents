@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { laboratoryService } from '../services/laboratory.service.js';
+import type { LaboratoryWorklistInput } from '../validators/laboratory.validators.js';
 export const laboratoryController = {
   patientCandidates: async (req: Request, res: Response) => res.json({ success: true, data: await laboratoryService.patientCandidates(String(req.query.search)) }),
   doctorCandidates: async (req: Request, res: Response) => res.json({ success: true, data: await laboratoryService.doctorCandidates(String(req.query.search)) }),
@@ -9,6 +10,7 @@ export const laboratoryController = {
   retireTest: async (req: Request, res: Response) => res.json({ success: true, data: await laboratoryService.retireTest(Number(req.params.id)) }),
   reactivateTest: async (req: Request, res: Response) => res.json({ success: true, data: await laboratoryService.reactivateTest(Number(req.params.id)) }),
   listOrders: async (req: Request, res: Response) => res.json({ success: true, data: await laboratoryService.listOrders(req.query as { patientId?: number; status?: any }, Boolean(req.user?.isSuperAdmin || req.user?.permissions.some((permission) => ['laboratory.update', 'laboratory.verify', 'laboratory.release'].includes(permission)))) }),
+  worklist: async (req: Request, res: Response) => res.json({ success: true, data: await laboratoryService.worklist(req.query as unknown as LaboratoryWorklistInput, Boolean(req.user?.isSuperAdmin || req.user?.permissions.some((permission) => ['laboratory.update', 'laboratory.verify', 'laboratory.release'].includes(permission)))) }),
   createOrder: async (req: Request, res: Response) => res.status(201).json({ success: true, data: await laboratoryService.createOrder(req.body, req.user?.id ?? null) }),
   cancelOrder: async (req: Request, res: Response) => res.json({ success: true, data: await laboratoryService.cancelOrder(Number(req.params.id), req.body.reason, req.user!.id) }),
   collectSample: async (req: Request, res: Response) => res.json({ success: true, data: await laboratoryService.collectSample(Number(req.params.id), req.body, req.user?.id ?? null) }),

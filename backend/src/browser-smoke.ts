@@ -62,11 +62,12 @@ try {
   assert.ok(loaded, `Laboratory workbench did not render: ${JSON.stringify(pageState)}`);
   let worklistReady = false;
   for (let attempt = 0; attempt < 100; attempt++) {
-    try { worklistReady = await evaluate('Boolean(document.querySelector(".laboratory-section table")) || document.body.innerText.includes("No laboratory orders found")'); } catch { /* navigation resets the execution context */ }
+    try { worklistReady = await evaluate('Boolean(document.querySelector(".laboratory-section table")) || document.body.innerText.includes("No matching laboratory orders found")'); } catch { /* navigation resets the execution context */ }
     if (worklistReady) break;
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   assert.ok(worklistReady, 'Laboratory orders did not finish loading');
+  assert.equal(await evaluate('Boolean(document.querySelector(".laboratory-section .ui-table-search input")) && Boolean(document.querySelector(".laboratory-section .ui-table-toolbar__entries select"))'), true, 'Worklist search and paging controls did not render');
   assert.equal(await evaluate('document.body.innerText.includes("Unable to load laboratory diagnostics")'), false, 'Laboratory workbench showed a load error');
   console.log('Browser smoke passed: authenticated laboratory workbench rendered in headless Chrome.');
   await send('Browser.close').catch(() => undefined);
