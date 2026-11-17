@@ -62,6 +62,10 @@ export const timelineService = {
     }
     for (const row of auditChanges) {
       if (['allergy_added', 'allergy_removed', 'history_added', 'history_removed'].includes(row.action)) events.push(event(row.action.replaceAll('_', '-'), row.id, row.createdAt, row.changeSummary || row.action.replaceAll('_', ' ')));
+      if (row.action === 'home_medication_recorded') events.push(event('home-medication-reported', row.id, row.createdAt, row.changeSummary || 'Reported home medicine recorded', null, 'reported'));
+      if (row.action === 'home_medication_ceased') events.push(event('home-medication-ceased', row.id, row.createdAt, row.changeSummary || 'Reported home medicine marked not current', null, 'not current'));
+      if (row.action === 'admission_medications_reviewed') events.push(event('admission-medications-reviewed', row.id, row.createdAt, row.changeSummary || 'Admission home medicines reviewed', null, 'reviewed'));
+      if (row.action === 'admission_medications_review_added') events.push(event('admission-medications-follow-up', row.id, row.createdAt, row.changeSummary || 'Newly reported home medicines reviewed', null, 'reviewed'));
     }
     for (const row of consents) {
       events.push(event('consent', row.id, row.createdAt, `Consent recorded: ${row.subject}`, row.consentType, row.status));

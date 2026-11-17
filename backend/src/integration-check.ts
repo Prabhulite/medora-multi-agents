@@ -661,13 +661,19 @@ try {
   assert.ok(timeline.some((item: { kind: string }) => item.kind === 'surgery-completed'));
   assert.ok(timeline.some((item: { kind: string }) => item.kind === 'allergy-removed'));
   assert.ok(timeline.some((item: { kind: string }) => item.kind === 'history-removed'));
+  assert.ok(timeline.some((item: { kind: string }) => item.kind === 'home-medication-reported'));
+  assert.ok(timeline.some((item: { kind: string }) => item.kind === 'home-medication-ceased'));
+  assert.ok(timeline.some((item: { kind: string }) => item.kind === 'admission-medications-reviewed'));
+  assert.ok(timeline.some((item: { kind: string }) => item.kind === 'admission-medications-follow-up'));
   assert.ok(timeline.some((item: { kind: string; title: string }) => item.kind === 'communication' && item.title.includes('phone')));
   assert.ok(timeline.some((item: { kind: string }) => item.kind === 'follow-up-completed'));
   assert.ok(timeline.some((item: { kind: string; status: string }) => item.kind === 'appointment-status' && item.status === 'booked'));
   assert.ok(timeline.some((item: { kind: string; status: string }) => item.kind === 'appointment-status' && item.status === 'cancelled'));
   assert.equal(timeline.some((item: { kind: string; title: string }) => item.kind === 'appointment' && item.title === 'Appointment booked'), false);
   assert.ok(timeline.every((item: { at: string }, index: number) => index === 0 || new Date(timeline[index - 1].at).getTime() >= new Date(item.at).getTime()));
-  assert.equal((await ok('GET', '/api/clinical/patients/2/timeline')).some((item: { kind: string }) => item.kind === 'consent'), false);
+  const otherPatientTimeline = await ok('GET', '/api/clinical/patients/2/timeline');
+  assert.equal(otherPatientTimeline.some((item: { kind: string }) => item.kind === 'consent'), false);
+  assert.equal(otherPatientTimeline.some((item: { title: string }) => item.title.includes('Patient Home Tablet')), false);
   assert.equal((await request('GET', '/api/clinical/patients/999999/timeline')).status, 404);
 
   await dataSource.query("INSERT INTO patient_contacts (patient_id,mobile_number,email) VALUES (1,'9999999999','patient@example.test')");
