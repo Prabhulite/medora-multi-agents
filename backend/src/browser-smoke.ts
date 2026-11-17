@@ -77,7 +77,7 @@ try {
   assert.equal(await evaluate('document.body.innerText.includes("Unable to load laboratory diagnostics")'), false, 'Laboratory workbench showed a load error');
   let communicationQueueReady = false;
   for (let attempt = 0; attempt < 100; attempt++) {
-    try { communicationQueueReady = await evaluate('Boolean(document.querySelector(".laboratory-communication-queue table")) || document.body.innerText.includes("No urgent or STAT verified results awaiting communication.")'); } catch { /* navigation resets the execution context */ }
+    try { communicationQueueReady = await evaluate('Boolean(document.querySelector(".laboratory-communication-queue table")) || document.body.innerText.includes("No verified urgent, STAT, or corrected results awaiting communication.")'); } catch { /* navigation resets the execution context */ }
     if (communicationQueueReady) break;
     await new Promise((resolve) => setTimeout(resolve, 100));
   }

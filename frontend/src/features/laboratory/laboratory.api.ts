@@ -15,7 +15,7 @@ export interface CreateLaboratoryTestPayload { testCode: string; testName: strin
 export type LaboratoryOrderStatus = 'ordered' | 'collected' | 'processing' | 'verified' | 'completed' | 'cancelled';
 export interface LaboratoryWorklist { items: LaboratoryOrder[]; total: number; page: number; pageSize: number; summary: { total: number; pending: number; processing: number; completed: number }; }
 
-export interface LaboratoryCommunicationQueueItem { id: number; orderNumber: string; patientId: number; patientName: string | null; patientMrdNumber: string | null; testName: string; priority: 'urgent' | 'stat'; status: 'verified' | 'completed'; verifiedAt: string | null; completedAt: string | null; attemptCount: number; lastAttemptAt: string | null; }
+export interface LaboratoryCommunicationQueueItem { id: number; orderNumber: string; patientId: number; patientName: string | null; patientMrdNumber: string | null; testName: string; priority: 'routine' | 'urgent' | 'stat'; status: 'verified' | 'completed'; verifiedAt: string | null; completedAt: string | null; latestAddendumAt: string | null; attemptCount: number; lastAttemptAt: string | null; }
 export interface LaboratoryCommunicationQueue { items: LaboratoryCommunicationQueueItem[]; total: number; page: number; pageSize: number; }
 
 export interface LaboratoryAddendum { id: number; reason: string; addendum: string; createdAt: string; createdById: number | null; authorName: string | null; }

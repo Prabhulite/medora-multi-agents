@@ -23,8 +23,8 @@ export const laboratoryService = {
     const pending = AppDataSource.getRepository(LaboratoryOrder).createQueryBuilder('lab')
       .innerJoin('lab.patient', 'patient').innerJoin('lab.test', 'test')
       .where('lab.status IN (:...readyStatuses)', { readyStatuses: ['verified', 'completed'] })
-      .andWhere('lab.priority IN (:...priorities)', { priorities: ['urgent', 'stat'] })
-      .andWhere("NOT EXISTS (SELECT 1 FROM laboratory_communications delivered WHERE delivered.order_id = lab.id AND delivered.outcome = 'delivered')");
+      .andWhere("(lab.priority IN (:...priorities) OR (lab.status = 'completed' AND EXISTS (SELECT 1 FROM laboratory_result_addenda correction WHERE correction.order_id = lab.id)))", { priorities: ['urgent', 'stat'] })
+      .andWhere("NOT EXISTS (SELECT 1 FROM laboratory_communications delivered WHERE delivered.order_id = lab.id AND delivered.outcome = 'delivered' AND (NOT EXISTS (SELECT 1 FROM laboratory_result_addenda correction WHERE correction.order_id = lab.id) OR (delivered.created_at > (SELECT MAX(correction.created_at) FROM laboratory_result_addenda correction WHERE correction.order_id = lab.id) AND delivered.occurred_at >= (SELECT MAX(correction.created_at) FROM laboratory_result_addenda correction WHERE correction.order_id = lab.id))))");
     if (search) {
       const term = `%${search.replace(/[%_\\]/g, '\\$&')}%`;
       pending.andWhere(new Brackets((terms) => {
@@ -40,17 +40,19 @@ export const laboratoryService = {
       .addSelect('lab.patientId', 'patientId').addSelect('patient.mrdNumber', 'patientMrdNumber')
       .addSelect('patient.firstName', 'firstName').addSelect('patient.middleName', 'middleName').addSelect('patient.lastName', 'lastName')
       .addSelect('test.testName', 'testName').addSelect('lab.priority', 'priority').addSelect('lab.status', 'status').addSelect('lab.verifiedAt', 'verifiedAt').addSelect('lab.completedAt', 'completedAt')
-      .orderBy('COALESCE(lab.verifiedAt, lab.completedAt, lab.orderedAt)', 'ASC').addOrderBy('lab.id', 'ASC')
+      .addSelect('(SELECT MAX(correction.created_at) FROM laboratory_result_addenda correction WHERE correction.order_id = lab.id)', 'latestAddendumAt')
+      .orderBy('COALESCE((SELECT MAX(correction.created_at) FROM laboratory_result_addenda correction WHERE correction.order_id = lab.id), lab.verifiedAt, lab.completedAt, lab.orderedAt)', 'ASC').addOrderBy('lab.id', 'ASC')
       .limit(pageSize).offset((page - 1) * pageSize).getRawMany<{
-        id: number; orderNumber: string; patientId: number; patientMrdNumber: string; firstName: string; middleName: string | null; lastName: string; testName: string; priority: 'urgent' | 'stat'; status: 'verified' | 'completed'; verifiedAt: Date | null; completedAt: Date | null;
+        id: number; orderNumber: string; patientId: number; patientMrdNumber: string; firstName: string; middleName: string | null; lastName: string; testName: string; priority: 'routine' | 'urgent' | 'stat'; status: 'verified' | 'completed'; verifiedAt: Date | null; completedAt: Date | null; latestAddendumAt: Date | null;
       }>();
     const ids = rows.map((row) => row.id);
     const attempts = ids.length ? await AppDataSource.getRepository(LaboratoryCommunication).createQueryBuilder('contact')
       .select('contact.orderId', 'orderId').addSelect('COUNT(*)', 'attemptCount').addSelect('MAX(contact.occurredAt)', 'lastAttemptAt')
       .where('contact.orderId IN (:...ids)', { ids }).andWhere('contact.outcome = :attempted', { attempted: 'attempted' })
+      .andWhere("(NOT EXISTS (SELECT 1 FROM laboratory_result_addenda correction WHERE correction.order_id = contact.order_id) OR (contact.created_at > (SELECT MAX(correction.created_at) FROM laboratory_result_addenda correction WHERE correction.order_id = contact.order_id) AND contact.occurred_at >= (SELECT MAX(correction.created_at) FROM laboratory_result_addenda correction WHERE correction.order_id = contact.order_id)))")
       .groupBy('contact.orderId').getRawMany<{ orderId: number; attemptCount: string; lastAttemptAt: Date | null }>() : [];
     const attemptMap = new Map(attempts.map((row) => [Number(row.orderId), row]));
-    return { items: rows.map((row) => ({ id: Number(row.id), orderNumber: row.orderNumber, patientId: Number(row.patientId), patientMrdNumber: row.patientMrdNumber, patientName: [row.firstName, row.middleName, row.lastName].filter(Boolean).join(' '), testName: row.testName, priority: row.priority, status: row.status, verifiedAt: row.verifiedAt, completedAt: row.completedAt, attemptCount: Number(attemptMap.get(Number(row.id))?.attemptCount ?? 0), lastAttemptAt: attemptMap.get(Number(row.id))?.lastAttemptAt ?? null })), total, page, pageSize };
+    return { items: rows.map((row) => ({ id: Number(row.id), orderNumber: row.orderNumber, patientId: Number(row.patientId), patientMrdNumber: row.patientMrdNumber, patientName: [row.firstName, row.middleName, row.lastName].filter(Boolean).join(' '), testName: row.testName, priority: row.priority, status: row.status, verifiedAt: row.verifiedAt, completedAt: row.completedAt, latestAddendumAt: row.latestAddendumAt, attemptCount: Number(attemptMap.get(Number(row.id))?.attemptCount ?? 0), lastAttemptAt: attemptMap.get(Number(row.id))?.lastAttemptAt ?? null })), total, page, pageSize };
   },
   async listCommunications(orderId: number, canViewUnreleasedResult: boolean) {
     const order = await AppDataSource.getRepository(LaboratoryOrder).findOne({ where: { id: orderId } });
