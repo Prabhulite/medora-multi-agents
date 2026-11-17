@@ -132,6 +132,7 @@ const PERMISSIONS = [
   { code: 'pharmacy.inventory.view', module: 'pharmacy_inventory', action: 'view', description: 'View pharmacy inventory' },
   { code: 'pharmacy.inventory.create', module: 'pharmacy_inventory', action: 'create', description: 'Receive pharmacy stock' },
   { code: 'pharmacy.inventory.update', module: 'pharmacy_inventory', action: 'update', description: 'Dispense pharmacy stock' },
+  { code: 'pharmacy.inventory.adjust', module: 'pharmacy_inventory', action: 'adjust', description: 'Reconcile counted pharmacy batch stock' },
   { code: 'pharmacy.procurement.view', module: 'pharmacy_procurement', action: 'view', description: 'View pharmacy suppliers and purchase orders' },
   { code: 'pharmacy.procurement.create', module: 'pharmacy_procurement', action: 'create', description: 'Create pharmacy suppliers and purchase orders' },
   { code: 'pharmacy.procurement.update', module: 'pharmacy_procurement', action: 'update', description: 'Receive pharmacy purchase orders' },

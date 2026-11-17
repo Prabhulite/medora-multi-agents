@@ -11,7 +11,7 @@ import { hasPermission } from '../../lib/permissions';
 import { useAuth } from '../auth/AuthContext';
 import { prescriptionsApi } from '../clinical/prescriptions.api';
 import type { Prescription } from '../../types';
-import { pharmacyApi, type DispenseRecord, type DispenseStockPayload, type InventoryBatch, type PharmacyPatientCandidate, type ReceiveStockPayload } from './pharmacy.api';
+import { pharmacyApi, type DispenseRecord, type DispenseStockPayload, type InventoryBatch, type PharmacyPatientCandidate, type ReceiveStockPayload, type StockMovement } from './pharmacy.api';
 import './PharmacyInventoryPage.css';
 
 const currency = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
@@ -35,12 +35,14 @@ export function PharmacyInventoryPage() {
   const { user } = useAuth();
   const canReceive = hasPermission(user, 'pharmacy.inventory.create');
   const canDispense = hasPermission(user, 'pharmacy.inventory.update');
+  const canAdjust = hasPermission(user, 'pharmacy.inventory.adjust');
   const [inventory, setInventory] = useState<InventoryBatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [modal, setModal] = useState<'receive' | 'dispense' | 'history' | null>(null);
+  const [modal, setModal] = useState<'receive' | 'dispense' | 'history' | 'adjust' | 'movements' | null>(null);
+  const [selectedBatch, setSelectedBatch] = useState<InventoryBatch | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -70,7 +72,8 @@ export function PharmacyInventoryPage() {
     { key: 'pricing', header: 'Price', render: (row) => <div><div>{currency.format(row.sellingPrice)}</div><div className="ui-table__cell-sub">Cost {currency.format(row.purchasePrice)}</div></div> },
     { key: 'location', header: 'Location', render: (row) => row.storageLocation || 'Not assigned' },
     { key: 'status', header: 'Status', render: (row) => <Badge tone={stockTone(row)}>{row.quantity <= row.reorderLevel ? 'Low stock' : daysToExpiry(row.expiryDate) <= 90 ? 'Review soon' : 'In stock'}</Badge> },
-  ], []);
+    { key: 'actions', header: 'Actions', render: (row) => <div className="pharmacy-actions"><Button size="sm" variant="secondary" onClick={() => { setSelectedBatch(row); setModal('movements'); }}>Movements</Button>{canAdjust && <Button size="sm" variant="secondary" onClick={() => { setSelectedBatch(row); setModal('adjust'); }}>Adjust count</Button>}</div> },
+  ], [canAdjust]);
 
   const saveReceipt = async (payload: ReceiveStockPayload) => {
     setSaving(true); setError(''); setNotice('');
@@ -87,6 +90,15 @@ export function PharmacyInventoryPage() {
       await pharmacyApi.dispenseStock(payload);
       setModal(null); setNotice('Stock dispensed and inventory updated.'); await load();
     } catch (err) { setError(getErrorMessage(err, 'Unable to dispense stock')); }
+    finally { setSaving(false); }
+  };
+  const saveAdjustment = async (countedQuantity: number, reason: string) => {
+    if (!selectedBatch) return;
+    setSaving(true); setError(''); setNotice('');
+    try {
+      const result = await pharmacyApi.adjustStock(selectedBatch.id, selectedBatch.quantity, countedQuantity, reason);
+      setModal(null); setSelectedBatch(null); setNotice(`Stock count adjusted by ${result.difference > 0 ? '+' : ''}${result.difference} units.`); await load();
+    } catch (err) { setError(getErrorMessage(err, 'Unable to adjust stock count')); }
     finally { setSaving(false); }
   };
 
@@ -107,7 +119,31 @@ export function PharmacyInventoryPage() {
     {modal === 'receive' && canReceive ? <ReceiveStockForm saving={saving} onClose={() => setModal(null)} onSubmit={(payload) => void saveReceipt(payload)} /> : null}
     {modal === 'dispense' && canDispense ? <DispenseStockForm inventory={inventory} saving={saving} onClose={() => setModal(null)} onSubmit={(payload) => void saveDispense(payload)} /> : null}
     {modal === 'history' ? <DispenseHistory onClose={() => setModal(null)} /> : null}
+    {modal === 'adjust' && selectedBatch && canAdjust ? <AdjustStockForm batch={selectedBatch} saving={saving} error={error} onClose={() => setModal(null)} onSubmit={(count, reason) => void saveAdjustment(count, reason)} /> : null}
+    {modal === 'movements' && selectedBatch ? <StockMovements batch={selectedBatch} onClose={() => setModal(null)} /> : null}
   </div>;
+}
+
+function AdjustStockForm({ batch, saving, error, onClose, onSubmit }: { batch: InventoryBatch; saving: boolean; error: string; onClose: () => void; onSubmit: (countedQuantity: number, reason: string) => void }) {
+  const [count, setCount] = useState(String(batch.quantity));
+  const [reason, setReason] = useState('');
+  const difference = Number(count) - batch.quantity;
+  return <ModalShell title={`Adjust count · ${batch.medicationName}`} eyebrow={`BATCH ${batch.batchNumber}`} onClose={onClose}><form className="pharmacy-form" onSubmit={(event) => { event.preventDefault(); onSubmit(Number(count), reason.trim()); }}><p>Current stock: <strong>{batch.quantity} units</strong>. Enter the quantity physically counted. The difference will be recorded in the stock ledger.</p><Input label="Counted quantity" type="number" min="0" max="1000000" required value={count} onChange={(event) => setCount(event.target.value)} /><p className="pharmacy-count-difference">Adjustment: {Number.isFinite(difference) && count !== '' ? `${difference > 0 ? '+' : ''}${difference} units` : 'Enter a count'}</p><Input label="Reason for adjustment" required minLength={5} maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Physical count variance, damaged stock, or correction" />{error && <Alert tone="error">{error}</Alert>}<FormFooter saving={saving} onClose={onClose} submitLabel="Record adjustment" disabled={count === '' || !Number.isInteger(Number(count)) || Number(count) < 0 || difference === 0 || reason.trim().length < 5} /></form></ModalShell>;
+}
+
+function StockMovements({ batch, onClose }: { batch: InventoryBatch; onClose: () => void }) {
+  const [rows, setRows] = useState<StockMovement[]>([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let active = true;
+    setLoading(true); setError('');
+    void pharmacyApi.movements(batch.id, page).then((result) => { if (active) { setRows(result.items); setTotal(result.total); } }).catch((err) => { if (active) setError(getErrorMessage(err, 'Unable to load stock movements')); }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [batch.id, page]);
+  return <ModalShell title={`Stock movements · ${batch.medicationName}`} eyebrow={`BATCH ${batch.batchNumber}`} onClose={onClose}><div className="pharmacy-form"><p>Current stock: <strong>{batch.quantity} units</strong>. Showing {total} recorded movements.</p>{error && <Alert tone="error">{error}</Alert>}{loading ? <p>Loading movements…</p> : rows.length ? <div className="pharmacy-movements">{rows.map((row) => <article key={row.id}><strong>{row.type} · {row.quantity > 0 ? '+' : ''}{row.quantity} units</strong><span>{new Date(row.createdAt).toLocaleString('en-IN')} · {row.createdByName || 'Former staff'}</span>{row.reference && <span>Reference: {row.reference}</span>}{row.notes && <span>Reason / notes: {row.notes}</span>}</article>)}</div> : <p>No movements recorded.</p>}<div className="pharmacy-modal__footer"><Button type="button" variant="secondary" disabled={loading || page === 1} onClick={() => setPage(page - 1)}>Previous</Button><span>Page {page} of {Math.max(1, Math.ceil(total / 25))}</span><Button type="button" variant="secondary" disabled={loading || page * 25 >= total} onClick={() => setPage(page + 1)}>Next</Button><Button type="button" onClick={onClose}>Close</Button></div></div></ModalShell>;
 }
 
 function ReceiveStockForm({ saving, onClose, onSubmit }: { saving: boolean; onClose: () => void; onSubmit: (payload: ReceiveStockPayload) => void }) {

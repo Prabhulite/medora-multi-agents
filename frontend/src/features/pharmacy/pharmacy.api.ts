@@ -35,6 +35,9 @@ export interface DispenseStockPayload {
 }
 export interface DispenseRecord { id: number; quantity: number; createdAt: string; reference: string | null; batch: { batchNumber: string; medication: { brandName: string } }; prescription: { id: number; medicineName: string } | null; createdBy: { fullName: string } | null }
 export interface PharmacyPatientCandidate { id: number; mrdNumber: string; fullName: string }
+export interface StockMovement { id: number; type: 'receipt' | 'dispense' | 'adjustment'; quantity: number; reference: string | null; notes: string | null; createdAt: string; createdByName: string | null }
+export interface StockMovementPage { items: StockMovement[]; total: number; page: number; pageSize: number }
+export interface StockAdjustment { batchId: number; previousQuantity: number; countedQuantity: number; difference: number; movementId: number }
 
 interface ApiEnvelope<T> { data: T; }
 
@@ -62,6 +65,14 @@ function mapBatch(row: any): InventoryBatch {
 }
 
 export const pharmacyApi = {
+  async movements(batchId: number, page = 1): Promise<StockMovementPage> {
+    const response = await api.get<ApiEnvelope<StockMovementPage>>(`/pharmacy/inventory/batches/${batchId}/movements`, { params: { page, pageSize: 25 } });
+    return response.data.data;
+  },
+  async adjustStock(batchId: number, expectedQuantity: number, countedQuantity: number, reason: string): Promise<StockAdjustment> {
+    const response = await api.post<ApiEnvelope<StockAdjustment>>(`/pharmacy/inventory/batches/${batchId}/adjustments`, { expectedQuantity, countedQuantity, reason });
+    return response.data.data;
+  },
   async patients(search: string): Promise<PharmacyPatientCandidate[]> {
     const response = await api.get<ApiEnvelope<PharmacyPatientCandidate[]>>('/pharmacy/inventory/patients', { params: { search } });
     return response.data.data;

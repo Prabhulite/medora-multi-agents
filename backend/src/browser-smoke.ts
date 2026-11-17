@@ -173,6 +173,21 @@ try {
   await evaluate('Array.from(document.querySelectorAll("button")).find(button => button.innerText === "Dispense history").click(); true');
   assert.equal(await evaluate('document.querySelector(".pharmacy-modal")?.innerText.includes("Search patient by name or MRD") && Boolean(document.querySelector(".pharmacy-modal button[type=submit]:disabled"))'), true, 'Pharmacy history did not require patient selection');
   await evaluate('document.querySelector(".pharmacy-modal__header button").click(); true');
+  const hasBatch = await evaluate('Boolean(document.querySelector(".pharmacy-section table tbody tr button"))');
+  if (hasBatch) {
+    await evaluate('Array.from(document.querySelectorAll(".pharmacy-section table tbody tr button")).find(button => button.innerText === "Movements").click(); true');
+    let movementsReady = false;
+    for (let attempt = 0; attempt < 100; attempt++) {
+      movementsReady = await evaluate('document.querySelector(".pharmacy-modal")?.innerText.includes("Stock movements") && !document.querySelector(".pharmacy-modal")?.innerText.includes("Loading movements")');
+      if (movementsReady) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.ok(movementsReady, 'Pharmacy batch movements did not load');
+    await evaluate('document.querySelector(".pharmacy-modal__header button").click(); true');
+    await evaluate('Array.from(document.querySelectorAll(".pharmacy-section table tbody tr button")).find(button => button.innerText === "Adjust count").click(); true');
+    assert.equal(await evaluate('document.querySelector(".pharmacy-modal")?.innerText.includes("Counted quantity") && Boolean(document.querySelector(".pharmacy-modal button[type=submit]:disabled"))'), true, 'Pharmacy adjustment form did not require a changed count and reason');
+    await evaluate('document.querySelector(".pharmacy-modal__header button").click(); true');
+  }
   await evaluate('history.pushState({}, "", "/inpatient"); window.dispatchEvent(new PopStateEvent("popstate")); true');
   let inpatientLoaded = false;
   for (let attempt = 0; attempt < 100; attempt++) {
@@ -183,7 +198,7 @@ try {
   const inpatientState = await evaluate('({ path: location.pathname, login: document.body.innerText.includes("Sign in"), inpatient: document.body.innerText.includes("Inpatient Management"), active: document.body.innerText.includes("Active admissions"), page: Boolean(document.querySelector(".inpatient-page")), kpis: Boolean(document.querySelector(".inpatient-kpis")), loadError: document.body.innerText.includes("Unable to load inpatient dashboard") })');
   assert.ok(inpatientLoaded, `Inpatient dashboard did not render: ${JSON.stringify(inpatientState)}`);
   assert.equal(await evaluate('document.body.innerText.includes("Unable to load inpatient dashboard")'), false, 'Inpatient dashboard showed a load error');
-  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, communication queues, pharmacy patient forms, inpatient dashboard${patientLookup.body.data?.length ? ', radiology patient selection' : ''}${finalOrderNumber ? ', and finalized radiology report print output' : ''} rendered in headless Chrome.`);
+  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, communication queues, pharmacy patient forms${hasBatch ? ', stock movements and count form' : ''}, inpatient dashboard${patientLookup.body.data?.length ? ', radiology patient selection' : ''}${finalOrderNumber ? ', and finalized radiology report print output' : ''} rendered in headless Chrome.`);
   await send('Browser.close').catch(() => undefined);
   socket.close();
 } finally {

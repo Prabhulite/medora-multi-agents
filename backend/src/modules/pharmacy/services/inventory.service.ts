@@ -1,10 +1,31 @@
 import { AppDataSource } from '../../../config/data-source.js';
 import { InventoryBatch, Medication, Patient, PatientAuditLog, Prescription, StockTransaction } from '../../../database/entities/index.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
-import type { DispenseStockInput, ReceiveStockInput } from '../validators/inventory.validators.js';
+import type { AdjustStockInput, DispenseStockInput, ReceiveStockInput, StockMovementListInput } from '../validators/inventory.validators.js';
 import { assertNoRecordedAllergy } from '../../clinical/services/allergy-check.js';
 
 export const inventoryService = {
+  async movements(batchId: number, input: StockMovementListInput) {
+    const exists = await AppDataSource.getRepository(InventoryBatch).exist({ where: { id: batchId } });
+    if (!exists) throw new NotFoundError('Inventory batch not found');
+    const [rows, total] = await AppDataSource.getRepository(StockTransaction).findAndCount({ where: { batchId }, relations: { createdBy: true }, order: { createdAt: 'DESC', id: 'DESC' }, skip: (input.page - 1) * input.pageSize, take: input.pageSize });
+    return { items: rows.map((row) => ({ id: row.id, type: row.type, quantity: row.quantity, reference: row.type === 'receipt' ? row.reference : null, notes: row.type === 'adjustment' ? row.notes : null, createdAt: row.createdAt, createdByName: row.createdBy?.fullName ?? null })), total, page: input.page, pageSize: input.pageSize };
+  },
+  async adjust(batchId: number, input: AdjustStockInput, userId: number) {
+    return AppDataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(InventoryBatch);
+      const batch = await repo.createQueryBuilder('batch').setLock('pessimistic_write').where('batch.id = :batchId', { batchId }).getOne();
+      if (!batch || !batch.isActive) throw new NotFoundError('Active inventory batch not found');
+      const previousQuantity = batch.quantity;
+      if (previousQuantity !== input.expectedQuantity) throw new ConflictError('Stock changed since this count was opened. Refresh and recount before adjusting');
+      const difference = input.countedQuantity - previousQuantity;
+      if (difference === 0) throw new ValidationError('Counted quantity matches current stock');
+      batch.quantity = input.countedQuantity;
+      await repo.save(batch);
+      const movement = await manager.getRepository(StockTransaction).save({ batchId, type: 'adjustment', quantity: difference, reference: null, notes: input.reason, createdById: userId });
+      return { batchId, previousQuantity, countedQuantity: input.countedQuantity, difference, movementId: movement.id };
+    });
+  },
   async patients(search: string) {
     const escaped = search.replace(/[%_\\]/g, '\\$&');
     const rows = await AppDataSource.getRepository(Patient).createQueryBuilder('patient')
