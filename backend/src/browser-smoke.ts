@@ -49,8 +49,14 @@ try {
   }
   const credentials = { username: process.env.SUPER_ADMIN_USERNAME, password: process.env.SUPER_ADMIN_PASSWORD };
   assert.ok(credentials.username && credentials.password, 'Set local super admin credentials for the browser smoke check');
-  const loginStatus = await evaluate(`fetch('/api/auth/login', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(${JSON.stringify(credentials)}) }).then(response => response.status)`);
-  assert.equal(loginStatus, 200, `Browser login returned ${loginStatus}`);
+  let loginResult = await evaluate(`fetch('/api/auth/login', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(${JSON.stringify(credentials)}) }).then(response => ({ status: response.status, retryAfter: Number(response.headers.get('Retry-After') || 0) }))`);
+  if (loginResult.status === 429 && loginResult.retryAfter > 0) {
+    await new Promise((resolve) => setTimeout(resolve, loginResult.retryAfter * 1000));
+    loginResult = await evaluate(`fetch('/api/auth/login', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(${JSON.stringify(credentials)}) }).then(response => ({ status: response.status, retryAfter: Number(response.headers.get('Retry-After') || 0) }))`);
+  }
+  assert.equal(loginResult.status, 200, `Browser login returned ${loginResult.status}`);
+  const cookies = await send('Network.getCookies', { urls: ['http://localhost:5173'] });
+  assert.ok(cookies.cookies.some((cookie: { name: string }) => cookie.name === 'medora_session'), 'Browser session cookie was not set');
   await send('Page.navigate', { url: 'http://localhost:5173/laboratory' });
   let loaded = false;
   for (let attempt = 0; attempt < 100; attempt++) {
@@ -69,7 +75,17 @@ try {
   assert.ok(worklistReady, 'Laboratory orders did not finish loading');
   assert.equal(await evaluate('Boolean(document.querySelector(".laboratory-section .ui-table-search input")) && Boolean(document.querySelector(".laboratory-section .ui-table-toolbar__entries select"))'), true, 'Worklist search and paging controls did not render');
   assert.equal(await evaluate('document.body.innerText.includes("Unable to load laboratory diagnostics")'), false, 'Laboratory workbench showed a load error');
-  console.log('Browser smoke passed: authenticated laboratory workbench rendered in headless Chrome.');
+  await evaluate('history.pushState({}, "", "/inpatient"); window.dispatchEvent(new PopStateEvent("popstate")); true');
+  let inpatientLoaded = false;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    try { inpatientLoaded = await evaluate('Boolean(document.querySelector(".inpatient-page .inpatient-kpis"))'); } catch { /* navigation resets the execution context */ }
+    if (inpatientLoaded) break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  const inpatientState = await evaluate('({ path: location.pathname, login: document.body.innerText.includes("Sign in"), inpatient: document.body.innerText.includes("Inpatient Management"), active: document.body.innerText.includes("Active admissions"), page: Boolean(document.querySelector(".inpatient-page")), kpis: Boolean(document.querySelector(".inpatient-kpis")), loadError: document.body.innerText.includes("Unable to load inpatient dashboard") })');
+  assert.ok(inpatientLoaded, `Inpatient dashboard did not render: ${JSON.stringify(inpatientState)}`);
+  assert.equal(await evaluate('document.body.innerText.includes("Unable to load inpatient dashboard")'), false, 'Inpatient dashboard showed a load error');
+  console.log('Browser smoke passed: authenticated laboratory and inpatient dashboards rendered in headless Chrome.');
   await send('Browser.close').catch(() => undefined);
   socket.close();
 } finally {

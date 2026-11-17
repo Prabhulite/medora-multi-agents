@@ -8,6 +8,7 @@ export { Prescription } from './Prescription.js';
 export { Ward } from './Ward.js';
 export { Bed } from './Bed.js';
 export { Admission } from './Admission.js';
+export { DischargeMedicationReview } from './DischargeMedicationReview.js';
 export { NursingObservation } from './NursingObservation.js';
 export { Invoice } from './Invoice.js';
 export { InvoiceItem } from './InvoiceItem.js';

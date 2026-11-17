@@ -25,6 +25,8 @@ export class Admission {
   @Column({ name: 'discharge_summary', type: 'text', nullable: true }) dischargeSummary!: string | null;
   @Column({ name: 'discharge_diagnosis', type: 'text', nullable: true }) dischargeDiagnosis!: string | null;
   @Column({ name: 'discharge_medications', type: 'text', nullable: true }) dischargeMedications!: string | null;
+  @Column({ name: 'medications_reviewed_at', type: 'timestamp', precision: 6, nullable: true }) medicationsReviewedAt!: Date | null;
+  @Column({ name: 'medications_reviewed_by_id', type: 'int', unsigned: true, nullable: true }) medicationsReviewedById!: number | null;
   @Column({ name: 'follow_up_instructions', type: 'text', nullable: true }) followUpInstructions!: string | null;
   @Column({ name: 'discharged_by_id', type: 'int', unsigned: true, nullable: true }) dischargedById!: number | null;
   @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true }) @JoinColumn({ name: 'discharged_by_id' }) dischargedBy!: User | null;

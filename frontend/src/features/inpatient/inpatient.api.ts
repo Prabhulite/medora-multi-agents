@@ -25,7 +25,7 @@ export interface Bed {
   patientMrdNumber: string | null;
 }
 
-export type AdmissionStatus = 'planned' | 'admitted' | 'discharged' | 'cancelled';
+export type AdmissionStatus = 'planned' | 'admitted' | 'transferred' | 'discharged' | 'cancelled';
 
 export interface Admission {
   id: number;
@@ -47,6 +47,7 @@ export interface Admission {
   dischargeSummary: string | null;
   dischargeDiagnosis: string | null;
   dischargeMedications: string | null;
+  medicationsReviewedAt?: string | null;
   followUpInstructions: string | null;
 }
 
@@ -54,6 +55,8 @@ export interface DischargePayload {
   dischargeSummary: string;
   dischargeDiagnosis?: string | null;
   dischargeMedications?: string | null;
+  medicationsReviewed: true;
+  medicationReview: ({ prescriptionId: number; decision: 'continue'; instructions: string } | { prescriptionId: number; decision: 'stop'; reason: string })[];
   followUpInstructions?: string | null;
 }
 export interface NursingObservation { id: number; observedAt: string; temperatureC: string | null; pulseBpm: number | null; systolicBp: number | null; diastolicBp: number | null; spo2Percent: number | null; notes: string | null; recordedBy?: { fullName: string } | null }
@@ -63,6 +66,7 @@ export interface NursingCarePlanPayload { problem: string; goal: string; interve
 export interface BedTransfer { id: number; fromBed: { number: string; ward: { name: string } }; toBed: { number: string; ward: { name: string } }; reason: string; transferredAt: string; transferredBy?: { fullName: string } | null }
 export interface MedicationOrder { id: number; medicineName: string; dosage: string | null; frequency: string | null; route: string; status: string }
 export interface MedicationAdministration { id: number; prescriptionId: number; prescription: MedicationOrder; outcome: 'given' | 'withheld' | 'refused'; doseGiven: string | null; route: string | null; notes: string | null; recordedAt: string; administeredBy?: { fullName: string } | null }
+export interface DischargeMedicationReview { medicationsReviewedAt: string | null; medicationsReviewedById: number | null; items: { id: number; prescriptionId: number; medicineName: string; dosage: string | null; frequency: string | null; route: string; decision: 'continue' | 'stop'; instructions: string | null; reason: string | null; reviewedAt: string; reviewedBy: { id: number; fullName: string } | null }[] }
 export interface MedicationAdministrationPayload { prescriptionId: number; outcome: MedicationAdministration['outcome']; doseGiven?: string; route?: string; notes?: string }
 
 export interface CreateAdmissionPayload {
@@ -122,6 +126,7 @@ export const inpatientApi = {
   listTransfers: async (id: number) => (await api.get<ApiEnvelope<BedTransfer[]>>(`/inpatient/admissions/${id}/transfers`)).data.data,
   transfer: async (id: number, toBedId: number, reason: string) => (await api.post<ApiEnvelope<BedTransfer>>(`/inpatient/admissions/${id}/transfers`, { toBedId, reason })).data.data,
   medicationOrders: async (id: number) => (await api.get<ApiEnvelope<MedicationOrder[]>>(`/inpatient/admissions/${id}/medication-orders`)).data.data,
+  dischargeMedicationReview: async (id: number) => (await api.get<ApiEnvelope<DischargeMedicationReview>>(`/inpatient/admissions/${id}/discharge-medication-review`)).data.data,
   medicationAdministrations: async (id: number) => (await api.get<ApiEnvelope<MedicationAdministration[]>>(`/inpatient/admissions/${id}/medication-administrations`)).data.data,
   addMedicationAdministration: async (id: number, payload: MedicationAdministrationPayload) => (await api.post<ApiEnvelope<MedicationAdministration>>(`/inpatient/admissions/${id}/medication-administrations`, payload)).data.data,
 };

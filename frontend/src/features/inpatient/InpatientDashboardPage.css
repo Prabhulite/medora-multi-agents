@@ -33,6 +33,13 @@
 .inpatient-discharge-sheet__body dd { margin: 3px 0 0; }
 .inpatient-discharge-sheet__body h3 { margin: 0 0 5px; font-size: 15px; }
 .inpatient-discharge-sheet__body p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.inpatient-discharge-review { grid-column: 1 / -1; display: grid; gap: 12px; border-top: 1px solid var(--color-border); padding-top: 16px; }
+.inpatient-discharge-review > p { color: var(--color-text-secondary); font-size: 13px; }
+.inpatient-discharge-review__item { display: grid; gap: 8px; padding: 13px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); }
+.inpatient-discharge-review__item small { color: var(--color-text-secondary); }
+.inpatient-discharge-review__attestation { display: flex; align-items: flex-start; gap: 9px; font-size: 13px; }
+.inpatient-discharge-review__error { padding: 16px 24px 0; }
+.inpatient-discharge-sheet__medication { padding: 9px 0; border-bottom: 1px solid var(--color-border); }
 .inpatient-discharge-sheet__body section { border-top: 1px solid var(--color-border); padding-top: 12px; }
 @media print {
   body:has(.inpatient-discharge-sheet) * { visibility: hidden; }

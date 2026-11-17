@@ -53,7 +53,7 @@ Current patient chart tabs: Profile and MRD show identity details and audit hist
 - Admissions, wards, rooms, beds, transfers, discharge
 - Nursing station, care plans, observations, medication administration
 - Discharge summaries and follow-up instructions
-- Completed admissions now expose a read-only discharge view with diagnosis, clinical summary, medications, follow-up instructions, admission/discharge dates, and a print layout. The form records the summary when releasing the bed; it is not a signed discharge document or a medication reconciliation workflow.
+- Completed admissions expose a read-only discharge view with diagnosis, clinical summary, medication review, follow-up instructions, admission/discharge dates, and a print layout. Discharge now requires a clinician with inpatient and clinical update permissions to review every active recorded prescription, choose continue with instructions or stop with a reason, and attest even when none are active. The server rechecks the list, stops selected prescriptions, saves an immutable decision snapshot, and audits the discharge in the same transaction as bed release. This is a review of Medora's active prescriptions, not a complete reconciliation of outside/home medicines, a new take-home prescription, or a certified signature. See [discharge review design](INPATIENT-DISCHARGE-REVIEW.md).
 - Bed occupancy and ward dashboards
 
 ### Phase 4: Billing and revenue cycle
@@ -110,7 +110,7 @@ Current radiology reporting and scheduling: the study name entered in the UI is 
 - Clinical encounter, inpatient care, pharmacy dispense, billing refund, and system audit responses now project staff references to the identifiers and display names needed by their screens, instead of serializing full staff profiles. Authentication secrets were already excluded by the User serializer. Further endpoint-by-endpoint data minimization remains to be reviewed.
 - GitHub Actions CI now runs frontend and backend production builds, fresh database setup and seed, and the backend integration suite against a disposable MySQL 8 service on push and pull request. The workflow has not yet run on GitHub; deployment and browser tests remain separate gates.
 - Route-level frontend loading is implemented. The measured Vite entry JavaScript chunk decreased from 790.43 kB to 357.26 kB (uncompressed); the frontend production build passes. Browser timing and visual checks remain to be measured.
-- A repeatable local Chrome browser smoke check signs in with the configured development super admin and verifies the laboratory workbench and order list load. Run `npm run browser:smoke` from `backend` while the API and Vite server are running. Set `CHROME_PATH` if Chrome is outside its usual location. It uses an isolated temporary Chrome profile and does not export patient data. Broader browser workflows and visual accessibility checks remain outstanding.
+- A repeatable local Chrome browser smoke check signs in with the configured development super admin and verifies the laboratory workbench, order list, and inpatient dashboard load. Run `npm run browser:smoke` from `backend` while the API and Vite server are running. Set `CHROME_PATH` if Chrome is outside its usual location. It uses an isolated temporary Chrome profile and does not export patient data. Broader browser workflows and visual accessibility checks remain outstanding.
 - Security review, permission matrix review, rate limiting
 - Backup/restore procedures, observability, alerting
 - Performance testing, accessibility, browser verification
