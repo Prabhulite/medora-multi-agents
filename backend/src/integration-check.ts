@@ -506,7 +506,9 @@ try {
   assert.equal((await request('POST', `/api/inpatient/admissions/${admission.id}/handoffs`, { conditionSummary: '' })).status, 422);
   assert.equal((await request('POST', `/api/inpatient/admissions/${admission.id}/handoffs`, { recipientId: 4, conditionSummary: 'Wrong role', pendingTasks: 'Review mobility care plan' })).status, 422);
   assert.equal((await request('POST', `/api/inpatient/admissions/${admission.id}/handoffs`, { recipientId: 1, conditionSummary: 'Self assignment', pendingTasks: 'Review mobility care plan' })).status, 422);
-  const handoff = await ok('POST', `/api/inpatient/admissions/${admission.id}/handoffs`, { recipientId: receiver.id, conditionSummary: 'Stable for handoff', pendingTasks: 'Review mobility care plan', safetyConcerns: 'Fall risk' }, 201);
+  const handoffDue = new Date(Date.now() + 60_000).toISOString();
+  assert.equal((await request('POST', `/api/inpatient/admissions/${admission.id}/handoffs`, { recipientId: receiver.id, conditionSummary: 'Late deadline', pendingTasks: 'Review mobility care plan', acknowledgementDueAt: new Date(Date.now() - 60_000).toISOString() })).status, 422);
+  const handoff = await ok('POST', `/api/inpatient/admissions/${admission.id}/handoffs`, { recipientId: receiver.id, conditionSummary: 'Stable for handoff', pendingTasks: 'Review mobility care plan', safetyConcerns: 'Fall risk', acknowledgementDueAt: handoffDue }, 201);
   assert.equal(handoff.outgoingBy.fullName, 'Integration Admin');
   assert.equal(handoff.recipient.fullName, 'Integration Receiver');
   assert.equal((await request('GET', '/api/inpatient/handoffs/pending?page=0')).status, 422);
@@ -517,8 +519,9 @@ try {
   assert.equal(pendingHandoffs.items[0].patientMrdNumber, 'IT-MRD-001');
   assert.equal(pendingHandoffs.items[0].recipientId, receiver.id);
   assert.equal(pendingHandoffs.items[0].recipientName, 'Integration Receiver');
+  assert.ok(pendingHandoffs.items[0].acknowledgementDueAt);
   assert.equal('conditionSummary' in pendingHandoffs.items[0], false);
-  assert.equal((await request('POST', `/api/inpatient/admissions/${admission.id}/handoffs`, { recipientId: receiver.id, conditionSummary: 'Again', pendingTasks: 'Later' })).status, 409);
+  assert.equal((await request('POST', `/api/inpatient/admissions/${admission.id}/handoffs`, { recipientId: receiver.id, conditionSummary: 'Again', pendingTasks: 'Later', acknowledgementDueAt: handoffDue })).status, 409);
   assert.equal((await request('POST', `/api/inpatient/admissions/${admission.id}/handoffs/${handoff.id}/acknowledge`)).status, 409);
   await dataSource.query('INSERT INTO users (employee_id,username,full_name,password_hash,is_active,is_super_admin,session_version) VALUES (?,?,?,?,1,1,1)', ['IT-BYSTANDER', 'integration_bystander', 'Integration Bystander', hash]);
   const [bystander] = await dataSource.query("SELECT id FROM users WHERE username = 'integration_bystander'");
@@ -550,7 +553,7 @@ try {
   assert.deepEqual(handoffAudit.map((row: { action: string }) => row.action), ['nursing_handoff_created', 'nursing_handoff_reassigned', 'nursing_handoff_reassigned', 'nursing_handoff_acknowledged']);
   assert.equal(handoffAudit[0].afterData.includes('Fall risk'), false);
   assert.equal(handoffAudit[1].afterData.includes('Receiver unavailable'), false);
-  const dischargeHandoff = await ok('POST', `/api/inpatient/admissions/${admission.id}/handoffs`, { recipientId: receiver.id, conditionSummary: 'Awaiting discharge', pendingTasks: 'Confirm departure instructions' }, 201);
+  const dischargeHandoff = await ok('POST', `/api/inpatient/admissions/${admission.id}/handoffs`, { recipientId: receiver.id, conditionSummary: 'Awaiting discharge', pendingTasks: 'Confirm departure instructions', acknowledgementDueAt: new Date(Date.now() + 60_000).toISOString() }, 201);
   await dataSource.query('UPDATE patients SET is_active = 0 WHERE id = 2');
   assert.equal((await request('POST', '/api/pharmacy/prescriptions', { patientId: 2, medicineName: 'Inactive patient prescription' })).status, 404);
   await dataSource.query('UPDATE patients SET is_active = 1, merged_into_patient_id = 1 WHERE id = 2');

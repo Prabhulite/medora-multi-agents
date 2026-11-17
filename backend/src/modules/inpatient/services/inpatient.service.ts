@@ -80,6 +80,7 @@ export const inpatientService = {
     const total = await query.clone().getCount();
     const items = await query.select('handoff.id', 'id').addSelect('handoff.admissionId', 'admissionId')
       .addSelect('handoff.createdAt', 'createdAt').addSelect('outgoing.id', 'outgoingById')
+      .addSelect('handoff.acknowledgementDueAt', 'acknowledgementDueAt')
       .addSelect('outgoing.fullName', 'outgoingByName')
       .addSelect('handoff.recipientId', 'recipientId')
       .addSelect('recipient.fullName', 'recipientName')
@@ -87,7 +88,8 @@ export const inpatientService = {
       .addSelect('patient.mrdNumber', 'patientMrdNumber')
       .addSelect("CONCAT_WS(' ', patient.firstName, patient.middleName, patient.lastName)", 'patientName')
       .addSelect('ward.name', 'wardName').addSelect('bed.number', 'bedNumber')
-      .orderBy('handoff.createdAt', 'ASC').addOrderBy('handoff.id', 'ASC')
+      .orderBy('CASE WHEN handoff.acknowledgement_due_at IS NULL THEN 1 ELSE 0 END', 'ASC')
+      .addOrderBy('handoff.acknowledgementDueAt', 'ASC').addOrderBy('handoff.id', 'ASC')
       .limit(pageSize).offset((page - 1) * pageSize).getRawMany();
     return { items, total, page, pageSize };
   },
@@ -98,6 +100,8 @@ export const inpatientService = {
   },
   async createNursingHandoff(admissionId: number, input: z.infer<typeof createNursingHandoffSchema>, userId: number | null) {
     if (!userId) throw new ValidationError('Staff identity is required');
+    const acknowledgementDueAt = new Date(input.acknowledgementDueAt);
+    if (acknowledgementDueAt.getTime() <= Date.now()) throw new ValidationError('Acknowledgement due time must be in the future');
     return AppDataSource.transaction(async (manager) => {
       const admission = await manager.getRepository(Admission).createQueryBuilder('admission').setLock('pessimistic_write').where('admission.id = :id', { id: admissionId }).getOne();
       if (!admission) throw new NotFoundError('Admission not found');
@@ -113,8 +117,9 @@ export const inpatientService = {
       if (!recipient) throw new ValidationError('Receiving staff must have active inpatient view and update permissions');
       const pending = await manager.getRepository(NursingHandoff).exist({ where: { admissionId, acknowledgedAt: IsNull(), closedOnDischargeAt: IsNull() } });
       if (pending) throw new ConflictError('A handoff is still awaiting acknowledgement');
-      const record = await manager.getRepository(NursingHandoff).save({ admissionId, conditionSummary: input.conditionSummary, pendingTasks: input.pendingTasks, safetyConcerns: input.safetyConcerns ?? null, outgoingById: userId, recipientId: recipient.id });
-      await manager.getRepository(PatientAuditLog).save({ patientId: admission.patientId, action: 'nursing_handoff_created', changedById: userId, changeSummary: `Nursing handoff created for admission ${admission.admissionNumber}`, beforeData: null, afterData: JSON.stringify({ admissionId, handoffId: record.id, recipientId: recipient.id }) });
+      if (acknowledgementDueAt.getTime() <= Date.now()) throw new ValidationError('Acknowledgement due time must be in the future');
+      const record = await manager.getRepository(NursingHandoff).save({ admissionId, conditionSummary: input.conditionSummary, pendingTasks: input.pendingTasks, safetyConcerns: input.safetyConcerns ?? null, outgoingById: userId, recipientId: recipient.id, acknowledgementDueAt });
+      await manager.getRepository(PatientAuditLog).save({ patientId: admission.patientId, action: 'nursing_handoff_created', changedById: userId, changeSummary: `Nursing handoff created for admission ${admission.admissionNumber}`, beforeData: null, afterData: JSON.stringify({ admissionId, handoffId: record.id, recipientId: recipient.id, acknowledgementDueAt }) });
       return handoffResponse((await manager.getRepository(NursingHandoff).findOne({ where: { id: record.id }, relations: { outgoingBy: true, recipient: true, acknowledgedBy: true } }))!);
     });
   },

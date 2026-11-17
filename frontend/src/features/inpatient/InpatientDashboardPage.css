@@ -58,6 +58,7 @@
 .inpatient-due-plans__list article div { display: grid; gap: 3px; min-width: 0; }
 .inpatient-due-plans__list article strong { color: #173b29; }
 .inpatient-due-plans__list article span, .inpatient-due-plans__list article small { color: #5b7164; }
+.inpatient-due-plans__list article .inpatient-overdue { color: #a62626; font-weight: 700; }
 .inpatient-due-plans__list article p { margin: 2px 0; overflow-wrap: anywhere; }
 .inpatient-due-plans__pager { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 12px; }
 .inpatient-review-history { display: grid; gap: 8px; margin-top: 10px; }

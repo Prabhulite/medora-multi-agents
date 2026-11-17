@@ -18,6 +18,7 @@ export function NursingHandoffPanel({ admission, onClose }: { admission: Admissi
   const [receiverSearch, setReceiverSearch] = useState('');
   const [receivers, setReceivers] = useState<HandoffReceiver[]>([]);
   const [recipientId, setRecipientId] = useState<number | null>(null);
+  const [acknowledgementDueAt, setAcknowledgementDueAt] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -37,10 +38,11 @@ export function NursingHandoffPanel({ admission, onClose }: { admission: Admissi
     event.preventDefault(); setBusy(true); setError('');
     try {
       if (!recipientId) { setError('Select receiving staff.'); return; }
-      await inpatientApi.createNursingHandoff(admission.id, { ...form, recipientId, safetyConcerns: form.safetyConcerns || null });
+      if (!acknowledgementDueAt || new Date(acknowledgementDueAt).getTime() <= Date.now()) { setError('Choose a future acknowledgement due time.'); return; }
+      await inpatientApi.createNursingHandoff(admission.id, { ...form, recipientId, acknowledgementDueAt: new Date(acknowledgementDueAt).toISOString(), safetyConcerns: form.safetyConcerns || null });
       setRows(await inpatientApi.listNursingHandoffs(admission.id));
       setForm({ conditionSummary: '', pendingTasks: '', safetyConcerns: '' });
-      setRecipientId(null); setReceiverSearch(''); setReceivers([]);
+      setRecipientId(null); setReceiverSearch(''); setReceivers([]); setAcknowledgementDueAt('');
     } catch (err) { setError(getErrorMessage(err, 'Unable to record handoff')); }
     finally { setBusy(false); }
   };
@@ -57,10 +59,11 @@ export function NursingHandoffPanel({ admission, onClose }: { admission: Admissi
     {canUpdate && !pending && !loading ? <form onSubmit={(event) => void create(event)}><div className="inpatient-form-grid">
       <div><Input label="Find receiving staff by name or employee ID" value={receiverSearch} onChange={(event) => { setReceiverSearch(event.target.value); setRecipientId(null); setReceivers([]); }} /><Button type="button" size="sm" variant="secondary" disabled={busy || receiverSearch.trim().length < 2} onClick={() => void searchReceivers()}>Search staff</Button></div>
       {receivers.length ? <Select label="Receiving staff *" value={recipientId ?? ''} required onChange={(event) => setRecipientId(Number(event.target.value))} options={[{ label: 'Select receiving staff', value: '' }, ...receivers.map((staff) => ({ label: `${staff.fullName}${staff.employeeId ? ` · ${staff.employeeId}` : ''}`, value: staff.id }))]} /> : null}
+      <Input label="Acknowledgement due *" type="datetime-local" required value={acknowledgementDueAt} onChange={(event) => setAcknowledgementDueAt(event.target.value)} />
       <label className="inpatient-textarea"><span>Current condition *</span><textarea required minLength={2} maxLength={5000} rows={3} value={form.conditionSummary} onChange={(event) => setForm({ ...form, conditionSummary: event.target.value })} /></label>
       <label className="inpatient-textarea"><span>Pending tasks *</span><textarea required minLength={2} maxLength={5000} rows={3} value={form.pendingTasks} onChange={(event) => setForm({ ...form, pendingTasks: event.target.value })} /></label>
       <label className="inpatient-textarea"><span>Safety concerns</span><textarea maxLength={5000} rows={2} value={form.safetyConcerns} onChange={(event) => setForm({ ...form, safetyConcerns: event.target.value })} /></label>
     </div><div className="inpatient-modal__footer"><Button type="submit" loading={busy}>Record handoff</Button></div></form> : pending ? <p className="inpatient-empty">A handoff is awaiting acknowledgement before the next one can be recorded.</p> : null}
-    <div className="inpatient-observations"><h3>Handoff history</h3>{loading ? <p>Loading handoffs…</p> : rows.length ? rows.map((row) => <article key={row.id}><strong>{new Date(row.createdAt).toLocaleString()} · {row.outgoingBy.fullName}</strong><span>{row.closedOnDischargeAt ? `Closed on discharge ${new Date(row.closedOnDischargeAt).toLocaleString()} by ${row.closedOnDischargeBy?.fullName || 'Staff'}` : row.acknowledgedAt ? `Acknowledged ${new Date(row.acknowledgedAt).toLocaleString()} by ${row.acknowledgedBy?.fullName || 'Staff'}` : `Awaiting ${row.recipient?.fullName || 'receiving staff'}`}</span><p>Condition: {row.conditionSummary}</p><p>Pending tasks: {row.pendingTasks}</p>{row.safetyConcerns && <p>Safety concerns: {row.safetyConcerns}</p>}{canUpdate && !row.acknowledgedAt && !row.closedOnDischargeAt && row.outgoingBy.id !== user?.id && (!row.recipientId || row.recipientId === user?.id) ? <Button size="sm" disabled={busy} onClick={() => void acknowledge(row.id)}>Acknowledge handoff</Button> : null}<NursingHandoffAssignmentPanel admissionId={admission.id} handoffId={row.id} canReassign={canReassign && !row.acknowledgedAt && !row.closedOnDischargeAt} onReassigned={async () => setRows(await inpatientApi.listNursingHandoffs(admission.id))} /></article>) : <p>No handoffs recorded.</p>}</div>
+    <div className="inpatient-observations"><h3>Handoff history</h3>{loading ? <p>Loading handoffs…</p> : rows.length ? rows.map((row) => <article key={row.id}><strong>{new Date(row.createdAt).toLocaleString()} · {row.outgoingBy.fullName}</strong><span>{row.closedOnDischargeAt ? `Closed on discharge ${new Date(row.closedOnDischargeAt).toLocaleString()} by ${row.closedOnDischargeBy?.fullName || 'Staff'}` : row.acknowledgedAt ? `Acknowledged ${new Date(row.acknowledgedAt).toLocaleString()} by ${row.acknowledgedBy?.fullName || 'Staff'}` : `Awaiting ${row.recipient?.fullName || 'receiving staff'}`}</span>{row.acknowledgementDueAt && <small>Due {new Date(row.acknowledgementDueAt).toLocaleString()}{!row.acknowledgedAt && !row.closedOnDischargeAt && new Date(row.acknowledgementDueAt).getTime() < Date.now() ? ' · Overdue' : ''}</small>}<p>Condition: {row.conditionSummary}</p><p>Pending tasks: {row.pendingTasks}</p>{row.safetyConcerns && <p>Safety concerns: {row.safetyConcerns}</p>}{canUpdate && !row.acknowledgedAt && !row.closedOnDischargeAt && row.outgoingBy.id !== user?.id && (!row.recipientId || row.recipientId === user?.id) ? <Button size="sm" disabled={busy} onClick={() => void acknowledge(row.id)}>Acknowledge handoff</Button> : null}<NursingHandoffAssignmentPanel admissionId={admission.id} handoffId={row.id} canReassign={canReassign && !row.acknowledgedAt && !row.closedOnDischargeAt} onReassigned={async () => setRows(await inpatientApi.listNursingHandoffs(admission.id))} /></article>) : <p>No handoffs recorded.</p>}</div>
   </section></div>;
 }

@@ -6,6 +6,7 @@ import { User } from './User.js';
 @Index('IDX_nursing_handoffs_admission', ['admissionId', 'id'])
 @Index('IDX_nursing_handoffs_pending', ['acknowledgedAt', 'id'])
 @Index('IDX_nursing_handoffs_recipient_pending', ['recipientId', 'acknowledgedAt'])
+@Index('IDX_nursing_handoffs_ack_due', ['acknowledgementDueAt', 'acknowledgedAt', 'closedOnDischargeAt'])
 export class NursingHandoff {
   @PrimaryGeneratedColumn({ unsigned: true }) id!: number;
   @Column({ name: 'admission_id', type: 'int', unsigned: true }) admissionId!: number;
@@ -16,6 +17,7 @@ export class NursingHandoff {
   @Column({ name: 'outgoing_by_id', type: 'int', unsigned: true }) outgoingById!: number;
   @ManyToOne(() => User, { onDelete: 'RESTRICT' }) @JoinColumn({ name: 'outgoing_by_id' }) outgoingBy!: User;
   @Column({ name: 'recipient_id', type: 'int', unsigned: true, nullable: true }) recipientId!: number | null;
+  @Column({ name: 'acknowledgement_due_at', type: 'timestamp', nullable: true }) acknowledgementDueAt!: Date | null;
   @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true }) @JoinColumn({ name: 'recipient_id' }) recipient!: User | null;
   @Column({ name: 'acknowledged_by_id', type: 'int', unsigned: true, nullable: true }) acknowledgedById!: number | null;
   @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true }) @JoinColumn({ name: 'acknowledged_by_id' }) acknowledgedBy!: User | null;
