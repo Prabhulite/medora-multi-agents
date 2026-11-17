@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
@@ -56,6 +56,8 @@ export function AppointmentFormPage() {
   const [mrdQuery, setMrdQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Patient[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [activeResultIndex, setActiveResultIndex] = useState(0);
   const [patient, setPatient] = useState<Patient | null>(null);
 
   const [appointmentDate, setAppointmentDate] = useState(todayIso());
@@ -196,30 +198,95 @@ export function AppointmentFormPage() {
     [departments],
   );
 
-  const onSearchPatient = async () => {
+  useEffect(() => {
+    if (isReschedule) return;
+
     const q = mrdQuery.trim();
-    if (!q) {
-      setFieldErrors((prev) => ({ ...prev, patient: 'Enter MRD number or patient name' }));
+    if (patient && q === patient.mrdNumber) {
+      setSearchResults([]);
+      setSearchOpen(false);
+      setSearching(false);
       return;
     }
-    setSearching(true);
-    setError('');
-    setFieldErrors((prev) => ({ ...prev, patient: '' }));
-    try {
-      const rows = await patientsApi.search({ q, mrdNumber: q });
-      setSearchResults(rows);
-      if (rows.length === 1) {
-        setPatient(rows[0]);
-        setMrdQuery(rows[0].mrdNumber);
-        setSearchResults([]);
-      } else if (!rows.length) {
-        setPatient(null);
-        setFieldErrors((prev) => ({ ...prev, patient: 'No patient found' }));
-      }
-    } catch (err) {
-      setError(getErrorMessage(err, 'Patient search failed'));
-    } finally {
+
+    if (q.length < 2) {
+      setSearchResults([]);
+      setSearchOpen(false);
       setSearching(false);
+      return;
+    }
+
+    let active = true;
+    setSearching(true);
+    const timer = window.setTimeout(() => {
+      patientsApi
+        .search({ q })
+        .then((rows) => {
+          if (!active) return;
+          const matches = rows.slice(0, 20);
+          setSearchResults(matches);
+          setActiveResultIndex(0);
+          setSearchOpen(matches.length > 0);
+          setFieldErrors((prev) => ({
+            ...prev,
+            patient: matches.length ? '' : 'No patient found',
+          }));
+        })
+        .catch((err) => {
+          if (!active) return;
+          setSearchResults([]);
+          setActiveResultIndex(0);
+          setSearchOpen(false);
+          setError(getErrorMessage(err, 'Patient search failed'));
+        })
+        .finally(() => {
+          if (active) setSearching(false);
+        });
+    }, 250);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [isReschedule, mrdQuery, patient]);
+
+  const selectPatient = (row: Patient) => {
+    setPatient(row);
+    setMrdQuery(row.mrdNumber);
+    setSearchResults([]);
+    setSearchOpen(false);
+    setActiveResultIndex(0);
+    setFieldErrors((prev) => ({ ...prev, patient: '' }));
+  };
+
+  const onPatientSearchKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (!searchOpen || !searchResults.length) {
+      if (e.key === 'Enter') e.preventDefault();
+      return;
+    }
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveResultIndex((prev) => (prev + 1) % searchResults.length);
+      return;
+    }
+
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveResultIndex((prev) => (prev - 1 + searchResults.length) % searchResults.length);
+      return;
+    }
+
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const selected = searchResults[activeResultIndex] || searchResults[0];
+      if (selected) selectPatient(selected);
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setSearchOpen(false);
     }
   };
 
@@ -317,7 +384,7 @@ export function AppointmentFormPage() {
             number is generated automatically.
           </p>
         </div>
-        <Button variant="secondary" size="sm" onClick={() => navigate('/appointments')}>
+        <Button variant="back" size="sm" onClick={() => navigate('/appointments')}>
           Back
         </Button>
       </div>
@@ -332,63 +399,84 @@ export function AppointmentFormPage() {
         <div className="appointment-form-grid">
           {!isReschedule ? (
             <div className="appointment-full">
-              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
-                <div style={{ flex: 1 }}>
-                  <Input
-                    label="Patient MRD / Name / Mobile"
+              <div className="appointment-patient-search">
+                <div
+                  className={`appointment-patient-search__field ${fieldErrors.patient ? 'is-error' : ''}`}
+                >
+                  <span className="appointment-patient-search__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="16" height="16">
+                      <path
+                        fill="currentColor"
+                        d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
+                      />
+                    </svg>
+                  </span>
+                  <input
+                    type="text"
                     value={mrdQuery}
-                    onChange={(e) => setMrdQuery(e.target.value)}
-                    error={fieldErrors.patient}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        void onSearchPatient();
+                    placeholder="Search by MRD, patient name, or phone number"
+                    aria-label="Search by MRD, patient name, or phone number"
+                    aria-autocomplete="list"
+                    aria-expanded={searchOpen}
+                    aria-activedescendant={
+                      searchOpen && searchResults[activeResultIndex]
+                        ? `patient-option-${searchResults[activeResultIndex].id}`
+                        : undefined
+                    }
+                    autoComplete="off"
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setMrdQuery(value);
+                      setActiveResultIndex(0);
+                      if (patient && value.trim() !== patient.mrdNumber) {
+                        setPatient(null);
                       }
+                      setFieldErrors((prev) => ({ ...prev, patient: '' }));
+                    }}
+                    onKeyDown={onPatientSearchKeyDown}
+                    onFocus={() => {
+                      if (searchResults.length) setSearchOpen(true);
+                    }}
+                    onBlur={() => {
+                      window.setTimeout(() => setSearchOpen(false), 150);
                     }}
                   />
+                  {searching ? (
+                    <span className="appointment-patient-search__hint">Searching…</span>
+                  ) : null}
+                  {searchOpen && searchResults.length ? (
+                    <div className="appointment-search-results" role="listbox">
+                      {searchResults.map((row, index) => (
+                        <button
+                          key={row.id}
+                          id={`patient-option-${row.id}`}
+                          type="button"
+                          className={`appointment-search-result ${
+                            index === activeResultIndex ? 'is-active' : ''
+                          }`}
+                          role="option"
+                          aria-selected={index === activeResultIndex}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onMouseEnter={() => setActiveResultIndex(index)}
+                          onClick={() => selectPatient(row)}
+                        >
+                          <div>
+                            <strong>{row.fullName}</strong>
+                            <span>
+                              {row.mrdNumber} · {genderLabel(row.gender)} · Age{' '}
+                              {row.ageYears ?? '—'}
+                            </span>
+                          </div>
+                          <span>{row.mobileNumber || '—'}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => void onSearchPatient()}
-                  disabled={searching}
-                >
-                  {searching ? 'Searching…' : 'Search'}
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => navigate('/patients/new')}
-                >
-                  New Patient
-                </Button>
+                {fieldErrors.patient ? (
+                  <span className="appointment-patient-search__error">{fieldErrors.patient}</span>
+                ) : null}
               </div>
-              {searchResults.length > 1 ? (
-                <div className="appointment-search-results">
-                  {searchResults.map((row) => (
-                    <button
-                      key={row.id}
-                      type="button"
-                      className="appointment-search-result"
-                      onClick={() => {
-                        setPatient(row);
-                        setMrdQuery(row.mrdNumber);
-                        setSearchResults([]);
-                        setFieldErrors((prev) => ({ ...prev, patient: '' }));
-                      }}
-                    >
-                      <div>
-                        <strong>{row.fullName}</strong>
-                        <span>
-                          {row.mrdNumber} · {genderLabel(row.gender)} · Age{' '}
-                          {row.ageYears ?? '—'}
-                        </span>
-                      </div>
-                      <span>{row.mobileNumber || '—'}</span>
-                    </button>
-                  ))}
-                </div>
-              ) : null}
             </div>
           ) : null}
 

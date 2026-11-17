@@ -1,13 +1,12 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import medoraLogo from '../../assets/medora/medora-horizontal.png';
 import { useAuth } from '../../features/auth/AuthContext';
 import { getMenuIcon } from '../../features/menus/menuIcons';
 import { menusApi } from '../../features/menus/menus.api';
-import { notificationsApi } from '../../features/notifications/notifications.api';
 import type { MenuItem } from '../../types';
-import { Button } from '../ui/Button';
-import { Modal } from '../ui/Modal';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { PatientSearchField } from '../ui/PatientSearchField';
 import './AppShell.css';
 
 function isRouteActive(pathname: string, route: string) {
@@ -16,8 +15,10 @@ function isRouteActive(pathname: string, route: string) {
 }
 
 export function AppShell() {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshProfile } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+  const canSearchPatients = hasPermission(user, 'patients.view');
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [navMenus, setNavMenus] = useState<MenuItem[]>([]);
@@ -37,6 +38,9 @@ export function AppShell() {
   useEffect(() => {
     let active = true;
 
+    // Keep AuthContext permissions in sync with nav (new menus/permissions after seed).
+    void refreshProfile();
+
     menusApi
       .listNav()
       .then((menus) => {
@@ -49,7 +53,7 @@ export function AppShell() {
     return () => {
       active = false;
     };
-  }, [user?.id]);
+  }, [user?.id, refreshProfile]);
 
   const searchQuery = menuSearch.trim().toLowerCase();
 
@@ -274,10 +278,6 @@ export function AppShell() {
             </button>
             <img src={medoraLogo} alt="Medora" className="app-shell__header-logo" />
           </div>
-          <NavLink to="/notifications" className="app-shell__notification-link" aria-label={`Notifications, ${unreadNotifications} unread`}>
-            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            {unreadNotifications > 0 && <span>{unreadNotifications > 99 ? '99+' : unreadNotifications}</span>}
-          </NavLink>
         </header>
 
         <main className="app-shell__content">
@@ -287,25 +287,15 @@ export function AppShell() {
         </main>
       </div>
 
-      <Modal
+      <ConfirmDialog
         open={logoutConfirmOpen}
         title="Confirm logout"
-        size="sm"
-        squared
-        onClose={() => setLogoutConfirmOpen(false)}
-        footer={
-          <>
-            <Button variant="ghost" size="sm" onClick={() => setLogoutConfirmOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="danger" size="sm" onClick={confirmLogout}>
-              Logout
-            </Button>
-          </>
-        }
-      >
-        <p>Are you sure you want to logout?</p>
-      </Modal>
+        message="Are you sure you want to logout?"
+        confirmLabel="Logout"
+        tone="danger"
+        onCancel={() => setLogoutConfirmOpen(false)}
+        onConfirm={confirmLogout}
+      />
     </div>
   );
 }

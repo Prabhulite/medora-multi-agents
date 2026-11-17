@@ -164,7 +164,9 @@ export const AppDataSource = new DataSource({
   migrationsTableName: 'migrations',
   synchronize: false,
   logging: env.NODE_ENV === 'development',
-  timezone: 'Z',
+  // Use local session TZ so TIMESTAMP wall times from MySQL are not treated as UTC.
+  // With timezone:'Z' + SYSTEM/IST session, Booked By showed ~+5:30 (e.g. 10:04 PM → 3:34 AM).
+  timezone: 'local',
 });
 
 export async function initializeDataSource(): Promise<DataSource> {

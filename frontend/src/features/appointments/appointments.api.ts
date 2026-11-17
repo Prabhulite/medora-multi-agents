@@ -12,6 +12,8 @@ import type {
 export const appointmentsApi = {
   list: async (params?: {
     date?: string;
+    fromDate?: string;
+    toDate?: string;
     doctorId?: number;
     patientId?: number;
     status?: AppointmentStatus;

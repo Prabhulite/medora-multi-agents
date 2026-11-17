@@ -104,7 +104,7 @@ export function DepartmentFormPage() {
       <div className="dm-form-page">
         <Alert tone="error">{error}</Alert>
         <div className="dm-form-footer">
-          <Button variant="secondary" size="sm" onClick={() => navigate('/departments')}>
+          <Button variant="back" size="sm" onClick={() => navigate('/departments')}>
             Back to Departments
           </Button>
         </div>

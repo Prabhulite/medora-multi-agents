@@ -333,7 +333,7 @@ export function DoctorFormPage() {
       <div className="doc-form-page">
         <Alert tone="error">{error}</Alert>
         <div className="doc-form-footer">
-          <Button variant="secondary" size="sm" onClick={() => navigate('/doctors')}>
+          <Button variant="back" size="sm" onClick={() => navigate('/doctors')}>
             Back to Doctors
           </Button>
         </div>

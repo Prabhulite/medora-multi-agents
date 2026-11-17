@@ -331,7 +331,7 @@ export function RoleFormPage() {
       <div className="rm-form-page">
         <Alert tone="error">{error}</Alert>
         <div className="rm-form-footer">
-          <Button variant="secondary" size="sm" onClick={() => navigate('/roles')}>
+          <Button variant="back" size="sm" onClick={() => navigate('/roles')}>
             Back to Roles
           </Button>
         </div>

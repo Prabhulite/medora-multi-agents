@@ -94,6 +94,8 @@ export const appointmentRepository = {
 
   async list(filters: {
     date?: string;
+    fromDate?: string;
+    toDate?: string;
     doctorId?: number;
     patientId?: number;
     status?: AppointmentStatus;
@@ -111,6 +113,15 @@ export const appointmentRepository = {
 
     if (filters.date) {
       qb.andWhere('appointment.appointment_date = :date', { date: filters.date });
+    } else {
+      if (filters.fromDate) {
+        qb.andWhere('appointment.appointment_date >= :fromDate', {
+          fromDate: filters.fromDate,
+        });
+      }
+      if (filters.toDate) {
+        qb.andWhere('appointment.appointment_date <= :toDate', { toDate: filters.toDate });
+      }
     }
     if (filters.doctorId) {
       qb.andWhere('appointment.doctor_id = :doctorId', { doctorId: filters.doctorId });

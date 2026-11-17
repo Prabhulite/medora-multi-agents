@@ -98,7 +98,7 @@ export function SpecializationFormPage() {
       <div className="dm-form-page">
         <Alert tone="error">{error}</Alert>
         <div className="dm-form-footer">
-          <Button variant="secondary" size="sm" onClick={() => navigate('/specializations')}>
+          <Button variant="back" size="sm" onClick={() => navigate('/specializations')}>
             Back to Specializations
           </Button>
         </div>

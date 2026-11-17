@@ -1,0 +1,95 @@
+.patient-search-field {
+  display: grid;
+  gap: 0.4rem;
+  min-width: min(320px, 100%);
+}
+
+.patient-search-field__label {
+  font-family: var(--font-display);
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-heading);
+}
+
+.patient-search-field__required {
+  margin-left: 0.2rem;
+  color: #ef4444;
+}
+
+.patient-search-field__control {
+  position: relative;
+  display: block;
+}
+
+.patient-search-field__control input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--color-text);
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.patient-search-field__control input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px rgba(22, 132, 71, 0.12);
+}
+
+.patient-search-field__hint {
+  position: absolute;
+  top: 50%;
+  right: 1rem;
+  transform: translateY(-50%);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  pointer-events: none;
+}
+
+.patient-search-field__results {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  max-height: 280px;
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: var(--shadow-md);
+}
+
+.patient-search-field__result {
+  display: grid;
+  gap: 0.15rem;
+  width: 100%;
+  padding: 0.8rem 1rem;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.patient-search-field__result:last-child {
+  border-bottom: 0;
+}
+
+.patient-search-field__result strong {
+  color: var(--color-heading);
+  font-size: 0.92rem;
+}
+
+.patient-search-field__result span {
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+}
+
+.patient-search-field__result:hover,
+.patient-search-field__result.is-active {
+  background: var(--color-hover);
+}

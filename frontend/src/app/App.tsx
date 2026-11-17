@@ -18,6 +18,8 @@ const DoctorsPage = lazy(() => import('../features/doctors/DoctorsPage').then((m
 const HospitalProfilePage = lazy(() => import('../features/hospital-profile/HospitalProfilePage').then((module) => ({ default: module.HospitalProfilePage })));
 const AppointmentFormPage = lazy(() => import('../features/appointments/AppointmentFormPage').then((module) => ({ default: module.AppointmentFormPage })));
 const AppointmentsPage = lazy(() => import('../features/appointments/AppointmentsPage').then((module) => ({ default: module.AppointmentsPage })));
+const CheckinPage = lazy(() => import('../features/checkin/CheckinPage').then((module) => ({ default: module.CheckinPage })));
+const CheckinListPage = lazy(() => import('../features/checkin/CheckinListPage').then((module) => ({ default: module.CheckinListPage })));
 const PatientDashboardPage = lazy(() => import('../features/patients/PatientDashboardPage').then((module) => ({ default: module.PatientDashboardPage })));
 const PatientFormPage = lazy(() => import('../features/patients/PatientFormPage').then((module) => ({ default: module.PatientFormPage })));
 const PatientsPage = lazy(() => import('../features/patients/PatientsPage').then((module) => ({ default: module.PatientsPage })));
@@ -108,6 +110,17 @@ export default function App() {
               <Route element={<ProtectedRoute permission="appointments.view" />}>
                 <Route path="appointments" element={<AppointmentsPage />} />
               </Route>
+              <Route
+                element={
+                  <ProtectedRoute permissions={['visits.view', 'visits.checkin', 'visits.checkout']} />
+                }
+              >
+                <Route path="checkin" element={<CheckinListPage />} />
+                <Route path="checkin-list" element={<Navigate to="/checkin" replace />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="visits.checkin" />}>
+                <Route path="checkin/new" element={<CheckinPage />} />
+              </Route>
               <Route element={<ProtectedRoute permission="inpatient.view" />}>
                 <Route path="inpatient" element={<InpatientDashboardPage />} />
               </Route>
@@ -166,10 +179,10 @@ export default function App() {
               <Route element={<ProtectedRoute permission="menus.view" />}>
                 <Route path="menus" element={<MenusPage />} />
               </Route>
+              {/* Keep catch-all inside the shell so unknown paths don't bypass page routes. */}
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Route>
-
-          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

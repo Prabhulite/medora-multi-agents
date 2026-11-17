@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import { env } from './config/env.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import appointmentRoutes from './modules/appointments/routes/appointment.routes.js';
+import visitRoutes from './modules/visits/routes/visit.routes.js';
 import clinicalRoutes from './modules/clinical/routes/clinical.routes.js';
 import authRoutes from './modules/auth/routes/auth.routes.js';
 import departmentRoutes from './modules/departments/routes/department.routes.js';
@@ -69,6 +70,7 @@ export function createApp() {
   app.use('/api/doctors', doctorRoutes);
   app.use('/api/patients', patientRoutes);
   app.use('/api/appointments', appointmentRoutes);
+  app.use('/api/visits', visitRoutes);
   app.use('/api/clinical', clinicalRoutes);
   app.use('/api/fhir', fhirRoutes);
   app.use('/api/pharmacy', prescriptionRoutes);
