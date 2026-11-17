@@ -494,7 +494,7 @@ try {
   assert.equal((await request('POST', '/api/pharmacy/inventory/dispense', { batchId: stock.id, patientId: 1, prescriptionId: prescription.id, quantity: 1 })).status, 409);
   assert.equal((await request('POST', '/api/pharmacy/inventory/dispense', { batchId: stock.id, patientId: 1, quantity: 1 })).status, 409);
   await ok('DELETE', `/api/clinical/patients/1/allergies/${laterAllergy.id}`);
-  await ok('POST', '/api/pharmacy/inventory/dispense', { batchId: stock.id, patientId: 1, prescriptionId: prescription.id, quantity: 4 });
+  await ok('POST', '/api/pharmacy/inventory/dispense', { batchId: stock.id, patientId: 1, prescriptionId: prescription.id, quantity: 4, notes: 'Sensitive issue note' });
   assert.equal((await request('POST', '/api/pharmacy/inventory/dispense', { batchId: stock.id, patientId: 1, prescriptionId: prescription.id, quantity: 3 })).status, 422);
   await ok('POST', '/api/pharmacy/inventory/dispense', { batchId: stock.id, patientId: 1, prescriptionId: prescription.id, quantity: 2 });
   const concurrentPrescription = await ok('POST', '/api/pharmacy/prescriptions', { patientId: 1, medicationId: 1, medicineName: 'Integration Medicine', dosage: '5 mg', quantityPrescribed: 1 }, 201);
@@ -503,6 +503,11 @@ try {
   const dispenses = await ok('GET', '/api/pharmacy/inventory/dispenses?patientId=1');
   assert.equal(dispenses.filter((row: { prescriptionId: number | null }) => row.prescriptionId === prescription.id).length, 2);
   assert.equal(dispenses.filter((row: { prescriptionId: number | null }) => row.prescriptionId === concurrentPrescription.id).length, 1);
+  const dispenseAudit = await dataSource.query("SELECT changed_by_id AS changedById, change_summary AS changeSummary, after_data AS afterData FROM patient_audit_logs WHERE patient_id = 1 AND action = 'pharmacy_dispensed' ORDER BY id");
+  assert.equal(dispenseAudit.length, 3);
+  assert.ok(dispenseAudit.every((row: { changedById: number | null; afterData: string }) => row.changedById && JSON.parse(row.afterData).transactionId));
+  assert.equal(dispenseAudit.some((row: { changeSummary: string; afterData: string }) => `${row.changeSummary}${row.afterData}`.includes('Sensitive issue note')), false);
+  assert.ok((await ok('GET', '/api/clinical/patients/1/timeline')).some((row: { kind: string }) => row.kind === 'pharmacy-dispensed'));
   await dataSource.query("UPDATE prescriptions SET status = 'completed' WHERE id = ?", [concurrentPrescription.id]);
   assert.deepEqual(Object.keys(dispenses[0].createdBy).sort(), ['fullName', 'id']);
   const administered = await ok('POST', `/api/inpatient/admissions/${admission.id}/medication-administrations`, { prescriptionId: prescription.id, outcome: 'given', doseGiven: '5 mg' }, 201);

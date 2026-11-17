@@ -1,5 +1,5 @@
 import { AppDataSource } from '../../../config/data-source.js';
-import { InventoryBatch, Medication, Patient, Prescription, StockTransaction } from '../../../database/entities/index.js';
+import { InventoryBatch, Medication, Patient, PatientAuditLog, Prescription, StockTransaction } from '../../../database/entities/index.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import type { DispenseStockInput, ReceiveStockInput } from '../validators/inventory.validators.js';
 import { assertNoRecordedAllergy } from '../../clinical/services/allergy-check.js';
@@ -67,7 +67,8 @@ export const inventoryService = {
         await assertNoRecordedAllergy(manager, input.patientId, [batch.medication.brandName, batch.medication.genericName, prescription?.medicineName]);
       }
       batch.quantity -= input.quantity; await repo.save(batch);
-      await manager.getRepository(StockTransaction).save(manager.getRepository(StockTransaction).create({ batchId: batch.id, type: 'dispense', quantity: -input.quantity, patientId: input.patientId ?? null, prescriptionId: prescription?.id ?? null, reference: input.reference ?? null, notes: input.notes ?? null, createdById: userId }));
+      const transaction = await manager.getRepository(StockTransaction).save(manager.getRepository(StockTransaction).create({ batchId: batch.id, type: 'dispense', quantity: -input.quantity, patientId: input.patientId ?? null, prescriptionId: prescription?.id ?? null, reference: input.reference ?? null, notes: input.notes ?? null, createdById: userId }));
+      if (input.patientId) await manager.getRepository(PatientAuditLog).save({ patientId: input.patientId, action: 'pharmacy_dispensed', changedById: userId, changeSummary: `Medication dispensed: ${input.quantity} unit${input.quantity === 1 ? '' : 's'}`, beforeData: null, afterData: JSON.stringify({ transactionId: transaction.id, batchId: batch.id, prescriptionId: prescription?.id ?? null, medicationId: batch.medicationId, quantity: input.quantity }) });
       return repo.findOne({ where: { id: batch.id }, relations: { medication: true } });
     });
   },
