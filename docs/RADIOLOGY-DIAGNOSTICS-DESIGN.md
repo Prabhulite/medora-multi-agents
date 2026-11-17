@@ -4,6 +4,8 @@ View-only access to a performed study does not expose draft report text or impre
 
 Cancellation is available to `radiology.cancel` for ordered or scheduled studies only. It records reason, actor, and time, preserves booking details, writes a patient audit event, and releases the reserved scanner slot by changing the order status. A linked active doctor receives an in-app notice. Cancellation never removes a performed study or final report.
 
+Patient audit entries are saved transactionally for creation, scheduling/rescheduling, study performance, draft saves, final reporting, addenda, finding contact, and cancellation. The audit payload includes IDs, workflow states, and timestamps, while the source tables retain detailed report and communication content. Patient timelines show selected milestones without duplicating order creation and final-report events already derived from the order itself.
+
 ## Scope
 
 Provide an imaging modality catalog, patient-linked radiology orders, priority and clinical notes, and a report workflow from ordered through performed/reported.

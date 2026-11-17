@@ -107,6 +107,8 @@ View-only radiology staff now see draft study status without draft report text o
 
 Staff with `radiology.cancel` can cancel an ordered or scheduled study with a reason. The transaction stores actor and time, adds a patient audit entry, and notifies a linked active referring doctor without putting the reason in notification text. A cancelled scheduled study no longer blocks its scanner slot; its prior booking and schedule events remain for review. Performed and reported studies cannot be cancelled.
 
+Radiology creation, scheduling and rescheduling, performance and draft saves, finalization, addenda, and finding contact now write attributed patient audit entries in the same transaction as the source change. Audit metadata identifies the affected record and workflow state without copying report text or communicated findings. The patient timeline surfaces scheduling, performance, correction, contact, and cancellation milestones alongside the existing order and final-report events.
+
 ### Phase 7: Operations and integrations
 
 - Operations dashboard KPI totals now use full database counts and billing balance aggregation; preview queues remain bounded. Waiting appointments count checked-in patients. The CSV export includes KPI and alert totals and escapes spreadsheet formula prefixes in patient-entered text. The isolated integration suite covers values beyond the preview limits.

@@ -61,6 +61,7 @@ export const timelineService = {
       if (row.followUpCompletedAt) events.push(event('follow-up-completed', row.id, row.followUpCompletedAt, 'Patient follow-up completed', row.subject, 'completed'));
     }
     for (const row of auditChanges) {
+      if (['radiology_order_scheduled', 'radiology_order_rescheduled', 'radiology_order_cancelled', 'radiology_study_performed', 'radiology_draft_saved', 'radiology_report_amended', 'radiology_finding_communication'].includes(row.action)) events.push(event(row.action.replaceAll('_', '-'), row.id, row.createdAt, row.changeSummary || row.action.replaceAll('_', ' ')));
       if (['allergy_added', 'allergy_removed', 'history_added', 'history_removed'].includes(row.action)) events.push(event(row.action.replaceAll('_', '-'), row.id, row.createdAt, row.changeSummary || row.action.replaceAll('_', ' ')));
       if (row.action === 'home_medication_recorded') events.push(event('home-medication-reported', row.id, row.createdAt, row.changeSummary || 'Reported home medicine recorded', null, 'reported'));
       if (row.action === 'home_medication_ceased') events.push(event('home-medication-ceased', row.id, row.createdAt, row.changeSummary || 'Reported home medicine marked not current', null, 'not current'));

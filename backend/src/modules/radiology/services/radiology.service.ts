@@ -1,11 +1,14 @@
 import { AppDataSource } from '../../../config/data-source.js';
-import { Brackets } from 'typeorm';
+import { Brackets, type EntityManager } from 'typeorm';
 import { Doctor, Patient, PatientAuditLog, RadiologyCommunication, RadiologyModality, RadiologyOrder, RadiologyReportAddendum, RadiologyResource, RadiologyScheduleEvent, User, UserNotification } from '../../../database/entities/index.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { nextSequenceNumber } from '../../patients/services/number-sequence.service.js';
 import type { CreateRadiologyAddendumInput, CreateRadiologyCommunicationInput, CreateRadiologyOrderInput, CreateRadiologyResourceInput, RadiologyCommunicationQueueInput, RadiologyWorklistInput, ScheduleRadiologyOrderInput, UpdateRadiologyReportInput } from '../validators/radiology.validators.js';
 
 const orderRelations = { patient: true, modality: true, doctor: true, resource: true } as const;
+async function auditRadiology(manager: EntityManager, patientId: number, userId: number | null, action: string, changeSummary: string, beforeData: Record<string, unknown> | null, afterData: Record<string, unknown>) {
+  await manager.getRepository(PatientAuditLog).save({ patientId, action, changedById: userId, changeSummary, beforeData: beforeData ? JSON.stringify(beforeData) : null, afterData: JSON.stringify(afterData) });
+}
 function orderResponse(order: RadiologyOrder, canViewDraft: boolean) {
   return !canViewDraft && order.status !== 'reported' ? { ...order, reportText: null, impression: null } : order;
 }
@@ -23,7 +26,7 @@ export const radiologyService = {
       order.cancelledById = userId;
       order.cancellationReason = reason;
       await repo.save(order);
-      await manager.getRepository(PatientAuditLog).save({ patientId: order.patientId, action: 'radiology_order_cancelled', changedById: userId, changeSummary: `Radiology order cancelled: ${order.orderNumber}`, beforeData: JSON.stringify({ orderId, status: previousStatus, scheduledAt: order.scheduledAt, resourceId: order.resourceId }), afterData: JSON.stringify({ orderId, status: 'cancelled', reason }) });
+      await auditRadiology(manager, order.patientId, userId, 'radiology_order_cancelled', `Radiology order cancelled: ${order.orderNumber}`, { orderId, status: previousStatus, scheduledAt: order.scheduledAt, resourceId: order.resourceId }, { orderId, status: 'cancelled', reason });
       if (order.doctorId) {
         const doctor = await manager.getRepository(Doctor).findOne({ where: { id: order.doctorId, isActive: true } });
         if (doctor?.accountUserId && await manager.getRepository(User).exist({ where: { id: doctor.accountUserId, isActive: true } })) {
@@ -134,7 +137,8 @@ export const radiologyService = {
       order.resourceId = resourceId;
       order.status = 'scheduled';
       await repo.save(order);
-      await manager.getRepository(RadiologyScheduleEvent).save({ orderId, previousAt, scheduledAt, previousEndAt, scheduledEndAt, previousResourceId, resourceId, reason: input.reason ?? null, createdById: userId });
+      const scheduleEvent = await manager.getRepository(RadiologyScheduleEvent).save({ orderId, previousAt, scheduledAt, previousEndAt, scheduledEndAt, previousResourceId, resourceId, reason: input.reason ?? null, createdById: userId });
+      await auditRadiology(manager, order.patientId, userId, previousAt ? 'radiology_order_rescheduled' : 'radiology_order_scheduled', `Radiology order ${previousAt ? 'rescheduled' : 'scheduled'}: ${order.orderNumber}`, { orderId, scheduledAt: previousAt, scheduledEndAt: previousEndAt, resourceId: previousResourceId }, { orderId, scheduleEventId: scheduleEvent.id, scheduledAt, scheduledEndAt, resourceId });
       return repo.findOne({ where: { id: orderId }, relations: orderRelations });
     });
   },
@@ -154,6 +158,7 @@ export const radiologyService = {
       if (occurredAt < order.orderedAt) throw new ValidationError('Communication time cannot precede the order');
       const repo = manager.getRepository(RadiologyCommunication);
       const row = await repo.save(repo.create({ orderId, outcome: input.outcome, method: input.method, recipientName: input.recipientName, findingSummary: input.findingSummary, note: input.note ?? null, occurredAt, recordedById: userId }));
+      await auditRadiology(manager, order.patientId, userId, 'radiology_finding_communication', `Radiology finding communication ${row.outcome}: ${order.orderNumber}`, null, { orderId, communicationId: row.id, outcome: row.outcome, method: row.method });
       const recorder = userId ? await manager.getRepository(User).findOne({ where: { id: userId } }) : null;
       return { id: row.id, outcome: row.outcome, method: row.method, recipientName: row.recipientName, findingSummary: row.findingSummary, note: row.note, occurredAt: row.occurredAt, recordedById: row.recordedById, createdAt: row.createdAt, recorderName: recorder?.fullName ?? null };
     });
@@ -170,6 +175,7 @@ export const radiologyService = {
       if (order.status !== 'reported') throw new ConflictError('Only final reports can receive addenda');
       const repo = manager.getRepository(RadiologyReportAddendum);
       const row = await repo.save(repo.create({ orderId, reason: input.reason, addendum: input.addendum, createdById: userId }));
+      await auditRadiology(manager, order.patientId, userId, 'radiology_report_amended', `Radiology report amended: ${order.orderNumber}`, { orderId, status: 'reported' }, { orderId, addendumId: row.id });
       if (order.doctorId) {
         const doctor = await manager.getRepository(Doctor).findOne({ where: { id: order.doctorId, isActive: true } });
         if (doctor?.accountUserId && await manager.getRepository(User).exist({ where: { id: doctor.accountUserId, isActive: true } })) {
@@ -238,6 +244,7 @@ export const radiologyService = {
       if (input.doctorId && !doctor) throw new NotFoundError('Active doctor not found');
       const repo = manager.getRepository(RadiologyOrder);
       const order = await repo.save(repo.create({ orderNumber: await nextSequenceNumber(manager, 'RAD', 'RAD', 6), patientId: input.patientId, modalityId: input.modalityId, studyName: input.studyName, doctorId: input.doctorId ?? null, status: 'ordered', priority: input.priority, clinicalNotes: input.clinicalNotes ?? null, orderedAt: new Date(), performedAt: null, reportedAt: null, reportText: null, impression: null, createdById: userId, reportedById: null }));
+      await auditRadiology(manager, order.patientId, userId, 'radiology_order_created', `Radiology order created: ${order.orderNumber}`, null, { orderId: order.id, modalityId: order.modalityId, priority: order.priority, doctorId: order.doctorId });
       return repo.findOne({ where: { id: order.id }, relations: orderRelations });
     });
   },
@@ -251,6 +258,8 @@ export const radiologyService = {
       if (input.status === 'reported' && order.status !== 'performed') throw new ConflictError('Mark the study performed before final reporting');
       const reportText = input.reportText ?? order.reportText;
       if (input.status === 'reported' && !reportText?.trim()) throw new ValidationError('A final report requires report text');
+      const previousStatus = order.status;
+      const beforeData = { orderId, status: previousStatus, reportPresent: Boolean(order.reportText?.trim()), impressionPresent: Boolean(order.impression?.trim()) };
       if (input.reportText !== undefined) order.reportText = input.reportText;
       if (input.impression !== undefined) order.impression = input.impression;
       if (input.status === 'performed') {
@@ -266,6 +275,9 @@ export const radiologyService = {
         // Use database precision so a contact immediately before finalization cannot clear the new follow-up period.
         await repo.createQueryBuilder().update().set({ reportedAt: () => 'CURRENT_TIMESTAMP(6)' }).where('id = :id', { id: orderId }).execute();
       }
+      const action = input.status === 'reported' ? 'radiology_report_finalized' : previousStatus === 'performed' ? 'radiology_draft_saved' : 'radiology_study_performed';
+      const label = input.status === 'reported' ? 'report finalized' : previousStatus === 'performed' ? 'draft saved' : 'study performed';
+      await auditRadiology(manager, order.patientId, userId, action, `Radiology ${label}: ${order.orderNumber}`, beforeData, { orderId, status: order.status, reportPresent: Boolean(order.reportText?.trim()), impressionPresent: Boolean(order.impression?.trim()) });
       if (input.status === 'reported' && order.doctorId) {
         const doctor = await manager.getRepository(Doctor).findOne({ where: { id: order.doctorId, isActive: true } });
         if (doctor?.accountUserId && await manager.getRepository(User).exist({ where: { id: doctor.accountUserId, isActive: true } })) {

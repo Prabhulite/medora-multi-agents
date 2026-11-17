@@ -138,6 +138,7 @@ try {
   assert.equal((await ok('GET', '/api/radiology/worklist?search=Integration%20chest%20image')).items[0].reportText, null);
   assert.equal((await request('PATCH', `/api/radiology/orders/${imaging.id}/report`, { status: 'reported', reportText: 'Unauthorized report' })).status, 403);
   token = adminToken;
+  assert.equal((await ok('PATCH', `/api/radiology/orders/${imaging.id}/report`, { status: 'performed', reportText: 'Revised preliminary image report' })).status, 'performed');
   assert.equal((await ok('GET', '/api/radiology/communication-queue')).total, 0);
   assert.equal((await request('GET', '/api/radiology/communication-queue?page=0')).status, 422);
   assert.equal((await request('GET', '/api/radiology/communication-queue?pageSize=101')).status, 422);
@@ -242,6 +243,12 @@ try {
   assert.equal((await ok('GET', '/api/notifications')).items.some((item: { kind: string; sourceId: number; message: string }) => item.kind === 'radiology_order_cancelled' && item.sourceId === bookedImaging.id && !item.message.includes('Imaging no longer required')), true);
   token = adminToken;
   assert.equal((await request('POST', `/api/radiology/orders/${imaging.id}/cancel`, { reason: 'Too late after performance' })).status, 409);
+  const radiologyAudit = await ok('GET', '/api/patients/1/audit-logs');
+  for (const action of ['radiology_order_created', 'radiology_order_scheduled', 'radiology_order_rescheduled', 'radiology_study_performed', 'radiology_draft_saved', 'radiology_report_finalized', 'radiology_report_amended', 'radiology_finding_communication', 'radiology_order_cancelled']) {
+    assert.ok(radiologyAudit.some((row: { action: string; changedByName: string | null }) => row.action === action && row.changedByName), `Missing attributed radiology audit: ${action}`);
+  }
+  const rawRadiologyAudit = await dataSource.query("SELECT change_summary AS changeSummary, before_data AS beforeData, after_data AS afterData FROM patient_audit_logs WHERE patient_id = 1 AND action LIKE 'radiology_%'");
+  assert.equal(rawRadiologyAudit.some((row: { changeSummary?: string; beforeData?: string; afterData?: string }) => [row.changeSummary, row.beforeData, row.afterData].some((value) => value?.includes('Preliminary image report') || value?.includes('Urgent finding discussed'))), false);
 
   assert.equal((await request('POST', '/api/blood-bank/units', { unitNumber: 'BAD-DATE', component: 'Red cells', bloodGroup: 'O+', collectedOn: '2027-02-30', expiresOn: '2030-01-01', storageLocation: 'Integration fridge' })).status, 422);
   assert.equal((await ok('GET', '/api/blood-bank/patients?search=IT-MRD-001'))[0].mrdNumber, 'IT-MRD-001');
@@ -794,6 +801,7 @@ try {
   assert.ok(timeline.some((item: { kind: string }) => item.kind === 'prescription'));
   assert.ok(timeline.some((item: { kind: string }) => item.kind === 'consent-revoked'));
   assert.ok(timeline.some((item: { kind: string }) => item.kind === 'laboratory-result'));
+  for (const kind of ['radiology-order-rescheduled', 'radiology-order-cancelled', 'radiology-study-performed', 'radiology-report-amended', 'radiology-finding-communication']) assert.ok(timeline.some((item: { kind: string }) => item.kind === kind), `Missing radiology timeline event: ${kind}`);
   assert.ok(timeline.some((item: { kind: string }) => item.kind === 'emergency'));
   assert.ok(timeline.some((item: { kind: string }) => item.kind === 'surgery-completed'));
   assert.ok(timeline.some((item: { kind: string }) => item.kind === 'allergy-removed'));
