@@ -50,9 +50,9 @@ async function nextTokenForDoctor(
   const row = await manager
     .getRepository(PatientVisit)
     .createQueryBuilder('visit')
-    .select('MAX(visit.token_number)', 'maxToken')
-    .where('visit.doctor_id = :doctorId', { doctorId })
-    .andWhere('visit.visit_at BETWEEN :dayStart AND :dayEnd', { dayStart, dayEnd })
+    .select('MAX(visit.tokenNumber)', 'maxToken')
+    .where('visit.doctorId = :doctorId', { doctorId })
+    .andWhere('visit.visitAt BETWEEN :dayStart AND :dayEnd', { dayStart, dayEnd })
     .getRawOne<{ maxToken: number | string | null }>();
   return Number(row?.maxToken || 0) + 1;
 }
@@ -75,8 +75,10 @@ function toCheckinView(
     patientMrdNumber: visit.patient?.mrdNumber ?? null,
     patientFamilyId: visit.patient?.familyId ?? null,
     patientMobile: visit.patient?.contact?.mobileNumber ?? null,
+    patientPhotoData: visit.patient?.photoData ?? null,
     doctorId: visit.doctorId,
     doctorName: visit.doctor?.name ?? null,
+    doctorQualification: visit.doctor?.qualification ?? null,
     departmentId: visit.departmentId,
     departmentName: visit.department?.name ?? null,
     natureOfVisit: visit.natureOfVisit,
@@ -111,30 +113,30 @@ export const visitService = {
       .leftJoinAndSelect('visit.department', 'department')
       .leftJoinAndSelect('visit.createdBy', 'createdBy')
       .leftJoinAndSelect('visit.checkedOutBy', 'checkedOutBy')
-      .where('visit.visit_type = :visitType', { visitType: 'OP' })
-      .orderBy('visit.visit_at', 'DESC')
+      .where('visit.visitType = :visitType', { visitType: 'OP' })
+      .orderBy('visit.visitAt', 'DESC')
       .take(500);
 
     const fromDate = filters.fromDate || filters.date;
     const toDate = filters.toDate || filters.date;
     if (fromDate) {
-      qb.andWhere('visit.visit_at >= :fromAt', { fromAt: `${fromDate} 00:00:00` });
+      qb.andWhere('visit.visitAt >= :fromAt', { fromAt: `${fromDate} 00:00:00` });
     }
     if (toDate) {
-      qb.andWhere('visit.visit_at <= :toAt', { toAt: `${toDate} 23:59:59` });
+      qb.andWhere('visit.visitAt <= :toAt', { toAt: `${toDate} 23:59:59` });
     }
     if (filters.doctorId) {
-      qb.andWhere('visit.doctor_id = :doctorId', { doctorId: filters.doctorId });
+      qb.andWhere('visit.doctorId = :doctorId', { doctorId: filters.doctorId });
     }
     if (filters.patientId) {
-      qb.andWhere('visit.patient_id = :patientId', { patientId: filters.patientId });
+      qb.andWhere('visit.patientId = :patientId', { patientId: filters.patientId });
     }
     if (filters.status === 'inside') {
-      qb.andWhere('visit.checked_out_at IS NULL').andWhere('visit.status != :cancelled', {
+      qb.andWhere('visit.checkedOutAt IS NULL').andWhere('visit.status != :cancelled', {
         cancelled: 'cancelled',
       });
     } else if (filters.status === 'done') {
-      qb.andWhere('(visit.checked_out_at IS NOT NULL OR visit.status = :completed)', {
+      qb.andWhere('(visit.checkedOutAt IS NOT NULL OR visit.status = :completed)', {
         completed: 'completed',
       });
     }
@@ -149,8 +151,8 @@ export const visitService = {
     if (patientIds.length) {
       const invoices = await AppDataSource.getRepository(Invoice)
         .createQueryBuilder('invoice')
-        .where('invoice.patient_id IN (:...patientIds)', { patientIds })
-        .orderBy('invoice.created_at', 'DESC')
+        .where('invoice.patientId IN (:...patientIds)', { patientIds })
+        .orderBy('invoice.createdAt', 'DESC')
         .getMany();
       for (const invoice of invoices) {
         if (!invoiceMap.has(invoice.patientId)) {
@@ -161,16 +163,16 @@ export const visitService = {
       const nowIso = new Date().toISOString();
       const appointments = await AppDataSource.getRepository(Appointment)
         .createQueryBuilder('appointment')
-        .where('appointment.patient_id IN (:...patientIds)', { patientIds })
+        .where('appointment.patientId IN (:...patientIds)', { patientIds })
         .andWhere('appointment.status NOT IN (:...closed)', {
           closed: ['cancelled', 'no_show', 'completed'],
         })
         .andWhere(
-          "(CONCAT(appointment.appointment_date, 'T', appointment.appointment_time) >= :nowIso OR appointment.appointment_date >= :today)",
+          "(CONCAT(appointment.appointmentDate, 'T', appointment.appointmentTime) >= :nowIso OR appointment.appointmentDate >= :today)",
           { nowIso, today: todayIso() },
         )
-        .orderBy('appointment.appointment_date', 'ASC')
-        .addOrderBy('appointment.appointment_time', 'ASC')
+        .orderBy('appointment.appointmentDate', 'ASC')
+        .addOrderBy('appointment.appointmentTime', 'ASC')
         .getMany();
 
       for (const appointment of appointments) {
@@ -272,12 +274,12 @@ export const visitService = {
       const openVisit = await manager
         .getRepository(PatientVisit)
         .createQueryBuilder('visit')
-        .where('visit.patient_id = :patientId', { patientId: patient.id })
-        .andWhere('visit.visit_type = :visitType', { visitType: 'OP' })
-        .andWhere('visit.checked_out_at IS NULL')
+        .where('visit.patientId = :patientId', { patientId: patient.id })
+        .andWhere('visit.visitType = :visitType', { visitType: 'OP' })
+        .andWhere('visit.checkedOutAt IS NULL')
         .andWhere('visit.status NOT IN (:...closed)', { closed: ['cancelled', 'completed'] })
-        .andWhere('visit.visit_at BETWEEN :dayStart AND :dayEnd', { dayStart, dayEnd })
-        .orderBy('visit.visit_at', 'DESC')
+        .andWhere('visit.visitAt BETWEEN :dayStart AND :dayEnd', { dayStart, dayEnd })
+        .orderBy('visit.visitAt', 'DESC')
         .getOne();
 
       if (openVisit) {

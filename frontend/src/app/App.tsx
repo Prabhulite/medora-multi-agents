@@ -106,17 +106,14 @@ export default function App() {
               </Route>
               <Route
                 element={
-                  <ProtectedRoute permissions={['visits.checkin', 'visits.view', 'visits.checkout']} />
-                }
-              >
-                <Route path="checkin" element={<CheckinPage />} />
-              </Route>
-              <Route
-                element={
                   <ProtectedRoute permissions={['visits.view', 'visits.checkin', 'visits.checkout']} />
                 }
               >
-                <Route path="checkin-list" element={<CheckinListPage />} />
+                <Route path="checkin" element={<CheckinListPage />} />
+                <Route path="checkin-list" element={<Navigate to="/checkin" replace />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="visits.checkin" />}>
+                <Route path="checkin/new" element={<CheckinPage />} />
               </Route>
               <Route element={<ProtectedRoute permission="inpatient.view" />}>
                 <Route path="inpatient" element={<InpatientDashboardPage />} />

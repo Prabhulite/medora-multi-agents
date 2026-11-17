@@ -696,8 +696,10 @@ export interface OpCheckinVisit {
   patientMrdNumber: string | null;
   patientFamilyId: string | null;
   patientMobile: string | null;
+  patientPhotoData: string | null;
   doctorId: number | null;
   doctorName: string | null;
+  doctorQualification: string | null;
   departmentId: number | null;
   departmentName: string | null;
   natureOfVisit: string | null;

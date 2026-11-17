@@ -1,11 +1,13 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import medoraLogo from '../../assets/medora/medora-horizontal.png';
 import { useAuth } from '../../features/auth/AuthContext';
 import { getMenuIcon } from '../../features/menus/menuIcons';
 import { menusApi } from '../../features/menus/menus.api';
+import { hasPermission } from '../../lib/permissions';
 import type { MenuItem } from '../../types';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { PatientSearchField } from '../ui/PatientSearchField';
 import './AppShell.css';
 
 function isRouteActive(pathname: string, route: string) {
@@ -16,6 +18,8 @@ function isRouteActive(pathname: string, route: string) {
 export function AppShell() {
   const { user, logout, refreshProfile } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+  const canSearchPatients = hasPermission(user, 'patients.view');
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [navMenus, setNavMenus] = useState<MenuItem[]>([]);
@@ -265,6 +269,14 @@ export function AppShell() {
             </button>
             <img src={medoraLogo} alt="Medora" className="app-shell__header-logo" />
           </div>
+
+          {canSearchPatients ? (
+            <div className="app-shell__patient-search">
+              <PatientSearchField
+                onSelect={(patient) => navigate(`/patients/${patient.id}`)}
+              />
+            </div>
+          ) : null}
         </header>
 
         <main className="app-shell__content">

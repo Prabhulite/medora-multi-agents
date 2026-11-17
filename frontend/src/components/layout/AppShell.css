@@ -292,6 +292,33 @@
   z-index: 10;
 }
 
+.app-shell__patient-search {
+  flex: 1;
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.app-shell__patient-search .patient-search-field {
+  width: min(360px, 100%);
+}
+
+@media (max-width: 900px) {
+  .app-shell__header {
+    flex-wrap: wrap;
+  }
+
+  .app-shell__patient-search {
+    order: 3;
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .app-shell__patient-search .patient-search-field {
+    width: 100%;
+  }
+}
+
 .app-shell__header-left {
   display: flex;
   align-items: center;

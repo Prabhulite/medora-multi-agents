@@ -42,7 +42,6 @@ export function CheckinPage() {
   const [activeResultIndex, setActiveResultIndex] = useState(0);
   const [patient, setPatient] = useState<Patient | null>(null);
 
-  const [familyId, setFamilyId] = useState('');
   const [natureOfVisit, setNatureOfVisit] = useState('Consultation');
   const [purposeOfVisit, setPurposeOfVisit] = useState('Consultation');
   const [doctorId, setDoctorId] = useState('');
@@ -156,7 +155,6 @@ export function CheckinPage() {
   const selectPatient = (row: Patient) => {
     setPatient(row);
     setMrdQuery(row.mrdNumber);
-    setFamilyId(row.familyId || '');
     setReferredBy(row.referredBy || '');
     setSearchOpen(false);
     setSearchResults([]);
@@ -211,23 +209,11 @@ export function CheckinPage() {
         isMlc,
         hadFood,
         makeNewCheckin: true,
-        familyId: familyId.trim() || null,
       });
       setSuccess(
         `Checked in ${result.patientName} · OP ${result.opNumber || result.visitNumber} · Token ${result.tokenNumber ?? '—'}`,
       );
-      setPatient(null);
-      setMrdQuery('');
-      setFamilyId('');
-      setDoctorId('');
-      setAppointmentId('');
-      setAppointments([]);
-      setReferredBy('');
-      setIsMlc(false);
-      setHadFood(false);
-      setNatureOfVisit('Consultation');
-      setPurposeOfVisit('Consultation');
-      setMakeNewCheckin(true);
+      navigate('/checkin', { replace: true });
     } catch (err) {
       setError(getErrorMessage(err, 'Unable to check in patient'));
     } finally {
@@ -238,11 +224,11 @@ export function CheckinPage() {
   return (
     <div className="checkin-page">
       <PageHeader
-        title="OP Checkin"
+        title="New Check-in"
         subtitle="Register walk-in or appointment patients for today's OP visit."
         actions={
-          <Button variant="secondary" size="sm" onClick={() => navigate('/checkin-list')}>
-            Check-in List
+          <Button variant="secondary" size="sm" onClick={() => navigate('/checkin')}>
+            Back to List
           </Button>
         }
       />
@@ -301,7 +287,6 @@ export function CheckinPage() {
               ) : null}
             </div>
 
-            <Input label="Family ID" value={familyId} onChange={(e) => setFamilyId(e.target.value)} />
             <Input
               label="Mobile"
               value={patient?.mobileNumber || patient?.contact?.mobileNumber || ''}

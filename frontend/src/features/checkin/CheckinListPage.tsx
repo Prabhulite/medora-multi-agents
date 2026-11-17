@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ActionMenu, type ActionMenuItem } from '../../components/ui/ActionMenu';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Input } from '../../components/ui/Input';
 import { PageHeader } from '../../components/ui/PageHeader';
+import { PatientAvatar } from '../../components/ui/PatientAvatar';
 import { Select } from '../../components/ui/Select';
 import { Table } from '../../components/ui/Table';
 import { getErrorMessage } from '../../lib/api';
@@ -55,7 +55,6 @@ export function CheckinListPage() {
   const [date, setDate] = useState(todayIso());
   const [doctorId, setDoctorId] = useState('');
   const [status, setStatus] = useState<'all' | 'inside' | 'done'>('all');
-  const [showCheckoutOnly, setShowCheckoutOnly] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [checkoutTarget, setCheckoutTarget] = useState<OpCheckinVisit | null>(null);
 
@@ -70,7 +69,7 @@ export function CheckinListPage() {
         await checkinApi.list({
           date: date || undefined,
           doctorId: doctorId ? Number(doctorId) : undefined,
-          status: showCheckoutOnly ? 'inside' : status === 'all' ? undefined : status,
+          status: status === 'all' ? undefined : status,
         }),
       );
     } catch (err) {
@@ -89,7 +88,7 @@ export function CheckinListPage() {
 
   useEffect(() => {
     void load();
-  }, [date, doctorId, status, showCheckoutOnly]);
+  }, [date, doctorId, status]);
 
   const requestCheckout = (row: OpCheckinVisit) => {
     setCheckoutTarget(row);
@@ -115,9 +114,16 @@ export function CheckinListPage() {
         header: 'Patient',
         render: (row: OpCheckinVisit) => (
           <div className="checkin-patient-cell">
-            <div className="ui-table__cell-title">{row.patientName || '—'}</div>
-            <div className="checkin-patient-cell__mrd">{row.patientMrdNumber || '—'}</div>
-            <div className="checkin-patient-cell__mobile">{row.patientMobile || '—'}</div>
+            <PatientAvatar
+              photo={row.patientPhotoData}
+              name={row.patientName || 'Patient'}
+              size={40}
+            />
+            <div className="checkin-patient-cell__meta">
+              <div className="ui-table__cell-title">{row.patientName || '—'}</div>
+              <div className="checkin-patient-cell__mrd">{row.patientMrdNumber || '—'}</div>
+              <div className="checkin-patient-cell__mobile">{row.patientMobile || '—'}</div>
+            </div>
           </div>
         ),
       },
@@ -127,7 +133,9 @@ export function CheckinListPage() {
         render: (row: OpCheckinVisit) => (
           <div>
             <div className="ui-table__cell-title">{row.doctorName || '—'}</div>
-            <div className="ui-table__cell-sub">{row.departmentName || '—'}</div>
+            <div className="ui-table__cell-sub">
+              {row.doctorQualification || row.departmentName || '—'}
+            </div>
           </div>
         ),
       },
@@ -214,49 +222,35 @@ export function CheckinListPage() {
         key: 'actions',
         header: 'Actions',
         render: (row: OpCheckinVisit) => {
-          const items: ActionMenuItem[] = [
-            {
-              key: 'patient',
-              label: 'Open patient',
-              onClick: () => navigate(`/patients/${row.patientId}`),
-            },
-          ];
-          if (canCheckout && row.visitState === 'inside' && busyId !== row.id) {
-            items.unshift({
-              key: 'checkout',
-              label: 'Check Out',
-              onClick: () => requestCheckout(row),
-            });
+          if (!(canCheckout && row.visitState === 'inside' && busyId !== row.id)) {
+            return <span className="checkin-actions-empty">—</span>;
           }
           return (
             <div className="checkin-actions-cell">
-              {canCheckout && row.visitState === 'inside' && busyId !== row.id ? (
-                <button
-                  type="button"
-                  className="checkin-checkout-btn"
-                  onClick={() => requestCheckout(row)}
-                >
-                  Check Out
-                </button>
-              ) : null}
-              <ActionMenu items={items} />
+              <button
+                type="button"
+                className="checkin-checkout-btn"
+                onClick={() => requestCheckout(row)}
+              >
+                Check Out
+              </button>
             </div>
           );
         },
       },
     ],
-    [busyId, canCheckout, navigate],
+    [busyId, canCheckout],
   );
 
   return (
     <div className="checkin-page">
       <PageHeader
-        title="Check-in List"
+        title="Check-in"
         subtitle="Track today's OP check-ins, tokens, and check-outs."
         actions={
           canCheckin ? (
-            <Button size="sm" onClick={() => navigate('/checkin')}>
-              New Checkin
+            <Button size="sm" onClick={() => navigate('/checkin/new')}>
+              Create New
             </Button>
           ) : null
         }
@@ -285,13 +279,6 @@ export function CheckinListPage() {
             { value: 'done', label: 'Done' },
           ]}
         />
-        <Button
-          variant={showCheckoutOnly ? 'primary' : 'secondary'}
-          size="sm"
-          onClick={() => setShowCheckoutOnly((value) => !value)}
-        >
-          {showCheckoutOnly ? 'Show All' : 'Show Checkout'}
-        </Button>
       </div>
 
       <div className="checkin-list-table appointments-table-panel">

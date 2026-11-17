@@ -315,21 +315,12 @@ const MENUS = [
   },
   {
     code: 'op_checkin',
-    label: 'Checkin',
+    label: 'Check-in',
     route: '/checkin',
     icon: 'appointments',
-    permissionCode: 'visits.checkin',
-    parentCode: 'front_office',
-    sortOrder: 33,
-  },
-  {
-    code: 'op_checkin_list',
-    label: 'Check-in List',
-    route: '/checkin-list',
-    icon: 'patients',
     permissionCode: 'visits.view',
     parentCode: 'front_office',
-    sortOrder: 34,
+    sortOrder: 33,
   },
   {
     code: 'inpatient',
