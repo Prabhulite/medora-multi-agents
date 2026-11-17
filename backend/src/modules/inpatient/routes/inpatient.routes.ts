@@ -4,7 +4,7 @@ import { authorize } from '../../../middleware/authorize.js';
 import { validate } from '../../../middleware/validate.js';
 import { asyncHandler } from '../../../shared/utils/asyncHandler.js';
 import { inpatientController } from '../controllers/inpatient.controller.js';
-import { admissionIdParamSchema, admissionListQuerySchema, admissionMedicationReviewSchema, carePlanIdParamSchema, closeCarePlanSchema, createAdmissionSchema, createCarePlanSchema, dischargeSummarySchema, dueCarePlanQuerySchema, medicationAdministrationSchema, nursingObservationSchema, transferBedSchema } from '../validators/inpatient.validators.js';
+import { admissionIdParamSchema, admissionListQuerySchema, admissionMedicationReviewSchema, carePlanIdParamSchema, closeCarePlanSchema, continueCarePlanSchema, createAdmissionSchema, createCarePlanSchema, dischargeSummarySchema, dueCarePlanQuerySchema, medicationAdministrationSchema, nursingObservationSchema, transferBedSchema } from '../validators/inpatient.validators.js';
 
 const router = Router(); router.use(authenticate);
 router.get('/wards', authorize('inpatient.view'), asyncHandler(inpatientController.wards));
@@ -14,6 +14,8 @@ router.get('/admissions', authorize('inpatient.view'), validate(admissionListQue
 router.post('/admissions', authorize('inpatient.create'), validate(createAdmissionSchema), asyncHandler(inpatientController.admit));
 router.get('/admissions/:id/care-plans', authorize('inpatient.view'), validate(admissionIdParamSchema, 'params'), asyncHandler(inpatientController.carePlans));
 router.post('/admissions/:id/care-plans', authorize('inpatient.update'), validate(admissionIdParamSchema, 'params'), validate(createCarePlanSchema), asyncHandler(inpatientController.addCarePlan));
+router.get('/admissions/:id/care-plans/:planId/reviews', authorize('inpatient.view'), validate(carePlanIdParamSchema, 'params'), asyncHandler(inpatientController.carePlanReviews));
+router.post('/admissions/:id/care-plans/:planId/reviews', authorize('inpatient.update'), validate(carePlanIdParamSchema, 'params'), validate(continueCarePlanSchema), asyncHandler(inpatientController.continueCarePlan));
 router.patch('/admissions/:id/care-plans/:planId/close', authorize('inpatient.update'), validate(carePlanIdParamSchema, 'params'), validate(closeCarePlanSchema), asyncHandler(inpatientController.closeCarePlan));
 router.get('/admissions/:id/medication-orders', authorize('inpatient.view'), validate(admissionIdParamSchema, 'params'), asyncHandler(inpatientController.medicationOrders));
 router.get('/admissions/:id/discharge-medication-review', authorize('inpatient.view'), validate(admissionIdParamSchema, 'params'), asyncHandler(inpatientController.dischargeMedicationReview));

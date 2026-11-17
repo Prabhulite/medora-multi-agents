@@ -64,6 +64,7 @@ export { EmergencyCase } from './EmergencyCase.js';
 export { OperatingRoom } from './OperatingRoom.js';
 export { SurgeryCase } from './SurgeryCase.js';
 export { NursingCarePlan } from './NursingCarePlan.js';
+export { NursingCarePlanReview } from './NursingCarePlanReview.js';
 export { InsuranceClaim } from './InsuranceClaim.js';
 export { ChargeMaster } from './ChargeMaster.js';
 export { DutyShift } from './DutyShift.js';

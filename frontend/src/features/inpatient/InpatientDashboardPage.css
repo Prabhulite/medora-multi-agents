@@ -60,4 +60,6 @@
 .inpatient-due-plans__list article span, .inpatient-due-plans__list article small { color: #5b7164; }
 .inpatient-due-plans__list article p { margin: 2px 0; overflow-wrap: anywhere; }
 .inpatient-due-plans__pager { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 12px; }
+.inpatient-review-history { display: grid; gap: 8px; margin-top: 10px; }
+.inpatient-review-history p { margin: 0; padding: 10px 12px; border-left: 3px solid #2d8b58; background: #f3f8f5; white-space: pre-wrap; }
 @media (max-width: 650px) { .inpatient-due-plans__list article { align-items: flex-start; flex-direction: column; } }

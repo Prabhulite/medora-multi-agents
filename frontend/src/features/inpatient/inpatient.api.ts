@@ -64,6 +64,7 @@ export interface DischargePayload {
 export interface NursingObservation { id: number; observedAt: string; temperatureC: string | null; pulseBpm: number | null; systolicBp: number | null; diastolicBp: number | null; spo2Percent: number | null; notes: string | null; recordedBy?: { fullName: string } | null }
 export interface NursingObservationPayload { temperatureC?: number; pulseBpm?: number; systolicBp?: number; diastolicBp?: number; spo2Percent?: number; notes?: string }
 export interface NursingCarePlan { id: number; problem: string; goal: string; interventions: string; reviewAt: string | null; status: 'active' | 'completed' | 'discontinued'; reviewNote: string | null; closedAt: string | null; createdAt: string; createdBy?: { fullName: string } | null; closedBy?: { fullName: string } | null }
+export interface NursingCarePlanReview { id: number; carePlanId: number; reviewNote: string; previousReviewAt: string | null; nextReviewAt: string; createdAt: string; reviewedBy?: { id: number; fullName: string } | null }
 export interface DueCarePlan { id: number; admissionId: number; problem: string; reviewAt: string; admissionNumber: string; patientMrdNumber: string; patientName: string; wardName: string; bedNumber: string }
 export interface DueCarePlanPage { items: DueCarePlan[]; total: number; page: number; pageSize: number }
 export interface NursingCarePlanPayload { problem: string; goal: string; interventions: string; reviewAt?: string | null }
@@ -137,6 +138,8 @@ export const inpatientApi = {
   listCarePlans: async (id: number) => (await api.get<ApiEnvelope<NursingCarePlan[]>>(`/inpatient/admissions/${id}/care-plans`)).data.data,
   addCarePlan: async (id: number, payload: NursingCarePlanPayload) => (await api.post<ApiEnvelope<NursingCarePlan>>(`/inpatient/admissions/${id}/care-plans`, payload)).data.data,
   closeCarePlan: async (id: number, planId: number, status: 'completed' | 'discontinued', reviewNote: string) => (await api.patch<ApiEnvelope<NursingCarePlan>>(`/inpatient/admissions/${id}/care-plans/${planId}/close`, { status, reviewNote })).data.data,
+  listCarePlanReviews: async (id: number, planId: number) => (await api.get<ApiEnvelope<NursingCarePlanReview[]>>(`/inpatient/admissions/${id}/care-plans/${planId}/reviews`)).data.data,
+  continueCarePlan: async (id: number, planId: number, reviewNote: string, nextReviewAt: string) => (await api.post<ApiEnvelope<NursingCarePlanReview>>(`/inpatient/admissions/${id}/care-plans/${planId}/reviews`, { reviewNote, nextReviewAt })).data.data,
   addObservation: async (id: number, payload: NursingObservationPayload) => (await api.post<ApiEnvelope<NursingObservation>>(`/inpatient/admissions/${id}/observations`, payload)).data.data,
   listTransfers: async (id: number) => (await api.get<ApiEnvelope<BedTransfer[]>>(`/inpatient/admissions/${id}/transfers`)).data.data,
   transfer: async (id: number, toBedId: number, reason: string) => (await api.post<ApiEnvelope<BedTransfer>>(`/inpatient/admissions/${id}/transfers`, { toBedId, reason })).data.data,

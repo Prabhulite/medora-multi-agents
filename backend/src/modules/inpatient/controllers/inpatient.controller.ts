@@ -5,6 +5,8 @@ import { inpatientService } from '../services/inpatient.service.js';
 export const inpatientController = {
   async dueCarePlans(req: Request, res: Response) { return sendSuccess(res, await inpatientService.dueCarePlans(Number(req.query.page), Number(req.query.pageSize)), 'Due care plans fetched'); },
   async carePlans(req: Request, res: Response) { return sendSuccess(res, await inpatientService.carePlans(Number(req.params.id)), 'Care plans fetched'); },
+  async carePlanReviews(req: Request, res: Response) { return sendSuccess(res, await inpatientService.carePlanReviews(Number(req.params.id), Number(req.params.planId)), 'Care plan reviews fetched'); },
+  async continueCarePlan(req: Request, res: Response) { return sendCreated(res, await inpatientService.continueCarePlan(Number(req.params.id), Number(req.params.planId), req.body, req.user?.id ?? null), 'Care plan reviewed'); },
   async addCarePlan(req: Request, res: Response) { return sendCreated(res, await inpatientService.addCarePlan(Number(req.params.id), req.body, req.user?.id ?? null), 'Care plan created'); },
   async closeCarePlan(req: Request, res: Response) { return sendSuccess(res, await inpatientService.closeCarePlan(Number(req.params.id), Number(req.params.planId), req.body, req.user?.id ?? null), 'Care plan closed'); },
   async medicationOrders(req: Request, res: Response) { return sendSuccess(res, await inpatientService.medicationOrders(Number(req.params.id)), 'Medication orders fetched'); },

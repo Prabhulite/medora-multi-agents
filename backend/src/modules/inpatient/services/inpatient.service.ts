@@ -1,11 +1,11 @@
 import { AppDataSource } from '../../../config/data-source.js';
-import { Admission, AdmissionHomeMedicationReview, Bed, BedTransfer, Department, DischargeHomeMedicationReview, DischargeMedicationReview, Doctor, HomeMedication, MedicationAdministration, NursingCarePlan, NursingObservation, Patient, PatientAuditLog, Prescription, Ward, Medication, User } from '../../../database/entities/index.js';
+import { Admission, AdmissionHomeMedicationReview, Bed, BedTransfer, Department, DischargeHomeMedicationReview, DischargeMedicationReview, Doctor, HomeMedication, MedicationAdministration, NursingCarePlan, NursingCarePlanReview, NursingObservation, Patient, PatientAuditLog, Prescription, Ward, Medication, User } from '../../../database/entities/index.js';
 import { assertNoRecordedAllergy } from '../../clinical/services/allergy-check.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { nextSequenceNumber } from '../../patients/services/number-sequence.service.js';
 import type { CreateAdmissionInput } from '../validators/inpatient.validators.js';
 import type { z } from 'zod';
-import { admissionMedicationReviewSchema, closeCarePlanSchema, createCarePlanSchema, dischargeSummarySchema, medicationAdministrationSchema, nursingObservationSchema, transferBedSchema } from '../validators/inpatient.validators.js';
+import { admissionMedicationReviewSchema, closeCarePlanSchema, continueCarePlanSchema, createCarePlanSchema, dischargeSummarySchema, medicationAdministrationSchema, nursingObservationSchema, transferBedSchema } from '../validators/inpatient.validators.js';
 
 function carePlanResponse(plan: NursingCarePlan | null) {
   if (!plan) throw new NotFoundError('Care plan not found');
@@ -78,6 +78,29 @@ export const inpatientService = {
   async carePlans(admissionId: number) {
     if (!(await AppDataSource.getRepository(Admission).exist({ where: { id: admissionId } }))) throw new NotFoundError('Admission not found');
     return (await AppDataSource.getRepository(NursingCarePlan).find({ where: { admissionId }, relations: { createdBy: true, closedBy: true }, order: { createdAt: 'DESC' } })).map(carePlanResponse);
+  },
+  async carePlanReviews(admissionId: number, planId: number) {
+    if (!(await AppDataSource.getRepository(NursingCarePlan).exist({ where: { id: planId, admissionId } }))) throw new NotFoundError('Care plan not found');
+    const rows = await AppDataSource.getRepository(NursingCarePlanReview).find({ where: { carePlanId: planId }, relations: { reviewedBy: true }, order: { id: 'ASC' } });
+    return rows.map(({ reviewedBy, ...row }) => ({ ...row, reviewedBy: staffReference(reviewedBy) }));
+  },
+  async continueCarePlan(admissionId: number, planId: number, input: z.infer<typeof continueCarePlanSchema>, userId: number | null) {
+    const nextReviewAt = new Date(input.nextReviewAt);
+    if (nextReviewAt.getTime() <= Date.now()) throw new ValidationError('Next review time must be in the future');
+    return AppDataSource.transaction(async (manager) => {
+      const admission = await manager.getRepository(Admission).createQueryBuilder('admission').setLock('pessimistic_write').where('admission.id = :id', { id: admissionId }).getOne();
+      if (!admission) throw new NotFoundError('Admission not found');
+      if (admission.status === 'discharged') throw new ConflictError('Cannot review a care plan after discharge');
+      const plan = await manager.getRepository(NursingCarePlan).createQueryBuilder('plan').setLock('pessimistic_write').where('plan.id = :planId AND plan.admission_id = :admissionId', { planId, admissionId }).getOne();
+      if (!plan) throw new NotFoundError('Care plan not found');
+      if (plan.status !== 'active') throw new ConflictError('Care plan is already closed');
+      const previousReviewAt = plan.reviewAt;
+      const review = await manager.getRepository(NursingCarePlanReview).save({ carePlanId: planId, reviewNote: input.reviewNote, previousReviewAt, nextReviewAt, reviewedById: userId });
+      plan.reviewAt = nextReviewAt;
+      await manager.getRepository(NursingCarePlan).save(plan);
+      await manager.getRepository(PatientAuditLog).save({ patientId: admission.patientId, action: 'care_plan_reviewed', changedById: userId, changeSummary: `Care plan reviewed for admission ${admission.admissionNumber}`, beforeData: JSON.stringify({ admissionId, carePlanId: planId, reviewAt: previousReviewAt }), afterData: JSON.stringify({ admissionId, carePlanId: planId, reviewId: review.id, reviewAt: nextReviewAt }) });
+      return { ...review, reviewedBy: staffReference(userId ? await manager.getRepository(User).findOne({ where: { id: userId } }) : null) };
+    });
   },
   async addCarePlan(admissionId: number, input: z.infer<typeof createCarePlanSchema>, userId: number | null) {
     return AppDataSource.transaction(async (manager) => {
