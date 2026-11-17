@@ -1,12 +1,49 @@
 import { AppDataSource } from '../../../config/data-source.js';
+import { Brackets } from 'typeorm';
 import { Doctor, Patient, RadiologyCommunication, RadiologyModality, RadiologyOrder, RadiologyReportAddendum, RadiologyResource, RadiologyScheduleEvent, User, UserNotification } from '../../../database/entities/index.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { nextSequenceNumber } from '../../patients/services/number-sequence.service.js';
-import type { CreateRadiologyAddendumInput, CreateRadiologyCommunicationInput, CreateRadiologyOrderInput, CreateRadiologyResourceInput, ScheduleRadiologyOrderInput, UpdateRadiologyReportInput } from '../validators/radiology.validators.js';
+import type { CreateRadiologyAddendumInput, CreateRadiologyCommunicationInput, CreateRadiologyOrderInput, CreateRadiologyResourceInput, RadiologyCommunicationQueueInput, ScheduleRadiologyOrderInput, UpdateRadiologyReportInput } from '../validators/radiology.validators.js';
 
 const orderRelations = { patient: true, modality: true, doctor: true, resource: true } as const;
 
 export const radiologyService = {
+  async communicationQueue({ page, pageSize, search }: RadiologyCommunicationQueueInput) {
+    const latestCorrection = '(SELECT MAX(correction.created_at) FROM radiology_report_addenda correction WHERE correction.order_id = study.id)';
+    const pending = AppDataSource.getRepository(RadiologyOrder).createQueryBuilder('study')
+      .innerJoin('study.patient', 'patient').innerJoin('study.modality', 'modality')
+      .where('study.status IN (:...readyStatuses)', { readyStatuses: ['performed', 'reported'] })
+      .andWhere("(study.priority IN (:...priorities) OR (study.status = 'reported' AND EXISTS (SELECT 1 FROM radiology_report_addenda correction WHERE correction.order_id = study.id)))", { priorities: ['urgent', 'stat'] })
+      .andWhere(`NOT EXISTS (SELECT 1 FROM radiology_communications delivered WHERE delivered.order_id = study.id AND delivered.outcome = 'delivered' AND (${latestCorrection} IS NULL OR (delivered.created_at > ${latestCorrection} AND delivered.occurred_at >= ${latestCorrection})))`);
+    if (search) {
+      const term = `%${search.replace(/[%_\\]/g, '\\$&')}%`;
+      pending.andWhere(new Brackets((terms) => {
+        terms.where('study.orderNumber LIKE :term', { term })
+          .orWhere('patient.mrdNumber LIKE :term', { term })
+          .orWhere("CONCAT_WS(' ', patient.firstName, patient.middleName, patient.lastName) LIKE :term", { term })
+          .orWhere('study.studyName LIKE :term', { term });
+      }));
+    }
+    const total = await pending.clone().getCount();
+    const rows = await pending.clone()
+      .select('study.id', 'id').addSelect('study.orderNumber', 'orderNumber').addSelect('study.patientId', 'patientId')
+      .addSelect('patient.mrdNumber', 'patientMrdNumber').addSelect('patient.firstName', 'firstName').addSelect('patient.middleName', 'middleName').addSelect('patient.lastName', 'lastName')
+      .addSelect('study.studyName', 'studyName').addSelect('modality.modalityName', 'modalityName').addSelect('study.modalityId', 'modalityId')
+      .addSelect('study.priority', 'priority').addSelect('study.status', 'status').addSelect('study.performedAt', 'performedAt').addSelect('study.reportedAt', 'reportedAt')
+      .addSelect(latestCorrection, 'latestAddendumAt')
+      .orderBy(`COALESCE(${latestCorrection}, study.performedAt, study.reportedAt, study.orderedAt)`, 'ASC').addOrderBy('study.id', 'ASC')
+      .limit(pageSize).offset((page - 1) * pageSize).getRawMany<{
+        id: number; orderNumber: string; patientId: number; patientMrdNumber: string; firstName: string; middleName: string | null; lastName: string; studyName: string | null; modalityName: string; modalityId: number; priority: 'routine' | 'urgent' | 'stat'; status: 'performed' | 'reported'; performedAt: Date | null; reportedAt: Date | null; latestAddendumAt: Date | null;
+      }>();
+    const ids = rows.map((row) => Number(row.id));
+    const attempts = ids.length ? await AppDataSource.getRepository(RadiologyCommunication).createQueryBuilder('contact')
+      .select('contact.orderId', 'orderId').addSelect('COUNT(*)', 'attemptCount').addSelect('MAX(contact.occurredAt)', 'lastAttemptAt')
+      .where('contact.orderId IN (:...ids)', { ids }).andWhere('contact.outcome = :attempted', { attempted: 'attempted' })
+      .andWhere("(NOT EXISTS (SELECT 1 FROM radiology_report_addenda correction WHERE correction.order_id = contact.order_id) OR (contact.created_at > (SELECT MAX(correction.created_at) FROM radiology_report_addenda correction WHERE correction.order_id = contact.order_id) AND contact.occurred_at >= (SELECT MAX(correction.created_at) FROM radiology_report_addenda correction WHERE correction.order_id = contact.order_id)))")
+      .groupBy('contact.orderId').getRawMany<{ orderId: number; attemptCount: string; lastAttemptAt: Date | null }>() : [];
+    const attemptMap = new Map(attempts.map((row) => [Number(row.orderId), row]));
+    return { items: rows.map((row) => ({ id: Number(row.id), orderNumber: row.orderNumber, patientId: Number(row.patientId), patientMrdNumber: row.patientMrdNumber, patientName: [row.firstName, row.middleName, row.lastName].filter(Boolean).join(' '), studyName: row.studyName || row.modalityName, modalityId: Number(row.modalityId), priority: row.priority, status: row.status, performedAt: row.performedAt, reportedAt: row.reportedAt, latestAddendumAt: row.latestAddendumAt, attemptCount: Number(attemptMap.get(Number(row.id))?.attemptCount ?? 0), lastAttemptAt: attemptMap.get(Number(row.id))?.lastAttemptAt ?? null })), total, page, pageSize };
+  },
   listResources() {
     return AppDataSource.getRepository(RadiologyResource).find({ relations: { modality: true }, order: { name: 'ASC' } });
   },

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -9,7 +9,7 @@ import { Table, type TableColumn } from '../../components/ui/Table';
 import { getErrorMessage } from '../../lib/api';
 import { hasPermission } from '../../lib/permissions';
 import { useAuth } from '../auth/AuthContext';
-import { radiologyApi, type CreateRadiologyOrderPayload, type RadiologyAddendum, type RadiologyCommunication, type RadiologyModality, type RadiologyOrder, type RadiologyResource, type RadiologyScheduleEvent, type ReferringDoctor, type UpdateRadiologyReportPayload } from './radiology.api';
+import { radiologyApi, type CreateRadiologyOrderPayload, type RadiologyAddendum, type RadiologyCommunication, type RadiologyCommunicationQueueItem, type RadiologyModality, type RadiologyOrder, type RadiologyResource, type RadiologyScheduleEvent, type ReferringDoctor, type UpdateRadiologyReportPayload } from './radiology.api';
 import './RadiologyDiagnosticsPage.css';
 
 type Modal = 'order' | 'report' | 'communications' | 'schedule' | 'resources' | null;
@@ -30,6 +30,15 @@ export function RadiologyDiagnosticsPage() {
   const canManageResources = hasPermission(user, 'radiology.resources.manage');
   const [modalities, setModalities] = useState<RadiologyModality[]>([]);
   const [orders, setOrders] = useState<RadiologyOrder[]>([]);
+  const [queue, setQueue] = useState<RadiologyCommunicationQueueItem[]>([]);
+  const [queueTotal, setQueueTotal] = useState(0);
+  const [queuePage, setQueuePage] = useState(1);
+  const [queuePageSize, setQueuePageSize] = useState(25);
+  const [queueSearch, setQueueSearch] = useState('');
+  const [debouncedQueueSearch, setDebouncedQueueSearch] = useState('');
+  const [queueLoading, setQueueLoading] = useState(true);
+  const [queueError, setQueueError] = useState('');
+  const queueRequestId = useRef(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -46,6 +55,31 @@ export function RadiologyDiagnosticsPage() {
     finally { setLoading(false); }
   };
   useEffect(() => { void load(); }, []);
+  const loadQueue = async () => {
+    const currentRequest = ++queueRequestId.current;
+    setQueueLoading(true); setQueueError('');
+    try {
+      const result = await radiologyApi.communicationQueue({ page: queuePage, pageSize: queuePageSize, search: debouncedQueueSearch || undefined });
+      if (currentRequest !== queueRequestId.current) return;
+      setQueue(result.items); setQueueTotal(result.total);
+      if (queuePage > 1 && result.total <= (queuePage - 1) * queuePageSize) setQueuePage(Math.max(1, Math.ceil(result.total / queuePageSize)));
+    } catch (err) { if (currentRequest === queueRequestId.current) setQueueError(getErrorMessage(err, 'Unable to load finding contact queue')); }
+    finally { if (currentRequest === queueRequestId.current) setQueueLoading(false); }
+  };
+  useEffect(() => { const timer = setTimeout(() => setDebouncedQueueSearch(queueSearch.trim().length >= 2 ? queueSearch.trim() : ''), 300); return () => clearTimeout(timer); }, [queueSearch]);
+  useEffect(() => { void loadQueue(); }, [queuePage, queuePageSize, debouncedQueueSearch]);
+  const openQueueCommunication = (row: RadiologyCommunicationQueueItem) => {
+    setSelectedOrder(orders.find((order) => order.id === row.id) ?? { id: row.id, orderNumber: row.orderNumber, patientId: row.patientId, patientName: row.patientName, patientMrdNumber: row.patientMrdNumber, modalityId: row.modalityId, modalityName: '', studyName: row.studyName, priority: row.priority, status: row.status });
+    setModal('communications');
+  };
+  const queueColumns: TableColumn<RadiologyCommunicationQueueItem>[] = [
+    { key: 'priority', header: 'Priority', render: (row) => <div><Badge tone={row.priority === 'stat' ? 'danger' : row.priority === 'urgent' ? 'warning' : 'neutral'}>{row.priority.toUpperCase()}</Badge>{row.latestAddendumAt && <div className="ui-table__cell-sub">Correction follow-up</div>}</div> },
+    { key: 'order', header: 'Order / patient', render: (row) => <div><div className="ui-table__cell-title">{row.orderNumber}</div><div className="ui-table__cell-sub">{row.patientName} / {row.patientMrdNumber}</div></div> },
+    { key: 'study', header: 'Study', render: (row) => row.studyName },
+    { key: 'since', header: 'Awaiting since', render: (row) => <div>{dateLabel(row.latestAddendumAt || row.performedAt || row.reportedAt)}<div className="ui-table__cell-sub">{row.latestAddendumAt ? 'Corrected' : row.status === 'reported' ? 'Final report' : 'Performed'}</div></div> },
+    { key: 'attempts', header: 'Contact attempts', render: (row) => <div>{row.attemptCount} {row.attemptCount === 1 ? 'attempt' : 'attempts'}<div className="ui-table__cell-sub">{row.lastAttemptAt ? `Last: ${dateLabel(row.lastAttemptAt)}` : 'No attempts recorded'}</div></div> },
+    { key: 'actions', header: 'Action', render: (row) => <Button size="sm" variant="secondary" onClick={() => openQueueCommunication(row)}>Communications</Button> },
+  ];
 
   const summary = useMemo(() => ({
     total: orders.length,
@@ -96,13 +130,18 @@ export function RadiologyDiagnosticsPage() {
       <article className="radiology-kpi--blue"><span>In progress</span><strong>{summary.inProgress}</strong><small>Being acquired or read</small></article>
       <article className="radiology-kpi--green"><span>Reported</span><strong>{summary.reported}</strong><small>Reports available to care teams</small></article>
     </div>
+    <section className="radiology-section radiology-communication-queue" aria-label="Radiology finding communication follow-up">
+      <div className="radiology-section__heading"><div><span className="radiology-eyebrow">FINDINGS / CONTACT FOLLOW-UP</span><h2>Finding communication follow-up ({queueTotal})</h2><p>Performed urgent and STAT studies, plus corrected final reports, awaiting confirmed delivery.</p></div><Button variant="secondary" size="sm" onClick={() => void loadQueue()}>Refresh queue</Button></div>
+      {queueError && <Alert tone="error">{queueError}</Alert>}
+      <Table columns={queueColumns} rows={queue} rowKey={(row) => row.id} loading={queueLoading} searchPlaceholder="Search order, patient, or study (2+ characters)" emptyMessage="No urgent, STAT, or corrected findings awaiting communication." serverPagination={{ page: queuePage, pageSize: queuePageSize, total: queueTotal, search: queueSearch, onPageChange: setQueuePage, onPageSizeChange: (size) => { setQueuePageSize(size); setQueuePage(1); }, onSearchChange: (value) => { setQueueSearch(value); setQueuePage(1); } }} />
+    </section>
     <section className="radiology-section">
       <div className="radiology-section__heading"><div><span className="radiology-eyebrow">IMAGING WORKLIST</span><h2>Radiology orders</h2><p>Track studies from request through final report.</p></div><Button variant="secondary" size="sm" onClick={() => void load()}>Refresh</Button></div>
       <Table columns={columns} rows={orders} rowKey={(row) => row.id} loading={loading} searchText={(row) => `${row.orderNumber} ${row.patientName || ''} ${row.patientMrdNumber || ''} ${row.studyName} ${row.modalityName} ${row.status}`} searchPlaceholder="Search orders, patients, or studies" emptyMessage="No radiology orders found. Create an imaging order to start the worklist." />
     </section>
     {modal === 'order' ? <OrderForm modalities={modalities} saving={saving} onClose={() => setModal(null)} onSubmit={(payload) => void saveOrder(payload)} /> : null}
     {modal === 'report' && selectedOrder ? selectedOrder.status === 'reported' ? <FinalReportView order={selectedOrder} canUpdate={canUpdate} onClose={() => { setModal(null); setSelectedOrder(null); }} /> : <ReportForm order={selectedOrder} saving={saving} onClose={() => { setModal(null); setSelectedOrder(null); }} onSubmit={(payload) => void saveReport(payload)} /> : null}
-    {modal === 'communications' && selectedOrder ? <CommunicationView order={selectedOrder} canUpdate={canUpdate} onClose={() => { setModal(null); setSelectedOrder(null); }} /> : null}
+    {modal === 'communications' && selectedOrder ? <CommunicationView order={selectedOrder} canUpdate={canUpdate} onRecorded={() => void loadQueue()} onClose={() => { setModal(null); setSelectedOrder(null); void loadQueue(); }} /> : null}
     {modal === 'schedule' && selectedOrder ? <ScheduleView order={selectedOrder} onSaved={(updated) => { setOrders((current) => current.map((row) => row.id === updated.id ? updated : row)); setSelectedOrder(updated); setNotice('Study schedule saved.'); }} onClose={() => { setModal(null); setSelectedOrder(null); }} /> : null}
     {modal === 'resources' ? <ResourceManager modalities={modalities} onClose={() => setModal(null)} /> : null}
   </div>;
@@ -238,7 +277,7 @@ function ScheduleView({ order, onSaved, onClose }: { order: RadiologyOrder; onSa
   </div></ModalShell>;
 }
 
-function CommunicationView({ order, canUpdate, onClose }: { order: RadiologyOrder; canUpdate: boolean; onClose: () => void }) {
+function CommunicationView({ order, canUpdate, onRecorded, onClose }: { order: RadiologyOrder; canUpdate: boolean; onRecorded: () => void; onClose: () => void }) {
   const [rows, setRows] = useState<RadiologyCommunication[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -254,6 +293,7 @@ function CommunicationView({ order, canUpdate, onClose }: { order: RadiologyOrde
     try {
       const row = await radiologyApi.recordCommunication(order.id, { outcome: form.outcome, method: form.method, recipientName: form.recipientName.trim(), findingSummary: form.findingSummary.trim(), note: form.note.trim() || null, occurredAt: new Date(form.occurredAt).toISOString() });
       setRows((current) => [...current, row]);
+      onRecorded();
       setForm((current) => ({ ...current, note: '' }));
     } catch (err) { setError(getErrorMessage(err, 'Unable to record communication')); }
     finally { setSaving(false); }

@@ -1,8 +1,9 @@
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { RadiologyOrder } from './RadiologyOrder.js';
 import { User } from './User.js';
 
 @Entity({ name: 'radiology_communications' })
+@Index('IDX_radiology_communication_delivery', ['orderId', 'outcome', 'createdAt', 'occurredAt'])
 export class RadiologyCommunication {
   @PrimaryGeneratedColumn({ unsigned: true }) id!: number;
   @Column({ name: 'order_id', type: 'int', unsigned: true }) orderId!: number;
