@@ -8,6 +8,28 @@ const cents = (value: number | string) => Math.round(Number(value) * 100);
 const refundResponse = (row: Refund | null) => row ? { ...row, createdBy: row.createdBy ? { id: row.createdBy.id, fullName: row.createdBy.fullName } : null } : null;
 
 export const billingService = {
+  async receipt(paymentId: number) {
+    return AppDataSource.transaction('REPEATABLE READ', async (manager) => {
+      const payment = await manager.getRepository(Payment).createQueryBuilder('payment')
+        .innerJoinAndSelect('payment.invoice', 'invoice')
+        .innerJoinAndSelect('invoice.patient', 'patient')
+        .select(['payment.id', 'payment.amount', 'payment.method', 'payment.referenceNumber', 'payment.paidAt', 'invoice.id', 'invoice.invoiceNumber', 'patient.firstName', 'patient.middleName', 'patient.lastName', 'patient.mrdNumber'])
+        .where('payment.id = :paymentId', { paymentId }).getOne();
+      if (!payment) throw new NotFoundError('Payment not found');
+      const refunds = await manager.getRepository(Refund).find({ where: { paymentId }, select: { id: true, amount: true, refundedAt: true }, order: { refundedAt: 'ASC', id: 'ASC' } });
+      const toCents = (amount: string) => { const [whole, fraction = ''] = amount.split('.'); return BigInt(whole) * 100n + BigInt(fraction.padEnd(2, '0')); };
+      const toMoney = (value: bigint) => `${value / 100n}.${(value % 100n).toString().padStart(2, '0')}`;
+      const totalRefunded = refunds.reduce((sum, refund) => sum + toCents(refund.amount), 0n);
+      return {
+        paymentId: payment.id, invoiceId: payment.invoice.id, invoiceNumber: payment.invoice.invoiceNumber,
+        patientName: [payment.invoice.patient.firstName, payment.invoice.patient.middleName, payment.invoice.patient.lastName].filter(Boolean).join(' '),
+        patientMrdNumber: payment.invoice.patient.mrdNumber, paidAt: payment.paidAt,
+        amount: toMoney(toCents(payment.amount)), method: payment.method, referenceNumber: payment.referenceNumber,
+        refunds: refunds.map((refund) => ({ id: refund.id, amount: toMoney(toCents(refund.amount)), refundedAt: refund.refundedAt })),
+        totalRefunded: toMoney(totalRefunded), netPaid: toMoney(toCents(payment.amount) - totalRefunded),
+      };
+    });
+  },
   list(filters: { patientId?: number; status?: string }) {
     return AppDataSource.getRepository(Invoice).find({ where: { ...(filters.patientId ? { patientId: filters.patientId } : {}), ...(filters.status ? { status: filters.status as Invoice['status'] } : {}) }, relations: { patient: true, items: true, payments: true }, order: { createdAt: 'DESC' } });
   },

@@ -24,3 +24,24 @@
 .billing-modal__header { display: flex; justify-content: space-between; gap: 16px; padding: 20px 22px; border-bottom: 1px solid var(--color-border); }.billing-modal__header h2 { margin: 4px 0 0; font-size: 21px; }.billing-modal__header button { border: 0; background: transparent; font-size: 25px; color: var(--color-text-secondary); cursor: pointer; }
 .billing-eyebrow { color: var(--color-brand-deep); font-size: 11px; font-weight: 800; letter-spacing: .08em; }.billing-form { display: grid; gap: 16px; padding: 20px 22px; }.billing-form__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }.billing-textarea { display: grid; gap: 6px; color: var(--color-heading); font-size: 13px; font-weight: 700; }.billing-textarea textarea { width: 100%; resize: vertical; border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 10px 12px; font: inherit; }.billing-modal__footer { display: flex; justify-content: flex-end; gap: 8px; padding-top: 4px; }
 @media (max-width: 760px) { .billing-kpis { grid-template-columns: 1fr; }.billing-section__heading { align-items: stretch; flex-direction: column; }.billing-filter { align-items: stretch; flex-wrap: wrap; }.billing-form__grid { grid-template-columns: 1fr; } }
+.payment-receipt__body { display: grid; gap: 18px; padding: 22px; }
+.billing-payment-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--color-border); padding: 8px 0; }
+.payment-receipt__loading { padding: 22px; }
+.payment-receipt__heading, .payment-receipt__amount, .payment-receipt__refunds li { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.payment-receipt__heading { border-bottom: 1px solid var(--color-border); padding-bottom: 16px; }
+.payment-receipt__details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.payment-receipt__details dt { color: var(--color-text-secondary); font-size: 12px; }
+.payment-receipt__details dd { margin: 3px 0 0; font-weight: 600; overflow-wrap: anywhere; }
+.payment-receipt__amount { border-top: 1px solid var(--color-border); padding-top: 12px; }
+.payment-receipt__amount strong { font-size: 19px; }
+.payment-receipt__amount--net strong { color: var(--color-success); }
+.payment-receipt__refunds { display: grid; gap: 9px; list-style: none; margin: 0; padding: 0; }
+.payment-receipt__note { color: var(--color-text-secondary); font-size: 12px; }
+@media (max-width: 540px) { .payment-receipt__details { grid-template-columns: 1fr; } }
+@media print {
+  body:has(.payment-receipt) #root * { visibility: hidden; }
+  body:has(.payment-receipt) .payment-receipt, body:has(.payment-receipt) .payment-receipt * { visibility: visible !important; }
+  body:has(.payment-receipt) .payment-receipt { position: absolute; inset: 0 auto auto 0; width: 100%; max-height: none; border: 0; box-shadow: none; }
+  body:has(.payment-receipt) .billing-modal-backdrop { position: static; padding: 0; background: white; }
+  body:has(.payment-receipt) .payment-receipt__actions, body:has(.payment-receipt) .billing-modal__header button { display: none; }
+}

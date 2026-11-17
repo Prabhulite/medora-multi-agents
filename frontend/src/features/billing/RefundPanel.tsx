@@ -8,7 +8,7 @@ import { billingApi, type BillingInvoice, type BillingRefund, type RecordRefundP
 
 const currency = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' });
 
-export function RefundPanel({ invoice, onClose, onUpdated }: { invoice: BillingInvoice; onClose: () => void; onUpdated: () => Promise<void> }) {
+export function RefundPanel({ invoice, onClose, onUpdated, onReceipt }: { invoice: BillingInvoice; onClose: () => void; onUpdated: () => Promise<void>; onReceipt: (paymentId: number) => void }) {
   const [refunds, setRefunds] = useState<BillingRefund[]>([]);
   const [paymentId, setPaymentId] = useState('');
   const [amount, setAmount] = useState('');
@@ -31,5 +31,22 @@ export function RefundPanel({ invoice, onClose, onUpdated }: { invoice: BillingI
     } catch (err) { setError(getErrorMessage(err, 'Unable to record refund')); }
     finally { setSaving(false); }
   };
-  return <div className="billing-modal-backdrop" role="presentation" onClick={onClose}><section className="billing-modal" role="dialog" aria-modal="true" aria-labelledby="refund-title" onClick={(event) => event.stopPropagation()}><div className="billing-modal__header"><div><span className="billing-eyebrow">REFUND RECORD</span><h2 id="refund-title">{invoice.invoiceNumber}</h2><p>{invoice.patientName}</p></div><button type="button" onClick={onClose} aria-label="Close refunds">×</button></div>{error && <Alert tone="error">{error}</Alert>}<form className="billing-form" onSubmit={(event) => void submit(event)}><div className="billing-form__grid"><Select label="Original payment" required value={paymentId} onChange={(event) => { setPaymentId(event.target.value); setAmount(''); }} options={[{ value: '', label: 'Select payment' }, ...(invoice.payments || []).map((row) => ({ value: row.id, label: `${currency.format(row.amount)} · ${row.method} · ${new Date(row.paidAt).toLocaleDateString()}` }))]} /><Input label="Refund amount" type="number" min="0.01" max={refundable || undefined} step="0.01" required value={amount} onChange={(event) => setAmount(event.target.value)} placeholder={paymentId ? `Up to ${currency.format(refundable)}` : '0.00'} /><Select label="Refund method" value={method} onChange={(event) => setMethod(event.target.value as RecordRefundPayload['method'])} options={[{ value: 'cash', label: 'Cash' }, { value: 'card', label: 'Card' }, { value: 'upi', label: 'UPI' }, { value: 'bank_transfer', label: 'Bank transfer' }]} /><Input label="Reference" maxLength={120} value={referenceNumber} onChange={(event) => setReferenceNumber(event.target.value)} /><Input label="Reason" required minLength={3} maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} /></div><div className="billing-modal__footer"><Button type="button" variant="secondary" onClick={onClose}>Close</Button><Button type="submit" loading={saving} disabled={!paymentId || refundable <= 0}>Record refund</Button></div></form><div className="billing-section"><h3>Refund history</h3>{refunds.length ? refunds.map((row) => <p key={row.id}>{currency.format(row.amount)} · {row.reason} · {new Date(row.refundedAt).toLocaleString()}</p>) : <p>No refunds recorded.</p>}</div></section></div>;
+  return <div className="billing-modal-backdrop" role="presentation" onClick={onClose}>
+    <section className="billing-modal" role="dialog" aria-modal="true" aria-labelledby="refund-title" onClick={(event) => event.stopPropagation()}>
+      <div className="billing-modal__header"><div><span className="billing-eyebrow">PAYMENTS AND REFUNDS</span><h2 id="refund-title">{invoice.invoiceNumber}</h2><p>{invoice.patientName}</p></div><button type="button" onClick={onClose} aria-label="Close refunds">×</button></div>
+      {error && <Alert tone="error">{error}</Alert>}
+      <div className="billing-form"><h3>Payment receipts</h3>{invoice.payments?.map((row) => <div className="billing-payment-row" key={row.id}><span>{currency.format(row.amount)} · {row.method.replaceAll('_', ' ')} · {new Date(row.paidAt).toLocaleDateString()}</span><Button type="button" size="sm" variant="secondary" onClick={() => onReceipt(row.id)}>View receipt</Button></div>)}</div>
+      <form className="billing-form" onSubmit={(event) => void submit(event)}>
+        <div className="billing-form__grid">
+          <Select label="Original payment" required value={paymentId} onChange={(event) => { setPaymentId(event.target.value); setAmount(''); }} options={[{ value: '', label: 'Select payment' }, ...(invoice.payments || []).map((row) => ({ value: row.id, label: `${currency.format(row.amount)} · ${row.method} · ${new Date(row.paidAt).toLocaleDateString()}` }))]} />
+          <Input label="Refund amount" type="number" min="0.01" max={refundable || undefined} step="0.01" required value={amount} onChange={(event) => setAmount(event.target.value)} placeholder={paymentId ? `Up to ${currency.format(refundable)}` : '0.00'} />
+          <Select label="Refund method" value={method} onChange={(event) => setMethod(event.target.value as RecordRefundPayload['method'])} options={[{ value: 'cash', label: 'Cash' }, { value: 'card', label: 'Card' }, { value: 'upi', label: 'UPI' }, { value: 'bank_transfer', label: 'Bank transfer' }]} />
+          <Input label="Reference" maxLength={120} value={referenceNumber} onChange={(event) => setReferenceNumber(event.target.value)} />
+          <Input label="Reason" required minLength={3} maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} />
+        </div>
+        <div className="billing-modal__footer"><Button type="button" variant="secondary" onClick={onClose}>Close</Button><Button type="submit" loading={saving} disabled={!paymentId || refundable <= 0}>Record refund</Button></div>
+      </form>
+      <div className="billing-form"><h3>Refund history</h3>{refunds.length ? refunds.map((row) => <p key={row.id}>{currency.format(row.amount)} · {row.reason} · {new Date(row.refundedAt).toLocaleString()}</p>) : <p>No refunds recorded.</p>}</div>
+    </section>
+  </div>;
 }

@@ -18,6 +18,7 @@ import { InsuranceClaimPanel } from './InsuranceClaimPanel';
 import { PatientLedgerPanel } from './PatientLedgerPanel';
 import { ChargeMasterPanel } from './ChargeMasterPanel';
 import { CashierReportPanel } from './CashierReportPanel';
+import { PaymentReceiptPanel } from './PaymentReceiptPanel';
 
 const currency = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
 
@@ -53,6 +54,7 @@ export function BillingDashboardPage() {
   const [showLedger, setShowLedger] = useState(false);
   const [showCharges, setShowCharges] = useState(false);
   const [showCashierReport, setShowCashierReport] = useState(false);
+  const [receiptPaymentId, setReceiptPaymentId] = useState<number | null>(null);
 
   const load = async (filter = patientId) => {
     setLoading(true);
@@ -122,11 +124,12 @@ export function BillingDashboardPage() {
     </section>
     {showInvoiceForm ? <InvoiceForm saving={saving} onClose={() => setShowInvoiceForm(false)} onSubmit={(payload) => void saveInvoice(payload)} /> : null}
     {showPaymentForm ? <PaymentForm invoices={invoices} saving={saving} onClose={() => setShowPaymentForm(false)} onSubmit={(payload) => void savePayment(payload)} /> : null}
-    {refundInvoice ? <RefundPanel invoice={refundInvoice} onClose={() => setRefundInvoice(null)} onUpdated={async () => { await load(); }} /> : null}
+    {refundInvoice ? <RefundPanel invoice={refundInvoice} onClose={() => setRefundInvoice(null)} onUpdated={async () => { await load(); }} onReceipt={(id) => { setRefundInvoice(null); setReceiptPaymentId(id); }} /> : null}
     {claimInvoice ? <InsuranceClaimPanel invoice={claimInvoice} onClose={() => setClaimInvoice(null)} /> : null}
     {showLedger ? <PatientLedgerPanel onClose={() => setShowLedger(false)} /> : null}
     {showCharges ? <ChargeMasterPanel onClose={() => setShowCharges(false)} /> : null}
     {showCashierReport ? <CashierReportPanel onClose={() => setShowCashierReport(false)} /> : null}
+    {receiptPaymentId !== null ? <PaymentReceiptPanel paymentId={receiptPaymentId} onClose={() => setReceiptPaymentId(null)} /> : null}
   </div>;
 }
 

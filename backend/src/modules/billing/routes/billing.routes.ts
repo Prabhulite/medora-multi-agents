@@ -8,6 +8,7 @@ import { cashierReportQuerySchema, chargeIdParamSchema, chargeSchema, claimActio
 import { z } from 'zod';
 
 const router = Router(); router.use(authenticate);
+router.get('/payments/:id/receipt', authorize('billing.view'), validate(invoiceIdParamSchema, 'params'), asyncHandler(billingController.receipt));
 router.get('/reports/cashier', authorize('billing.view'), validate(cashierReportQuerySchema, 'query'), asyncHandler(billingController.cashierReport));
 router.get('/charges', authorize('billing.view'), asyncHandler(billingController.charges));
 router.post('/charges', authorize('billing.charges.manage'), validate(chargeSchema), asyncHandler(billingController.createCharge));
