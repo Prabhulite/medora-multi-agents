@@ -16,10 +16,11 @@ export class DischargeHomeMedicationReview {
   @Column({ type: 'varchar', length: 80, nullable: true }) frequency!: string | null;
   @Column({ type: 'varchar', length: 40, nullable: true }) route!: string | null;
   @Column({ type: 'varchar', length: 20 }) source!: HomeMedication['source'];
-  @Column({ name: 'source_detail', type: 'varchar', length: 255, nullable: true }) sourceDetail!: string | null;
+  @Column({ name: 'source_detail', type: 'varchar', length: 500, nullable: true }) sourceDetail!: string | null;
   @Column({ type: 'varchar', length: 20 }) decision!: 'continue' | 'stop';
   @Column({ type: 'varchar', length: 1000, nullable: true }) instructions!: string | null;
   @Column({ type: 'varchar', length: 1000, nullable: true }) reason!: string | null;
+  @Column({ name: 'change_reason', type: 'varchar', length: 1000, nullable: true }) changeReason!: string | null;
   @Column({ name: 'reviewed_by_id', type: 'int', unsigned: true, nullable: true }) reviewedById!: number | null;
   @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true }) @JoinColumn({ name: 'reviewed_by_id' }) reviewedBy!: User | null;
   @Column({ name: 'reviewed_at', type: 'timestamp', precision: 6 }) reviewedAt!: Date;

@@ -6,7 +6,7 @@ import { getErrorMessage } from '../../lib/api';
 import { inpatientApi, type Admission, type AdmissionMedicationReview, type DischargePayload, type MedicationOrder } from './inpatient.api';
 import { homeMedicationApi, type HomeMedication } from '../clinical/homeMedication.api';
 
-type Decision = { decision: '' | 'continue' | 'stop'; instructions: string; reason: string };
+type Decision = { decision: '' | 'continue' | 'stop'; instructions: string; reason: string; changeReason: string };
 
 export function DischargeReviewForm({ admission, saving, submitError, onClose, onSubmit }: { admission: Admission; saving: boolean; submitError: string; onClose: () => void; onSubmit: (payload: DischargePayload) => void }) {
   const [form, setForm] = useState({ dischargeSummary: '', dischargeDiagnosis: admission.diagnosis || '', dischargeMedications: '', followUpInstructions: '' });
@@ -25,11 +25,11 @@ export function DischargeReviewForm({ admission, saving, submitError, onClose, o
     Promise.all([inpatientApi.medicationOrders(admission.id), homeMedicationApi.list(admission.patientId), inpatientApi.admissionMedicationReview(admission.id)]).then(([items, homeItems, savedAdmissionReview]) => {
       if (!active) return;
       setOrders(items);
-      setDecisions(Object.fromEntries(items.map((item) => [item.id, { decision: '', instructions: '', reason: '' }])));
+      setDecisions(Object.fromEntries(items.map((item) => [item.id, { decision: '', instructions: '', reason: '', changeReason: '' }])));
       const currentHome = homeItems.filter((item) => item.isCurrent);
       setHomeRows(currentHome);
       setAdmissionReview(savedAdmissionReview);
-      setHomeDecisions(Object.fromEntries(currentHome.map((item) => [item.id, { decision: '', instructions: '', reason: '' }])));
+      setHomeDecisions(Object.fromEntries(currentHome.map((item) => [item.id, { decision: '', instructions: '', reason: '', changeReason: '' }])));
     }).catch((err) => { if (active) setError(getErrorMessage(err, 'Unable to load medication lists')); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -44,7 +44,8 @@ export function DischargeReviewForm({ admission, saving, submitError, onClose, o
     return choice?.decision === 'continue' ? choice.instructions.trim().length >= 2 : choice?.decision === 'stop' && choice.reason.trim().length >= 5;
   }) && homeRows.every((home) => {
     const choice = homeDecisions[home.id];
-    return choice?.decision === 'continue' ? choice.instructions.trim().length >= 2 : choice?.decision === 'stop' && choice.reason.trim().length >= 5;
+    const prior = admissionDecisions.get(home.id);
+    return choice?.decision === 'continue' ? choice.instructions.trim().length >= 2 && (!prior || prior.decision === 'continue' || choice.changeReason.trim().length >= 5) : choice?.decision === 'stop' && choice.reason.trim().length >= 5;
   });
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -58,7 +59,7 @@ export function DischargeReviewForm({ admission, saving, submitError, onClose, o
     const homeMedicationReview: DischargePayload['homeMedicationReview'] = homeRows.map((home) => {
       const choice = homeDecisions[home.id];
       return choice.decision === 'continue'
-        ? { homeMedicationId: home.id, decision: 'continue', instructions: choice.instructions.trim() }
+        ? { homeMedicationId: home.id, decision: 'continue', instructions: choice.instructions.trim(), ...(choice.changeReason.trim() ? { changeReason: choice.changeReason.trim() } : {}) }
         : { homeMedicationId: home.id, decision: 'stop', reason: choice.reason.trim() };
     });
     onSubmit({ ...form, medicationsReviewed: true, medicationReview, homeMedicationsReviewed: true, homeMedicationReview });
@@ -98,6 +99,7 @@ export function DischargeReviewForm({ admission, saving, submitError, onClose, o
                 {admissionReview?.reviewedAt ? <small>{prior ? `Admission decision: ${prior.decision}${prior.reason ? ` — ${prior.reason}` : ''}` : 'Added to the reported history after admission review; confirm the source and current use.'}</small> : null}
                 <Select label="Home medicine decision" value={choice?.decision || ''} onChange={(event) => setHomeDecisions((current) => ({ ...current, [home.id]: { ...current[home.id], decision: event.target.value as Decision['decision'] } }))} options={[{ value: '', label: 'Choose a decision' }, { value: 'continue', label: 'Continue' }, { value: 'stop', label: 'Stop' }]} />
                 {choice?.decision === 'continue' && prior && prior.decision !== 'continue' ? <Alert tone="warning">This medicine was {prior.decision} at admission. Confirm the changed plan before discharge.</Alert> : null}
+                {choice?.decision === 'continue' && prior && prior.decision !== 'continue' ? <label className="inpatient-textarea"><span>Why is this medicine continued now? *</span><textarea required minLength={5} maxLength={1000} rows={2} value={choice.changeReason} onChange={(event) => setHomeDecisions((current) => ({ ...current, [home.id]: { ...current[home.id], changeReason: event.target.value } }))} /></label> : null}
                 {choice?.decision === 'continue' && <label className="inpatient-textarea"><span>Instructions on discharge *</span><textarea required minLength={2} maxLength={1000} rows={2} value={choice.instructions} onChange={(event) => setHomeDecisions((current) => ({ ...current, [home.id]: { ...current[home.id], instructions: event.target.value } }))} /></label>}
                 {choice?.decision === 'stop' && <label className="inpatient-textarea"><span>Reason for stopping *</span><textarea required minLength={5} maxLength={1000} rows={2} value={choice.reason} onChange={(event) => setHomeDecisions((current) => ({ ...current, [home.id]: { ...current[home.id], reason: event.target.value } }))} /></label>}
               </div>;

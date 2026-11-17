@@ -189,6 +189,8 @@ export const inpatientService = {
       const activeHomeMedications = await homeRepo.createQueryBuilder('home').setLock('pessimistic_write').where('home.patient_id = :patientId', { patientId: admission.patientId }).andWhere('home.is_current = 1').orderBy('home.id', 'ASC').getMany();
       const homeDecisions = new Map(summary.homeMedicationReview.map((item) => [item.homeMedicationId, item]));
       if (homeDecisions.size !== summary.homeMedicationReview.length || homeDecisions.size !== activeHomeMedications.length || activeHomeMedications.some((home) => !homeDecisions.has(home.id))) throw new ValidationError('Review every current home medication exactly once before discharge');
+      const admissionHomeReviews = await manager.getRepository(AdmissionHomeMedicationReview).find({ where: { admissionId: id } });
+      const admissionHomeDecisions = new Map(admissionHomeReviews.map((item) => [item.homeMedicationId, item.decision]));
       const bed = await manager.getRepository(Bed).createQueryBuilder('bed').setLock('pessimistic_write').where('bed.id = :id', { id: admission.bedId }).getOne();
       if (!bed) throw new NotFoundError('Bed not found');
       const reviewedAt = new Date();
@@ -206,7 +208,9 @@ export const inpatientService = {
       for (const home of activeHomeMedications) {
         const decision = homeDecisions.get(home.id)!;
         if (decision.decision === 'continue') await assertNoRecordedAllergy(manager, admission.patientId, [home.medicineName]);
-        await homeReviewRepo.save(homeReviewRepo.create({ admissionId: id, homeMedicationId: home.id, medicineName: home.medicineName, dosage: home.dosage, frequency: home.frequency, route: home.route, source: home.source, sourceDetail: home.sourceDetail, decision: decision.decision, instructions: decision.decision === 'continue' ? decision.instructions : null, reason: decision.decision === 'stop' ? decision.reason : null, reviewedById: userId, reviewedAt }));
+        const changedFromHoldOrStop = admissionHomeDecisions.get(home.id) === 'hold' || admissionHomeDecisions.get(home.id) === 'stop';
+        if (decision.decision === 'continue' && changedFromHoldOrStop && !decision.changeReason) throw new ValidationError(`Explain why ${home.medicineName} is continued after being held or stopped at admission`);
+        await homeReviewRepo.save(homeReviewRepo.create({ admissionId: id, homeMedicationId: home.id, medicineName: home.medicineName, dosage: home.dosage, frequency: home.frequency, route: home.route, source: home.source, sourceDetail: home.sourceDetail, decision: decision.decision, instructions: decision.decision === 'continue' ? decision.instructions : null, reason: decision.decision === 'stop' ? decision.reason : null, changeReason: decision.decision === 'continue' && changedFromHoldOrStop ? decision.changeReason ?? null : null, reviewedById: userId, reviewedAt }));
         if (decision.decision === 'stop') { home.isCurrent = false; home.ceasedAt = reviewedAt; home.ceasedById = userId; home.cessationReason = decision.reason; await homeRepo.save(home); }
       }
       admission.status = 'discharged'; admission.dischargedAt = reviewedAt; admission.medicationsReviewedAt = reviewedAt; admission.medicationsReviewedById = userId; bed.status = 'available'; admission.dischargeSummary = summary.dischargeSummary; admission.dischargeDiagnosis = summary.dischargeDiagnosis ?? null; admission.dischargeMedications = summary.dischargeMedications ?? null; admission.followUpInstructions = summary.followUpInstructions ?? null; admission.dischargedById = userId;

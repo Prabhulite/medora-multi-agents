@@ -14,7 +14,7 @@ const medicationDecisionSchema = z.discriminatedUnion('decision', [
   z.object({ prescriptionId: z.number().int().positive(), decision: z.literal('stop'), reason: z.string().trim().min(5).max(1000) }),
 ]);
 const homeMedicationDecisionSchema = z.discriminatedUnion('decision', [
-  z.object({ homeMedicationId: z.number().int().positive(), decision: z.literal('continue'), instructions: z.string().trim().min(2).max(1000) }),
+  z.object({ homeMedicationId: z.number().int().positive(), decision: z.literal('continue'), instructions: z.string().trim().min(2).max(1000), changeReason: z.string().trim().min(5).max(1000).optional() }),
   z.object({ homeMedicationId: z.number().int().positive(), decision: z.literal('stop'), reason: z.string().trim().min(5).max(1000) }),
 ]);
 export const dischargeSummarySchema = z.object({ dischargeSummary: z.string().trim().min(2).max(10000), dischargeDiagnosis: z.string().trim().max(5000).nullable().optional(), dischargeMedications: z.string().trim().max(5000).nullable().optional(), followUpInstructions: z.string().trim().max(5000).nullable().optional(), medicationsReviewed: z.literal(true), medicationReview: z.array(medicationDecisionSchema).max(500), homeMedicationsReviewed: z.literal(true), homeMedicationReview: z.array(homeMedicationDecisionSchema).max(500) });
