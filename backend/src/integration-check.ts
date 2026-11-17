@@ -125,7 +125,7 @@ try {
   assert.deepEqual(concurrentResourceBookings.map((result) => result.status).sort(), [200, 409]);
   assert.equal((await request('POST', `/api/radiology/orders/${imaging.id}/communications`, { outcome: 'attempted', method: 'phone', recipientName: 'Dr Test', findingSummary: 'Urgent finding', occurredAt: new Date().toISOString() })).status, 409);
   assert.equal((await request('POST', `/api/radiology/orders/${imaging.id}/addenda`, { reason: 'Clarify finding', addendum: 'Additional description' })).status, 409);
-  assert.equal((await request('PATCH', `/api/radiology/orders/${imaging.id}/report`, { status: 'reported', reportText: 'Final image report' })).status, 409);
+  assert.equal((await request('PATCH', `/api/radiology/orders/${imaging.id}/report`, { status: 'reported', reportText: 'Final image report', reviewAttested: true })).status, 409);
   assert.equal((await ok('PATCH', `/api/radiology/orders/${imaging.id}/report`, { status: 'performed', reportText: 'Preliminary image report', impression: 'Preliminary impression' })).status, 'performed');
   const authorDraft = (await ok('GET', '/api/radiology/orders?patientId=1')).find((row: { id: number }) => row.id === imaging.id);
   assert.equal(authorDraft.reportText, 'Preliminary image report');
@@ -155,7 +155,9 @@ try {
   assert.equal((await request('POST', `/api/radiology/orders/${imaging.id}/communications`, { outcome: 'delivered', method: 'phone', recipientName: 'Dr Test', findingSummary: 'Urgent finding discussed', occurredAt: new Date(Date.now() + 10 * 60_000).toISOString() })).status, 422);
   const callDelivered = await ok('POST', `/api/radiology/orders/${imaging.id}/communications`, { outcome: 'delivered', method: 'phone', recipientName: 'Dr Test', findingSummary: 'Urgent finding discussed', occurredAt: new Date().toISOString() }, 201);
   assert.equal((await ok('GET', `/api/radiology/orders/${imaging.id}/communications`)).map((row: { id: number }) => row.id).join(','), `${callAttempt.id},${callDelivered.id}`);
-  assert.equal((await ok('PATCH', `/api/radiology/orders/${imaging.id}/report`, { status: 'reported', reportText: 'Final image report' })).status, 'reported');
+  assert.equal((await request('PATCH', `/api/radiology/orders/${imaging.id}/report`, { status: 'reported', reportText: 'Final image report' })).status, 422);
+  assert.equal((await request('PATCH', `/api/radiology/orders/${imaging.id}/report`, { status: 'reported', reportText: 'Final image report', reviewAttested: false })).status, 422);
+  assert.equal((await ok('PATCH', `/api/radiology/orders/${imaging.id}/report`, { status: 'reported', reportText: 'Final image report', reviewAttested: true })).status, 'reported');
   token = radiologyViewerToken;
   const finalizedImaging = (await ok('GET', '/api/radiology/orders?patientId=1')).find((row: { id: number }) => row.id === imaging.id);
   assert.equal(finalizedImaging.reportText, 'Final image report');
@@ -169,7 +171,7 @@ try {
   assert.equal((await ok('GET', `/api/radiology/orders/${imaging.id}/communications`))[0].findingSummary, 'Urgent finding discussed');
   assert.equal((await ok('GET', `/api/radiology/orders/${imaging.id}/communications`))[0].note, 'Awaiting return call');
   token = adminToken;
-  assert.equal((await request('PATCH', `/api/radiology/orders/${imaging.id}/report`, { status: 'reported', reportText: 'Changed final report' })).status, 409);
+  assert.equal((await request('PATCH', `/api/radiology/orders/${imaging.id}/report`, { status: 'reported', reportText: 'Changed final report', reviewAttested: true })).status, 409);
   assert.equal((await request('POST', `/api/radiology/orders/${imaging.id}/addenda`, { reason: 'Bad', addendum: 'Additional description' })).status, 422);
   const radiologyAddendum = await ok('POST', `/api/radiology/orders/${imaging.id}/addenda`, { reason: 'Clarify finding', addendum: 'Additional description' }, 201);
   const correctedImagingQueue = await ok('GET', '/api/radiology/communication-queue?page=1&pageSize=1');
@@ -198,7 +200,7 @@ try {
   assert.equal((await ok('GET', '/api/radiology/communication-queue')).items[0].attemptCount, 1);
   await ok('POST', `/api/radiology/orders/${urgentImaging.id}/communications`, { outcome: 'delivered', method: 'phone', recipientName: 'Dr Test', findingSummary: 'Urgent imaging observation', occurredAt: new Date().toISOString() }, 201);
   assert.equal((await ok('GET', '/api/radiology/communication-queue')).total, 0);
-  await ok('PATCH', `/api/radiology/orders/${urgentImaging.id}/report`, { status: 'reported', reportText: 'Final urgent imaging observation' });
+  await ok('PATCH', `/api/radiology/orders/${urgentImaging.id}/report`, { status: 'reported', reportText: 'Final urgent imaging observation', reviewAttested: true });
   const finalizedImagingQueue = await ok('GET', '/api/radiology/communication-queue');
   assert.equal(finalizedImagingQueue.total, 1);
   assert.equal(finalizedImagingQueue.items[0].id, urgentImaging.id);
@@ -212,10 +214,10 @@ try {
   token = adminToken;
   const concurrentImaging = await ok('POST', '/api/radiology/orders', { patientId: 1, modalityId: 1, doctorId: 1, studyName: 'Concurrent final report test' }, 201);
   await ok('PATCH', `/api/radiology/orders/${concurrentImaging.id}/report`, { status: 'performed' });
-  assert.equal((await request('PATCH', `/api/radiology/orders/${concurrentImaging.id}/report`, { status: 'reported', reportText: '' })).status, 422);
+  assert.equal((await request('PATCH', `/api/radiology/orders/${concurrentImaging.id}/report`, { status: 'reported', reportText: '', reviewAttested: true })).status, 422);
   const finalAttempts = await Promise.all([
-    request('PATCH', `/api/radiology/orders/${concurrentImaging.id}/report`, { status: 'reported', reportText: 'First final report' }),
-    request('PATCH', `/api/radiology/orders/${concurrentImaging.id}/report`, { status: 'reported', reportText: 'Second final report' }),
+    request('PATCH', `/api/radiology/orders/${concurrentImaging.id}/report`, { status: 'reported', reportText: 'First final report', reviewAttested: true }),
+    request('PATCH', `/api/radiology/orders/${concurrentImaging.id}/report`, { status: 'reported', reportText: 'Second final report', reviewAttested: true }),
   ]);
   assert.deepEqual(finalAttempts.map((attempt) => attempt.status).sort(), [200, 409]);
   token = (await ok('POST', '/api/auth/login', { username: 'integration_doctor', password: 'Temporary!Pass123' })).token;
@@ -254,8 +256,9 @@ try {
   for (const action of ['radiology_order_created', 'radiology_order_scheduled', 'radiology_order_rescheduled', 'radiology_study_performed', 'radiology_draft_saved', 'radiology_report_finalized', 'radiology_report_amended', 'radiology_finding_communication', 'radiology_order_cancelled']) {
     assert.ok(radiologyAudit.some((row: { action: string; changedByName: string | null }) => row.action === action && row.changedByName), `Missing attributed radiology audit: ${action}`);
   }
-  const rawRadiologyAudit = await dataSource.query("SELECT change_summary AS changeSummary, before_data AS beforeData, after_data AS afterData FROM patient_audit_logs WHERE patient_id = 1 AND action LIKE 'radiology_%'");
+  const rawRadiologyAudit = await dataSource.query("SELECT action, change_summary AS changeSummary, before_data AS beforeData, after_data AS afterData FROM patient_audit_logs WHERE patient_id = 1 AND action LIKE 'radiology_%'");
   assert.equal(rawRadiologyAudit.some((row: { changeSummary?: string; beforeData?: string; afterData?: string }) => [row.changeSummary, row.beforeData, row.afterData].some((value) => value?.includes('Preliminary image report') || value?.includes('Urgent finding discussed'))), false);
+  assert.ok(rawRadiologyAudit.some((row: { action: string; afterData: string }) => row.action === 'radiology_report_finalized' && JSON.parse(row.afterData).reviewAttested === true));
 
   assert.equal((await request('POST', '/api/blood-bank/units', { unitNumber: 'BAD-DATE', component: 'Red cells', bloodGroup: 'O+', collectedOn: '2027-02-30', expiresOn: '2030-01-01', storageLocation: 'Integration fridge' })).status, 422);
   assert.equal((await ok('GET', '/api/blood-bank/patients?search=IT-MRD-001'))[0].mrdNumber, 'IT-MRD-001');

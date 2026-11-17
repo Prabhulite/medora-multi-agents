@@ -28,6 +28,8 @@
 .radiology-textarea textarea:focus { outline: 2px solid color-mix(in srgb, var(--color-primary) 30%, transparent); border-color: var(--color-primary); }
 .radiology-result-context { display: grid; gap: 4px; padding: 13px 15px; border: 1px solid #d7e9dc; border-radius: var(--radius-sm); background: var(--color-selected); color: var(--color-brand-deep); }
 .radiology-result-context span { color: var(--color-text-secondary); font-size: 13px; }
+.radiology-report-attestation { display: flex; align-items: flex-start; gap: 10px; line-height: 1.45; font-size: 14px; }
+.radiology-report-attestation input { margin-top: 3px; flex: none; }
 .radiology-report__details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 18px; margin: 0; }
 .radiology-report__details dt { color: var(--color-text-secondary); font-size: 12px; font-weight: 700; }
 .radiology-report__details dd { margin: 3px 0 0; overflow-wrap: anywhere; }

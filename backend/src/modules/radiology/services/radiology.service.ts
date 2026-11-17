@@ -280,7 +280,7 @@ export const radiologyService = {
       }
       const action = input.status === 'reported' ? 'radiology_report_finalized' : previousStatus === 'performed' ? 'radiology_draft_saved' : 'radiology_study_performed';
       const label = input.status === 'reported' ? 'report finalized' : previousStatus === 'performed' ? 'draft saved' : 'study performed';
-      await auditRadiology(manager, order.patientId, userId, action, `Radiology ${label}: ${order.orderNumber}`, beforeData, { orderId, status: order.status, reportPresent: Boolean(order.reportText?.trim()), impressionPresent: Boolean(order.impression?.trim()) });
+      await auditRadiology(manager, order.patientId, userId, action, `Radiology ${label}: ${order.orderNumber}`, beforeData, { orderId, status: order.status, reportPresent: Boolean(order.reportText?.trim()), impressionPresent: Boolean(order.impression?.trim()), ...(input.status === 'reported' ? { reviewAttested: true } : {}) });
       if (input.status === 'reported' && order.doctorId) {
         const doctor = await manager.getRepository(Doctor).findOne({ where: { id: order.doctorId, isActive: true } });
         if (doctor?.accountUserId && await manager.getRepository(User).exist({ where: { id: doctor.accountUserId, isActive: true } })) {

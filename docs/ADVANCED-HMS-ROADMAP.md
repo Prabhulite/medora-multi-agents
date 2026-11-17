@@ -111,6 +111,8 @@ Radiology creation, scheduling and rescheduling, performance and draft saves, fi
 
 Finalized radiology reports now have a browser print view containing patient and study identifiers, report and impression, dates, reporting staff, and dated addenda. Printing waits for addenda to load successfully and excludes the correction form. This is a browser printout, not a signed or archived PDF.
 
+Finalizing a new radiology report requires an explicit reporting-staff review confirmation for the patient identifier, study, report, and impression. The API rejects finalization without it and records the confirmation in the patient audit event. This is an internal attestation; independent image review, regulated signatures, and external PACS remain outstanding.
+
 ### Phase 7: Operations and integrations
 
 - Operations dashboard KPI totals now use full database counts and billing balance aggregation; preview queues remain bounded. Waiting appointments count checked-in patients. The CSV export includes KPI and alert totals and escapes spreadsheet formula prefixes in patient-entered text. The isolated integration suite covers values beyond the preview limits.

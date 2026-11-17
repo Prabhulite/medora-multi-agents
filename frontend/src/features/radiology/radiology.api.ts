@@ -64,6 +64,7 @@ export interface UpdateRadiologyReportPayload {
   report?: string;
   impression?: string | null;
   status: 'performed' | 'reported';
+  reviewAttested?: boolean;
 }
 
 interface ApiEnvelope<T> { data: T; }

@@ -5,7 +5,9 @@ export const radiologyWorklistSchema = z.object({ page: z.coerce.number().int().
 export const radiologyCommunicationQueueSchema = z.object({ page: z.coerce.number().int().min(1).default(1), pageSize: z.coerce.number().int().min(1).max(100).default(25), search: z.string().trim().min(2).max(80).optional() });
 export const radiologyDoctorLookupSchema = z.object({ search: z.string().trim().min(2).max(80) });
 export const createRadiologyOrderSchema = z.object({ patientId: positiveInt, modalityId: positiveInt, studyName: z.string().trim().min(2).max(160), doctorId: positiveInt.nullable().optional(), priority: z.enum(['routine', 'urgent', 'stat']).default('routine'), clinicalNotes: z.string().trim().max(5000).nullable().optional() });
-export const updateRadiologyReportSchema = z.object({ status: z.enum(['performed', 'reported']), reportText: z.string().trim().max(10000).nullable().optional(), impression: z.string().trim().max(5000).nullable().optional() });
+export const updateRadiologyReportSchema = z.object({ status: z.enum(['performed', 'reported']), reportText: z.string().trim().max(10000).nullable().optional(), impression: z.string().trim().max(5000).nullable().optional(), reviewAttested: z.boolean().optional() }).superRefine((input, context) => {
+  if (input.status === 'reported' && input.reviewAttested !== true) context.addIssue({ code: z.ZodIssueCode.custom, path: ['reviewAttested'], message: 'Confirm patient, study, and final report review before finalizing' });
+});
 export const radiologyOrderIdParamSchema = z.object({ id: z.coerce.number().int().positive() });
 export const createRadiologyAddendumSchema = z.object({ reason: z.string().trim().min(5).max(500), addendum: z.string().trim().min(1).max(10000) });
 export const cancelRadiologyOrderSchema = z.object({ reason: z.string().trim().min(5).max(500) });
