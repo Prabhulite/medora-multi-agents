@@ -76,7 +76,7 @@ export function RadiologyDiagnosticsPage() {
     { key: 'priority', header: 'Priority', render: (row) => <div><Badge tone={row.priority === 'stat' ? 'danger' : row.priority === 'urgent' ? 'warning' : 'neutral'}>{row.priority.toUpperCase()}</Badge>{row.latestAddendumAt && <div className="ui-table__cell-sub">Correction follow-up</div>}</div> },
     { key: 'order', header: 'Order / patient', render: (row) => <div><div className="ui-table__cell-title">{row.orderNumber}</div><div className="ui-table__cell-sub">{row.patientName} / {row.patientMrdNumber}</div></div> },
     { key: 'study', header: 'Study', render: (row) => row.studyName },
-    { key: 'since', header: 'Awaiting since', render: (row) => <div>{dateLabel(row.latestAddendumAt || row.performedAt || row.reportedAt)}<div className="ui-table__cell-sub">{row.latestAddendumAt ? 'Corrected' : row.status === 'reported' ? 'Final report' : 'Performed'}</div></div> },
+    { key: 'since', header: 'Awaiting since', render: (row) => <div>{dateLabel(row.latestAddendumAt || (row.status === 'reported' ? row.reportedAt : row.performedAt))}<div className="ui-table__cell-sub">{row.latestAddendumAt ? 'Corrected' : row.status === 'reported' ? 'Final report' : 'Performed'}</div></div> },
     { key: 'attempts', header: 'Contact attempts', render: (row) => <div>{row.attemptCount} {row.attemptCount === 1 ? 'attempt' : 'attempts'}<div className="ui-table__cell-sub">{row.lastAttemptAt ? `Last: ${dateLabel(row.lastAttemptAt)}` : 'No attempts recorded'}</div></div> },
     { key: 'actions', header: 'Action', render: (row) => <Button size="sm" variant="secondary" onClick={() => openQueueCommunication(row)}>Communications</Button> },
   ];

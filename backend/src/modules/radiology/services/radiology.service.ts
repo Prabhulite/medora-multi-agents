@@ -10,11 +10,13 @@ const orderRelations = { patient: true, modality: true, doctor: true, resource: 
 export const radiologyService = {
   async communicationQueue({ page, pageSize, search }: RadiologyCommunicationQueueInput) {
     const latestCorrection = '(SELECT MAX(correction.created_at) FROM radiology_report_addenda correction WHERE correction.order_id = study.id)';
+    const followUpAt = `COALESCE(${latestCorrection}, CASE WHEN study.status = 'reported' THEN study.reported_at END, study.performed_at, study.ordered_at)`;
+    const contactFollowUpAt = followUpAt.replaceAll('study.', 'contactStudy.');
     const pending = AppDataSource.getRepository(RadiologyOrder).createQueryBuilder('study')
       .innerJoin('study.patient', 'patient').innerJoin('study.modality', 'modality')
       .where('study.status IN (:...readyStatuses)', { readyStatuses: ['performed', 'reported'] })
       .andWhere("(study.priority IN (:...priorities) OR (study.status = 'reported' AND EXISTS (SELECT 1 FROM radiology_report_addenda correction WHERE correction.order_id = study.id)))", { priorities: ['urgent', 'stat'] })
-      .andWhere(`NOT EXISTS (SELECT 1 FROM radiology_communications delivered WHERE delivered.order_id = study.id AND delivered.outcome = 'delivered' AND (${latestCorrection} IS NULL OR (delivered.created_at > ${latestCorrection} AND delivered.occurred_at >= ${latestCorrection})))`);
+      .andWhere(`NOT EXISTS (SELECT 1 FROM radiology_communications delivered WHERE delivered.order_id = study.id AND delivered.outcome = 'delivered' AND delivered.created_at > ${followUpAt} AND delivered.occurred_at >= ${followUpAt})`);
     if (search) {
       const term = `%${search.replace(/[%_\\]/g, '\\$&')}%`;
       pending.andWhere(new Brackets((terms) => {
@@ -31,7 +33,7 @@ export const radiologyService = {
       .addSelect('study.studyName', 'studyName').addSelect('modality.modalityName', 'modalityName').addSelect('study.modalityId', 'modalityId')
       .addSelect('study.priority', 'priority').addSelect('study.status', 'status').addSelect('study.performedAt', 'performedAt').addSelect('study.reportedAt', 'reportedAt')
       .addSelect(latestCorrection, 'latestAddendumAt')
-      .orderBy(`COALESCE(${latestCorrection}, study.performedAt, study.reportedAt, study.orderedAt)`, 'ASC').addOrderBy('study.id', 'ASC')
+      .orderBy(followUpAt, 'ASC').addOrderBy('study.id', 'ASC')
       .limit(pageSize).offset((page - 1) * pageSize).getRawMany<{
         id: number; orderNumber: string; patientId: number; patientMrdNumber: string; firstName: string; middleName: string | null; lastName: string; studyName: string | null; modalityName: string; modalityId: number; priority: 'routine' | 'urgent' | 'stat'; status: 'performed' | 'reported'; performedAt: Date | null; reportedAt: Date | null; latestAddendumAt: Date | null;
       }>();
@@ -39,7 +41,8 @@ export const radiologyService = {
     const attempts = ids.length ? await AppDataSource.getRepository(RadiologyCommunication).createQueryBuilder('contact')
       .select('contact.orderId', 'orderId').addSelect('COUNT(*)', 'attemptCount').addSelect('MAX(contact.occurredAt)', 'lastAttemptAt')
       .where('contact.orderId IN (:...ids)', { ids }).andWhere('contact.outcome = :attempted', { attempted: 'attempted' })
-      .andWhere("(NOT EXISTS (SELECT 1 FROM radiology_report_addenda correction WHERE correction.order_id = contact.order_id) OR (contact.created_at > (SELECT MAX(correction.created_at) FROM radiology_report_addenda correction WHERE correction.order_id = contact.order_id) AND contact.occurred_at >= (SELECT MAX(correction.created_at) FROM radiology_report_addenda correction WHERE correction.order_id = contact.order_id)))")
+      .innerJoin('contact.order', 'contactStudy')
+      .andWhere(`contact.created_at > ${contactFollowUpAt} AND contact.occurred_at >= ${contactFollowUpAt}`)
       .groupBy('contact.orderId').getRawMany<{ orderId: number; attemptCount: string; lastAttemptAt: Date | null }>() : [];
     const attemptMap = new Map(attempts.map((row) => [Number(row.orderId), row]));
     return { items: rows.map((row) => ({ id: Number(row.id), orderNumber: row.orderNumber, patientId: Number(row.patientId), patientMrdNumber: row.patientMrdNumber, patientName: [row.firstName, row.middleName, row.lastName].filter(Boolean).join(' '), studyName: row.studyName || row.modalityName, modalityId: Number(row.modalityId), priority: row.priority, status: row.status, performedAt: row.performedAt, reportedAt: row.reportedAt, latestAddendumAt: row.latestAddendumAt, attemptCount: Number(attemptMap.get(Number(row.id))?.attemptCount ?? 0), lastAttemptAt: attemptMap.get(Number(row.id))?.lastAttemptAt ?? null })), total, page, pageSize };
@@ -202,6 +205,10 @@ export const radiologyService = {
         order.reportedById = userId;
       }
       await repo.save(order);
+      if (input.status === 'reported') {
+        // Use database precision so a contact immediately before finalization cannot clear the new follow-up period.
+        await repo.createQueryBuilder().update().set({ reportedAt: () => 'CURRENT_TIMESTAMP(6)' }).where('id = :id', { id: orderId }).execute();
+      }
       if (input.status === 'reported' && order.doctorId) {
         const doctor = await manager.getRepository(Doctor).findOne({ where: { id: order.doctorId, isActive: true } });
         if (doctor?.accountUserId && await manager.getRepository(User).exist({ where: { id: doctor.accountUserId, isActive: true } })) {

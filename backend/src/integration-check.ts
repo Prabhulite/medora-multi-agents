@@ -161,6 +161,14 @@ try {
   assert.equal((await ok('GET', '/api/radiology/communication-queue')).items[0].attemptCount, 1);
   await ok('POST', `/api/radiology/orders/${urgentImaging.id}/communications`, { outcome: 'delivered', method: 'phone', recipientName: 'Dr Test', findingSummary: 'Urgent imaging observation', occurredAt: new Date().toISOString() }, 201);
   assert.equal((await ok('GET', '/api/radiology/communication-queue')).total, 0);
+  await ok('PATCH', `/api/radiology/orders/${urgentImaging.id}/report`, { status: 'reported', reportText: 'Final urgent imaging observation' });
+  const finalizedImagingQueue = await ok('GET', '/api/radiology/communication-queue');
+  assert.equal(finalizedImagingQueue.total, 1);
+  assert.equal(finalizedImagingQueue.items[0].id, urgentImaging.id);
+  assert.equal(finalizedImagingQueue.items[0].attemptCount, 0);
+  assert.ok(finalizedImagingQueue.items[0].reportedAt);
+  await ok('POST', `/api/radiology/orders/${urgentImaging.id}/communications`, { outcome: 'delivered', method: 'phone', recipientName: 'Dr Test', findingSummary: 'Final urgent imaging observation communicated', occurredAt: new Date().toISOString() }, 201);
+  assert.equal((await ok('GET', '/api/radiology/communication-queue')).total, 0);
   token = (await ok('POST', '/api/auth/login', { username: 'integration_doctor', password: 'Temporary!Pass123' })).token;
   assert.equal((await ok('GET', '/api/notifications')).items.some((item: { kind: string; sourceId: number; message: string }) => item.kind === 'radiology_report_final' && item.sourceId === imaging.id && !item.message.includes('Final image report')), true);
   assert.equal((await ok('GET', '/api/notifications')).items.some((item: { kind: string; sourceId: number; message: string }) => item.kind === 'radiology_report_amended' && item.sourceId === radiologyAddendum.id && !item.message.includes('Additional description')), true);
