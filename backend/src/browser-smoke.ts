@@ -260,7 +260,18 @@ try {
   }
   const cashierState = await evaluate('({ dialog: document.querySelector("[role=dialog]")?.innerText.slice(0, 600), path: location.pathname })');
   assert.ok(cashierReady, `Cashier operator breakdown did not render: ${JSON.stringify(cashierState)}`);
-  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, communication queues, pharmacy patient forms${hasBatch ? ', stock movements and count form' : ''}, inpatient dashboard, patient registration${hasPatientRow ? ' and merge confirmation' : ''}${patientLookup.body.data?.length ? ', radiology patient selection' : ''}${finalOrderNumber ? ', finalized radiology report print output' : ''}, and cashier report rendered in headless Chrome.`);
+  await evaluate('document.querySelector("#cashier-report-title").closest("[role=dialog]").querySelector("button[aria-label]").click(); [...document.querySelectorAll("button")].find(button => button.textContent?.includes("Cash closeouts")).click(); true');
+  let closeoutsReady = false;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    closeoutsReady = await evaluate('Boolean(document.querySelector("#cash-closeout-title")) && Boolean(document.querySelector(".billing-ledger-table"))');
+    if (closeoutsReady) break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.ok(closeoutsReady, 'Cash closeout review did not render');
+  const closeoutFetch = await evaluate('fetch(`/api/billing/closeouts?date=${document.querySelector("#cash-closeout-title").closest("[role=dialog]").querySelector("input[type=date]").value}`, { credentials: "include" }).then(async response => ({ status: response.status, rows: (await response.json()).data }))');
+  assert.equal(closeoutFetch.status, 200, 'Cash closeout review API failed');
+  assert.ok(Array.isArray(closeoutFetch.rows), 'Cash closeout review did not return rows');
+  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, communication queues, pharmacy patient forms${hasBatch ? ', stock movements and count form' : ''}, inpatient dashboard, patient registration${hasPatientRow ? ' and merge confirmation' : ''}${patientLookup.body.data?.length ? ', radiology patient selection' : ''}${finalOrderNumber ? ', finalized radiology report print output' : ''}, cashier report, and cash closeout review rendered in headless Chrome.`);
   await send('Browser.close').catch(() => undefined);
   socket.close();
 } finally {

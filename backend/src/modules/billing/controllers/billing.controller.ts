@@ -7,6 +7,8 @@ import { chargeMasterService } from '../services/charge-master.service.js';
 import { cashierReportService } from '../services/cashier-report.service.js';
 
 export const billingController = {
+  async closeouts(req: Request, res: Response) { return sendSuccess(res, await billingService.closeouts(String(req.query.date)), 'Cashier closeouts fetched'); },
+  async closeout(req: Request, res: Response) { return sendCreated(res, await billingService.closeout(req.body, req.user?.id ?? null), 'Cashier day closed'); },
   async receipt(req: Request, res: Response) { return sendSuccess(res, await billingService.receipt(Number(req.params.id)), 'Payment receipt fetched'); },
   async cashierReport(req: Request, res: Response) { return sendSuccess(res, await cashierReportService.get(String(req.query.from), String(req.query.to)), 'Cashier report fetched'); },
   async charges(_req: Request, res: Response) { return sendSuccess(res, await chargeMasterService.list(), 'Charges fetched'); },

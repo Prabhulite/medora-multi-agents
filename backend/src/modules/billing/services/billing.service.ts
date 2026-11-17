@@ -1,13 +1,49 @@
 import { AppDataSource } from '../../../config/data-source.js';
-import { ChargeMaster, InsuranceClaim, Invoice, InvoiceItem, Patient, Payment, Refund } from '../../../database/entities/index.js';
+import { CashierCloseout, ChargeMaster, InsuranceClaim, Invoice, InvoiceItem, Patient, Payment, Refund, User } from '../../../database/entities/index.js';
+import type { EntityManager } from 'typeorm';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { nextSequenceNumber } from '../../patients/services/number-sequence.service.js';
-import type { CreateInvoiceInput, PaymentInput, RefundInput } from '../validators/billing.validators.js';
+import type { CloseoutInput, CreateInvoiceInput, PaymentInput, RefundInput } from '../validators/billing.validators.js';
 
 const cents = (value: number | string) => Math.round(Number(value) * 100);
 const refundResponse = (row: Refund | null) => row ? { ...row, createdBy: row.createdBy ? { id: row.createdBy.id, fullName: row.createdBy.fullName } : null } : null;
+const toCents = (value: string) => { const [whole, fraction = ''] = value.split('.'); return BigInt(whole) * 100n + BigInt(fraction.padEnd(2, '0')); };
+const money = (value: bigint) => `${value < 0n ? '-' : ''}${(value < 0n ? -value : value) / 100n}.${((value < 0n ? -value : value) % 100n).toString().padStart(2, '0')}`;
+async function lockCashier(manager: EntityManager, userId: number | null): Promise<{ date: string; postedAt: Date }> {
+  if (userId === null) throw new ValidationError('Cash posting requires an authenticated cashier');
+  const user = await manager.getRepository(User).createQueryBuilder('user').setLock('pessimistic_write').where('user.id = :userId', { userId }).getOne();
+  if (!user) throw new NotFoundError('Cashier not found');
+  // Capture the DB-local posting time and its calendar date in one statement while holding the user lock.
+  const [clock] = await manager.query("SELECT NOW(6) AS postedAt, DATE_FORMAT(NOW(6), '%Y-%m-%d') AS businessDate");
+  const date: string = clock.businessDate;
+  if (await manager.getRepository(CashierCloseout).exist({ where: { cashierId: userId, businessDate: date } })) throw new ConflictError('Cashier day is already closed');
+  return { date, postedAt: clock.postedAt };
+}
+const closeoutResponse = (row: CashierCloseout) => ({ id: row.id, businessDate: row.businessDate, cashierId: row.cashierId, cashierName: row.cashier.fullName, cashReceived: row.cashReceived, cashRefunded: row.cashRefunded, expectedCash: row.expectedCash, countedCash: row.countedCash, variance: row.variance, reason: row.reason, closedAt: row.closedAt });
 
 export const billingService = {
+  async closeouts(date: string) {
+    const rows = await AppDataSource.getRepository(CashierCloseout).find({ where: { businessDate: date }, relations: { cashier: true }, order: { id: 'ASC' } });
+    return rows.map(closeoutResponse);
+  },
+  async closeout(input: CloseoutInput, userId: number | null) {
+    return AppDataSource.transaction(async (manager) => {
+      const { date } = await lockCashier(manager, userId);
+      const [end] = await manager.query('SELECT DATE_FORMAT(DATE_ADD(?, INTERVAL 1 DAY), \'%Y-%m-%d\') AS nextDate', [date]);
+      const [received] = await manager.query('SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE created_by_id = ? AND method = \'cash\' AND paid_at >= ? AND paid_at < ?', [userId, date, end.nextDate]);
+      const [refunded] = await manager.query('SELECT COALESCE(SUM(amount), 0) AS total FROM refunds WHERE created_by_id = ? AND method = \'cash\' AND refunded_at >= ? AND refunded_at < ?', [userId, date, end.nextDate]);
+      const cashReceived = toCents(String(received.total));
+      const cashRefunded = toCents(String(refunded.total));
+      const expected = cashReceived - cashRefunded;
+      const counted = toCents(input.countedCash.toFixed(2));
+      const variance = counted - expected;
+      const reason = input.reason?.trim() || null;
+      if (variance !== 0n && (!reason || reason.length < 3)) throw new ValidationError('Reason must have at least 3 characters when cash varies');
+      const repo = manager.getRepository(CashierCloseout);
+      const saved = await repo.save(repo.create({ businessDate: date, cashierId: userId!, cashReceived: money(cashReceived), cashRefunded: money(cashRefunded), expectedCash: money(expected), countedCash: money(counted), variance: money(variance), reason }));
+      return closeoutResponse((await repo.findOne({ where: { id: saved.id }, relations: { cashier: true } }))!);
+    });
+  },
   async receipt(paymentId: number) {
     return AppDataSource.transaction('REPEATABLE READ', async (manager) => {
       const payment = await manager.getRepository(Payment).createQueryBuilder('payment')
@@ -60,13 +96,14 @@ export const billingService = {
   },
   async addPayment(invoiceId: number, input: PaymentInput, userId: number | null) {
     return AppDataSource.transaction(async (manager) => {
+      const cashPosting = input.method === 'cash' ? await lockCashier(manager, userId) : null;
       const invoice = await manager.getRepository(Invoice).createQueryBuilder('invoice').setLock('pessimistic_write').where('invoice.id = :id', { id: invoiceId }).getOne();
       if (!invoice) throw new NotFoundError('Invoice not found');
       if (invoice.status === 'cancelled') throw new ConflictError('Cancelled invoice cannot receive payments');
       const balance = cents(invoice.balanceAmount);
       const amountCents = cents(input.amount);
       if (amountCents > balance) throw new ValidationError('Payment cannot exceed invoice balance');
-      await manager.getRepository(Payment).save(manager.getRepository(Payment).create({ invoiceId, amount: input.amount.toFixed(2), method: input.method, referenceNumber: input.referenceNumber ?? null, paidAt: new Date(), createdById: userId }));
+      await manager.getRepository(Payment).save(manager.getRepository(Payment).create({ invoiceId, amount: input.amount.toFixed(2), method: input.method, referenceNumber: input.referenceNumber ?? null, paidAt: cashPosting?.postedAt ?? new Date(), createdById: userId }));
       const paid = cents(invoice.paidAmount) + amountCents; const nextBalance = cents(invoice.total) - paid;
       invoice.paidAmount = (paid / 100).toFixed(2); invoice.balanceAmount = (nextBalance / 100).toFixed(2); invoice.status = nextBalance === 0 ? 'paid' : 'partially_paid';
       await manager.getRepository(Invoice).save(invoice);
@@ -75,6 +112,7 @@ export const billingService = {
   },
   async addRefund(invoiceId: number, input: RefundInput, userId: number | null) {
     return AppDataSource.transaction(async (manager) => {
+      const cashPosting = input.method === 'cash' ? await lockCashier(manager, userId) : null;
       const invoiceRepo = manager.getRepository(Invoice);
       const invoice = await invoiceRepo.createQueryBuilder('invoice').setLock('pessimistic_write').where('invoice.id = :id', { id: invoiceId }).getOne();
       if (!invoice) throw new NotFoundError('Invoice not found');
@@ -86,7 +124,7 @@ export const billingService = {
       const refundedCents = existing.reduce((sum, refund) => sum + cents(refund.amount), 0);
       const amountCents = cents(input.amount);
       if (amountCents > cents(payment.amount) - refundedCents) throw new ValidationError('Refund exceeds the unrefunded payment amount');
-      const refund = await manager.getRepository(Refund).save(manager.getRepository(Refund).create({ invoiceId, paymentId: payment.id, amount: input.amount.toFixed(2), method: input.method, referenceNumber: input.referenceNumber ?? null, reason: input.reason, createdById: userId }));
+      const refund = await manager.getRepository(Refund).save(manager.getRepository(Refund).create({ invoiceId, paymentId: payment.id, amount: input.amount.toFixed(2), method: input.method, referenceNumber: input.referenceNumber ?? null, reason: input.reason, createdById: userId, ...(cashPosting ? { refundedAt: cashPosting.postedAt } : {}) }));
       const paidCents = cents(invoice.paidAmount) - amountCents;
       const balanceCents = cents(invoice.total) - paidCents;
       invoice.paidAmount = (paidCents / 100).toFixed(2);
