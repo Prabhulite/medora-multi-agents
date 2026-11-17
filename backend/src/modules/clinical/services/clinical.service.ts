@@ -24,17 +24,17 @@ export const clinicalService = {
   },
 
   async create(input: CreateClinicalEncounterInput, userId: number | null) {
-    const patient = await AppDataSource.getRepository(Patient).findOne({ where: { id: input.patientId } });
-    if (!patient) throw new NotFoundError('Patient not found');
-    if (input.visitId) {
-      const visit = await AppDataSource.getRepository(PatientVisit).findOne({ where: { id: input.visitId, patientId: input.patientId } });
-      if (!visit) throw new ValidationError('Visit does not belong to this patient');
-    }
-    if (input.doctorId) {
-      const doctor = await AppDataSource.getRepository(Doctor).findOne({ where: { id: input.doctorId, isActive: true } });
-      if (!doctor) throw new ValidationError('Doctor is invalid or inactive');
-    }
     return AppDataSource.transaction(async (manager) => {
+      const patient = await manager.getRepository(Patient).createQueryBuilder('patient').setLock('pessimistic_write').where('patient.id = :id', { id: input.patientId }).getOne();
+      if (!patient || !patient.isActive || patient.mergedIntoPatientId) throw new NotFoundError('Active patient not found');
+      if (input.visitId) {
+        const visit = await manager.getRepository(PatientVisit).findOne({ where: { id: input.visitId, patientId: input.patientId } });
+        if (!visit) throw new ValidationError('Visit does not belong to this patient');
+      }
+      if (input.doctorId) {
+        const doctor = await manager.getRepository(Doctor).findOne({ where: { id: input.doctorId, isActive: true } });
+        if (!doctor) throw new ValidationError('Doctor is invalid or inactive');
+      }
       const diagnosisTerm = input.diagnosisTermId
         ? await manager.getRepository(DiagnosisTerm).findOne({ where: { id: input.diagnosisTermId, isActive: true } })
         : null;

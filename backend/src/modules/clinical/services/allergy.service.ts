@@ -12,7 +12,8 @@ export const allergyService = {
   },
   async create(patientId: number, input: CreateAllergyInput, userId: number | null) {
     return AppDataSource.transaction(async (manager) => {
-      if (!await manager.getRepository(Patient).exist({ where: { id: patientId, isActive: true } })) throw new NotFoundError('Patient not found');
+      const patient = await manager.getRepository(Patient).createQueryBuilder('patient').setLock('pessimistic_write').where('patient.id = :patientId', { patientId }).getOne();
+      if (!patient || !patient.isActive || patient.mergedIntoPatientId) throw new NotFoundError('Active patient not found');
       const existing = await manager.getRepository(PatientAllergy).find({ where: { patientId } });
       if (existing.some((row) => normalized(row.allergen) === normalized(input.allergen))) throw new ConflictError('Allergy already recorded for this patient');
       const allergy = await manager.getRepository(PatientAllergy).save(manager.getRepository(PatientAllergy).create({ patientId, allergen: input.allergen, reaction: input.reaction ?? null, severity: input.severity ?? null, notes: input.notes ?? null }));

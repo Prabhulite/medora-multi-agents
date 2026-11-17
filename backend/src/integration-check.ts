@@ -911,6 +911,9 @@ try {
   await ok('POST', '/api/pharmacy/inventory/dispense', { batchId: stock.id, patientId: 2, quantity: 1, reference: 'IT-MERGE-DISPENSE' });
   await dataSource.query("UPDATE patients SET gender = 'transgender' WHERE id = 2");
   await ok('POST', '/api/patients/merge', { sourcePatientId: 2, targetPatientId: 1 });
+  assert.equal((await request('POST', '/api/clinical/encounters', { patientId: 2, assessment: 'Late merged encounter' })).status, 404);
+  assert.equal((await request('POST', '/api/clinical/patients/2/allergies', { allergen: 'Late merged allergy' })).status, 404);
+  assert.equal((await request('POST', '/api/clinical/patients/2/medical-history', { conditionName: 'Late merged condition' })).status, 404);
   assert.deepEqual((await ok('GET', '/api/patients/search?mrdNumber=IT-MRD-002')).map((row: { id: number }) => row.id), [1]);
   assert.deepEqual((await ok('GET', '/api/patients/search?q=IT-MRD-002')).map((row: { id: number }) => row.id), [1]);
   assert.equal((await ok('GET', '/api/patients/1/audit-logs')).some((row: { action: string; sourceMrdNumber: string | null }) => row.action === 'pharmacy_dispensed' && row.sourceMrdNumber === 'IT-MRD-002'), true);
