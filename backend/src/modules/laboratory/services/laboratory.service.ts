@@ -241,6 +241,12 @@ export const laboratoryService = {
       order.status = 'verified'; order.verifiedAt = new Date(); order.verifiedById = userId; order.criticalResult = input.criticalResult; order.criticalReason = input.criticalReason;
       await repo.save(order);
       await manager.getRepository(PatientAuditLog).save({ patientId: order.patientId, action: 'laboratory_result_verified', changedById: userId, changeSummary: `Laboratory result verified: ${order.orderNumber}${order.criticalResult ? ' (critical)' : ''}`, beforeData: JSON.stringify({ orderId, status: 'processing' }), afterData: JSON.stringify({ orderId, status: 'verified', criticalResult: order.criticalResult }) });
+      if (order.criticalResult && order.doctorId) {
+        const doctor = await manager.getRepository(Doctor).findOne({ where: { id: order.doctorId, isActive: true } });
+        if (doctor?.accountUserId && await manager.getRepository(User).exist({ where: { id: doctor.accountUserId, isActive: true } })) {
+          await manager.getRepository(UserNotification).save({ recipientId: doctor.accountUserId, kind: 'lab_result_critical', sourceId: order.id, title: 'Critical laboratory result verified', message: `Laboratory order ${order.orderNumber} has a verified critical result awaiting direct communication. Contact the laboratory for details.`, route: '/laboratory' });
+        }
+      }
       return orderResponse((await repo.findOneOrFail({ where: { id: orderId }, relations: orderRelations })));
     });
   },

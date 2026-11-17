@@ -1023,7 +1023,7 @@ try {
   assert.equal(routineCorrectionQueue.items[0].attemptCount, 0);
   await ok('POST', `/api/laboratory/orders/${routineContactOrder.id}/communications`, { ...routineContactPayload, resultSummary: 'Updated routine interpretation', occurredAt: new Date().toISOString() }, 201);
   assert.equal((await ok('GET', '/api/laboratory/communication-queue')).total, 0);
-  const criticalOrder = await ok('POST', '/api/laboratory/orders', { patientId: 1, testId: newLabTest.id, priority: 'routine' }, 201);
+  const criticalOrder = await ok('POST', '/api/laboratory/orders', { patientId: 1, testId: newLabTest.id, doctorId: 1, priority: 'routine' }, 201);
   await ok('PATCH', `/api/laboratory/orders/${criticalOrder.id}/collect`, { specimenLabel: 'IT-CRITICAL-SPECIMEN' });
   await ok('PATCH', `/api/laboratory/orders/${criticalOrder.id}/result`, { status: 'processing', resultValue: 'Review result' });
   token = routineVerifierToken;
@@ -1035,6 +1035,9 @@ try {
   const [criticalAudit] = await dataSource.query("SELECT after_data AS afterData FROM patient_audit_logs WHERE action = 'laboratory_result_verified' AND after_data LIKE ? ORDER BY id DESC LIMIT 1", [`%\"orderId\":${criticalOrder.id}%`]);
   assert.equal(JSON.parse(criticalAudit.afterData).criticalResult, true);
   assert.equal(criticalAudit.afterData.includes('Meets the laboratory'), false);
+  const [criticalNotice] = await dataSource.query("SELECT recipient_id AS recipientId, message FROM user_notifications WHERE kind = 'lab_result_critical' AND source_id = ?", [criticalOrder.id]);
+  assert.equal(criticalNotice.recipientId, 3);
+  assert.equal(criticalNotice.message.includes('Review result') || criticalNotice.message.includes('Meets the laboratory'), false);
   const criticalQueue = await ok('GET', '/api/laboratory/communication-queue');
   assert.equal(criticalQueue.items.some((row: { id: number; criticalResult: boolean }) => row.id === criticalOrder.id && row.criticalResult), true);
   await ok('POST', `/api/laboratory/orders/${criticalOrder.id}/communications`, { outcome: 'delivered', method: 'phone', recipientName: 'Dr Integration', resultSummary: 'Critical result conveyed', occurredAt: new Date().toISOString() }, 201);
