@@ -19,6 +19,25 @@ const transferResponse = (row: BedTransfer | null) => row ? { ...row, transferre
 const observationResponse = (row: NursingObservation) => ({ ...row, recordedBy: staffReference(row.recordedBy) });
 
 export const inpatientService = {
+  async dueCarePlans(page: number, pageSize: number) {
+    const query = AppDataSource.getRepository(NursingCarePlan).createQueryBuilder('plan')
+      .innerJoin('plan.admission', 'admission')
+      .innerJoin('admission.patient', 'patient')
+      .innerJoin('admission.bed', 'bed')
+      .innerJoin('bed.ward', 'ward')
+      .where('plan.status = :status AND plan.review_at <= :now', { status: 'active', now: new Date() })
+      .andWhere('admission.status IN (:...statuses)', { statuses: ['admitted', 'transferred'] });
+    const total = await query.clone().getCount();
+    const items = await query.select('plan.id', 'id').addSelect('plan.admissionId', 'admissionId')
+      .addSelect('plan.problem', 'problem').addSelect('plan.reviewAt', 'reviewAt')
+      .addSelect('admission.admissionNumber', 'admissionNumber')
+      .addSelect('patient.mrdNumber', 'patientMrdNumber')
+      .addSelect("CONCAT_WS(' ', patient.firstName, patient.middleName, patient.lastName)", 'patientName')
+      .addSelect('ward.name', 'wardName').addSelect('bed.number', 'bedNumber')
+      .orderBy('plan.reviewAt', 'ASC').addOrderBy('plan.id', 'ASC')
+      .limit(pageSize).offset((page - 1) * pageSize).getRawMany();
+    return { items, total, page, pageSize };
+  },
   async admissionMedicationReview(admissionId: number) {
     const admission = await AppDataSource.getRepository(Admission).findOne({ where: { id: admissionId } });
     if (!admission) throw new NotFoundError('Admission not found');

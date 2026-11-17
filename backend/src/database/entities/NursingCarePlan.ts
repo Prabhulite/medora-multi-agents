@@ -1,8 +1,9 @@
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { Admission } from './Admission.js';
 import { User } from './User.js';
 
 @Entity({ name: 'nursing_care_plans' })
+@Index('IDX_nursing_care_plans_due', ['status', 'reviewAt', 'id'])
 export class NursingCarePlan {
   @PrimaryGeneratedColumn({ unsigned: true }) id!: number;
   @Column({ name: 'admission_id', type: 'int', unsigned: true }) admissionId!: number;

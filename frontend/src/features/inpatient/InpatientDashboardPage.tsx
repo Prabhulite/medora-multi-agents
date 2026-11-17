@@ -12,7 +12,7 @@ import { useAuth } from '../auth/AuthContext';
 import { patientsApi } from '../patients/patients.api';
 import { doctorsApi } from '../doctors/doctors.api';
 import type { Doctor, Patient } from '../../types';
-import { inpatientApi, type Admission, type Bed, type BedTransfer, type CreateAdmissionPayload, type DischargeMedicationReview, type DischargePayload, type NursingObservation, type NursingObservationPayload, type Ward } from './inpatient.api';
+import { inpatientApi, type Admission, type Bed, type BedTransfer, type CreateAdmissionPayload, type DischargeMedicationReview, type DischargePayload, type DueCarePlanPage, type NursingObservation, type NursingObservationPayload, type Ward } from './inpatient.api';
 import './InpatientDashboardPage.css';
 import { MedicationAdministrationPanel } from './MedicationAdministrationPanel';
 import { CarePlanPanel } from './CarePlanPanel';
@@ -54,6 +54,9 @@ export function InpatientDashboardPage() {
   const [medicationTarget, setMedicationTarget] = useState<Admission | null>(null);
   const [admissionReviewTarget, setAdmissionReviewTarget] = useState<Admission | null>(null);
   const [carePlanTarget, setCarePlanTarget] = useState<Admission | null>(null);
+  const [duePage, setDuePage] = useState(1);
+  const [dueCarePlans, setDueCarePlans] = useState<DueCarePlanPage>({ items: [], total: 0, page: 1, pageSize: 10 });
+  const [dueError, setDueError] = useState('');
   const [transfers, setTransfers] = useState<BedTransfer[]>([]);
   const [observations, setObservations] = useState<NursingObservation[]>([]);
 
@@ -71,6 +74,11 @@ export function InpatientDashboardPage() {
   };
 
   useEffect(() => { void load(); }, []);
+  const loadDueCarePlans = async () => {
+    try { setDueCarePlans(await inpatientApi.dueCarePlans(duePage)); setDueError(''); }
+    catch (err) { setDueError(getErrorMessage(err, 'Unable to load due care plans')); }
+  };
+  useEffect(() => { void loadDueCarePlans(); }, [duePage]);
 
   const availableBeds = beds.filter((bed) => bed.status === 'available');
   const occupiedBeds = beds.filter((bed) => bed.status === 'occupied');
@@ -129,6 +137,12 @@ export function InpatientDashboardPage() {
     <div className="inpatient-tabs" role="tablist" aria-label="Inpatient views">
       {(['overview', 'beds', 'admissions'] as Tab[]).map((item) => <button key={item} type="button" role="tab" aria-selected={tab === item} className={tab === item ? 'is-active' : ''} onClick={() => setTab(item)}>{item === 'overview' ? 'Ward overview' : item === 'beds' ? 'Bed board' : 'Admissions'}</button>)}
     </div>
+    {tab === 'overview' ? <section className="inpatient-section inpatient-due-plans" aria-label="Care plans due for review">
+      <div className="inpatient-section-heading"><div><h2>Care plans due for review</h2><p>{dueCarePlans.total} active plan{dueCarePlans.total === 1 ? '' : 's'} past the scheduled review time.</p></div><Button variant="secondary" size="sm" onClick={() => void loadDueCarePlans()}>Refresh</Button></div>
+      {dueError && <Alert tone="error">{dueError}</Alert>}
+      {dueCarePlans.items.length ? <div className="inpatient-due-plans__list">{dueCarePlans.items.map((plan) => <article key={plan.id}><div><strong>{plan.patientName} · {plan.patientMrdNumber}</strong><span>{plan.admissionNumber} · {plan.wardName} / bed {plan.bedNumber}</span><p>{plan.problem}</p><small>Review due {new Date(plan.reviewAt).toLocaleString()}</small></div><Button size="sm" variant="secondary" onClick={() => { const admission = admissions.find((item) => item.id === Number(plan.admissionId)); if (admission) setCarePlanTarget(admission); else { setTab('admissions'); setError('Refresh admissions to open this care plan.'); } }}>Review plan</Button></article>)}</div> : !dueError ? <p className="inpatient-empty">No care plans are due for review.</p> : null}
+      {dueCarePlans.total > dueCarePlans.pageSize ? <div className="inpatient-due-plans__pager"><Button size="sm" variant="secondary" disabled={duePage <= 1} onClick={() => setDuePage((page) => page - 1)}>Previous</Button><span>Page {duePage} of {Math.ceil(dueCarePlans.total / dueCarePlans.pageSize)}</span><Button size="sm" variant="secondary" disabled={duePage * dueCarePlans.pageSize >= dueCarePlans.total} onClick={() => setDuePage((page) => page + 1)}>Next</Button></div> : null}
+    </section> : null}
     {tab === 'overview' ? <section className="inpatient-section"><div className="inpatient-section-heading"><div><h2>Ward overview</h2><p>Occupancy at a glance across configured inpatient units.</p></div><Button variant="secondary" size="sm" onClick={() => void load()}>Refresh</Button></div><div className="ward-grid">{wards.map((ward) => { const available = ward.totalBeds - ward.occupiedBeds; const percent = ward.totalBeds ? Math.round((ward.occupiedBeds / ward.totalBeds) * 100) : 0; return <article className="ward-card" key={ward.id}><div className="ward-card__top"><div><span className="ward-card__code">{ward.code}</span><h3>{ward.name}</h3><p>{ward.floor || 'Floor not specified'} · {ward.specialty || 'General care'}</p></div><Badge tone={ward.status === 'active' ? 'success' : 'neutral'}>{ward.status}</Badge></div><div className="ward-card__meter" aria-label={`${percent}% occupied`}><span style={{ width: `${percent}%` }} /></div><div className="ward-card__stats"><div><strong>{ward.occupiedBeds}</strong><span>Occupied</span></div><div><strong>{available}</strong><span>Available</span></div><div><strong>{ward.totalBeds}</strong><span>Total beds</span></div></div><button type="button" className="ward-card__link" onClick={() => setTab('beds')}>View bed board <span aria-hidden="true">→</span></button></article>; })}</div>{!wards.length && !loading ? <div className="inpatient-empty">No wards are configured yet.</div> : null}</section> : null}
     {tab === 'beds' ? <section className="inpatient-section"><div className="inpatient-section-heading"><div><h2>Bed board</h2><p>See current bed status and patient placement.</p></div><Button variant="secondary" size="sm" onClick={() => void load()}>Refresh</Button></div><Table columns={bedColumns} rows={beds} rowKey={(row) => row.id} loading={loading} searchText={(row) => `${row.bedNumber} ${row.wardName} ${row.patientName || ''}`} searchPlaceholder="Search beds or patients" emptyMessage="No beds found." /></section> : null}
     {tab === 'admissions' ? <section className="inpatient-section"><div className="inpatient-section-heading"><div><h2>Admissions</h2><p>Review current and planned inpatient stays.</p></div><Button size="sm" onClick={() => setShowForm(true)}>New admission</Button></div><Table columns={admissionColumns} rows={admissions} rowKey={(row) => row.id} loading={loading} searchText={(row) => `${row.admissionNumber} ${row.patientName} ${row.patientMrdNumber} ${row.wardName}`} searchPlaceholder="Search admissions" emptyMessage="No admissions found." /></section> : null}
@@ -139,7 +153,7 @@ export function InpatientDashboardPage() {
     {transferTarget ? <TransferPanel admission={transferTarget} availableBeds={availableBeds} transfers={transfers} onClose={() => setTransferTarget(null)} onSave={async (toBedId, reason) => { await inpatientApi.transfer(transferTarget.id, toBedId, reason); setTransfers(await inpatientApi.listTransfers(transferTarget.id)); await load(); }} /> : null}
     {medicationTarget ? <MedicationAdministrationPanel admission={medicationTarget} onClose={() => setMedicationTarget(null)} /> : null}
     {admissionReviewTarget ? <AdmissionMedicationReviewPanel admission={admissionReviewTarget} onClose={() => setAdmissionReviewTarget(null)} /> : null}
-    {carePlanTarget ? <CarePlanPanel admission={carePlanTarget} onClose={() => setCarePlanTarget(null)} /> : null}
+    {carePlanTarget ? <CarePlanPanel admission={carePlanTarget} onClose={() => { setCarePlanTarget(null); void loadDueCarePlans(); }} /> : null}
   </div>;
 }
 

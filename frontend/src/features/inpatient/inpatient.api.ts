@@ -64,6 +64,8 @@ export interface DischargePayload {
 export interface NursingObservation { id: number; observedAt: string; temperatureC: string | null; pulseBpm: number | null; systolicBp: number | null; diastolicBp: number | null; spo2Percent: number | null; notes: string | null; recordedBy?: { fullName: string } | null }
 export interface NursingObservationPayload { temperatureC?: number; pulseBpm?: number; systolicBp?: number; diastolicBp?: number; spo2Percent?: number; notes?: string }
 export interface NursingCarePlan { id: number; problem: string; goal: string; interventions: string; reviewAt: string | null; status: 'active' | 'completed' | 'discontinued'; reviewNote: string | null; closedAt: string | null; createdAt: string; createdBy?: { fullName: string } | null; closedBy?: { fullName: string } | null }
+export interface DueCarePlan { id: number; admissionId: number; problem: string; reviewAt: string; admissionNumber: string; patientMrdNumber: string; patientName: string; wardName: string; bedNumber: string }
+export interface DueCarePlanPage { items: DueCarePlan[]; total: number; page: number; pageSize: number }
 export interface NursingCarePlanPayload { problem: string; goal: string; interventions: string; reviewAt?: string | null }
 export interface BedTransfer { id: number; fromBed: { number: string; ward: { name: string } }; toBed: { number: string; ward: { name: string } }; reason: string; transferredAt: string; transferredBy?: { fullName: string } | null }
 export interface MedicationOrder { id: number; medicineName: string; dosage: string | null; frequency: string | null; route: string; status: string }
@@ -122,6 +124,7 @@ export const inpatientApi = {
   listWards: async () => (await getOrFallback<any[]>('/inpatient/wards', [])).map(mapWard),
   listBeds: async () => (await getOrFallback<any[]>('/inpatient/beds', [])).map(mapBed),
   listAdmissions: async () => (await getOrFallback<any[]>('/inpatient/admissions', [])).map(mapAdmission),
+  dueCarePlans: async (page: number) => (await api.get<ApiEnvelope<DueCarePlanPage>>('/inpatient/care-plans/due', { params: { page, pageSize: 10 } })).data.data,
   createAdmission: async (payload: CreateAdmissionPayload) => {
     const response = await api.post<ApiEnvelope<any>>('/inpatient/admissions', { patientId: payload.patientId, bedId: payload.bedId, doctorId: payload.doctorId || null, reason: payload.diagnosis || null, notes: payload.notes || null });
     return mapAdmission(response.data.data);

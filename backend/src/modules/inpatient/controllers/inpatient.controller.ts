@@ -3,6 +3,7 @@ import { sendCreated, sendSuccess } from '../../../shared/utils/response.js';
 import { inpatientService } from '../services/inpatient.service.js';
 
 export const inpatientController = {
+  async dueCarePlans(req: Request, res: Response) { return sendSuccess(res, await inpatientService.dueCarePlans(Number(req.query.page), Number(req.query.pageSize)), 'Due care plans fetched'); },
   async carePlans(req: Request, res: Response) { return sendSuccess(res, await inpatientService.carePlans(Number(req.params.id)), 'Care plans fetched'); },
   async addCarePlan(req: Request, res: Response) { return sendCreated(res, await inpatientService.addCarePlan(Number(req.params.id), req.body, req.user?.id ?? null), 'Care plan created'); },
   async closeCarePlan(req: Request, res: Response) { return sendSuccess(res, await inpatientService.closeCarePlan(Number(req.params.id), Number(req.params.planId), req.body, req.user?.id ?? null), 'Care plan closed'); },

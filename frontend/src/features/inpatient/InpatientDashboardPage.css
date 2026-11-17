@@ -53,3 +53,11 @@
   .inpatient-discharge-sheet__actions, .inpatient-discharge-sheet .inpatient-modal__header > button { display: none !important; }
   .inpatient-discharge-sheet__body section { break-inside: avoid; }
 }
+.inpatient-due-plans__list { display: grid; gap: 8px; }
+.inpatient-due-plans__list article { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 14px; border: 1px solid #e0e9e3; border-radius: 10px; background: #fff; }
+.inpatient-due-plans__list article div { display: grid; gap: 3px; min-width: 0; }
+.inpatient-due-plans__list article strong { color: #173b29; }
+.inpatient-due-plans__list article span, .inpatient-due-plans__list article small { color: #5b7164; }
+.inpatient-due-plans__list article p { margin: 2px 0; overflow-wrap: anywhere; }
+.inpatient-due-plans__pager { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 12px; }
+@media (max-width: 650px) { .inpatient-due-plans__list article { align-items: flex-start; flex-direction: column; } }
