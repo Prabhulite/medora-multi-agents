@@ -35,7 +35,7 @@ function formatDate(value: string | null) {
 
 export function InpatientDashboardPage() {
   const { user } = useAuth();
-  const canDischarge = hasPermission(user, 'inpatient.update') && hasPermission(user, 'clinical.update');
+  const canDischarge = ['inpatient.view', 'inpatient.update', 'clinical.view', 'clinical.update'].every((permission) => hasPermission(user, permission));
   const [tab, setTab] = useState<Tab>('overview');
   const [wards, setWards] = useState<Ward[]>([]);
   const [beds, setBeds] = useState<Bed[]>([]);
@@ -183,6 +183,7 @@ function DischargeSummaryView({ admission, onClose }: { admission: Admission; on
         <section><h3>Clinical summary</h3><p>{admission.dischargeSummary || 'No clinical summary recorded.'}</p></section>
         <section><h3>Discharge diagnosis</h3><p>{admission.dischargeDiagnosis || 'Not recorded.'}</p></section>
         <section><h3>Medication review</h3>{loadingReview ? <p>Loading medication review…</p> : reviewError ? <Alert tone="error">{reviewError}</Alert> : review?.medicationsReviewedAt ? <><p>Reviewed {new Date(review.medicationsReviewedAt).toLocaleString('en-IN')}</p>{review.items.length ? review.items.map((item) => <article key={item.id} className="inpatient-discharge-sheet__medication"><strong>{item.medicineName} · {item.decision}</strong><p>{[item.dosage, item.frequency, item.route].filter(Boolean).join(' · ')}</p><p>{item.decision === 'continue' ? item.instructions : `Stopped: ${item.reason}`}</p></article>) : <p>No active prescriptions at discharge.</p>}</> : <p>Historical discharge: no structured medication review recorded.</p>}</section>
+        {review?.medicationsReviewedAt && <section><h3>Reported home medicine review</h3>{review.homeItems?.length ? review.homeItems.map((item) => <article key={item.id} className="inpatient-discharge-sheet__medication"><strong>{item.medicineName} · {item.decision}</strong><p>{[item.dosage, item.frequency, item.route, `Source: ${item.source}`].filter(Boolean).join(' · ')}</p><p>{item.decision === 'continue' ? item.instructions : `Stopped: ${item.reason}`}</p></article>) : <p>No current reported home medicines at discharge.</p>}</section>}
         <section><h3>Additional medication instructions</h3><p>{admission.dischargeMedications || 'No additional instructions recorded. See medication review above.'}</p></section>
         <section><h3>Follow-up instructions</h3><p>{admission.followUpInstructions || 'Not recorded.'}</p></section>
       </div>

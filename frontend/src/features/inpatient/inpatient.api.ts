@@ -57,6 +57,8 @@ export interface DischargePayload {
   dischargeMedications?: string | null;
   medicationsReviewed: true;
   medicationReview: ({ prescriptionId: number; decision: 'continue'; instructions: string } | { prescriptionId: number; decision: 'stop'; reason: string })[];
+  homeMedicationsReviewed: true;
+  homeMedicationReview: ({ homeMedicationId: number; decision: 'continue'; instructions: string } | { homeMedicationId: number; decision: 'stop'; reason: string })[];
   followUpInstructions?: string | null;
 }
 export interface NursingObservation { id: number; observedAt: string; temperatureC: string | null; pulseBpm: number | null; systolicBp: number | null; diastolicBp: number | null; spo2Percent: number | null; notes: string | null; recordedBy?: { fullName: string } | null }
@@ -66,7 +68,7 @@ export interface NursingCarePlanPayload { problem: string; goal: string; interve
 export interface BedTransfer { id: number; fromBed: { number: string; ward: { name: string } }; toBed: { number: string; ward: { name: string } }; reason: string; transferredAt: string; transferredBy?: { fullName: string } | null }
 export interface MedicationOrder { id: number; medicineName: string; dosage: string | null; frequency: string | null; route: string; status: string }
 export interface MedicationAdministration { id: number; prescriptionId: number; prescription: MedicationOrder; outcome: 'given' | 'withheld' | 'refused'; doseGiven: string | null; route: string | null; notes: string | null; recordedAt: string; administeredBy?: { fullName: string } | null }
-export interface DischargeMedicationReview { medicationsReviewedAt: string | null; medicationsReviewedById: number | null; items: { id: number; prescriptionId: number; medicineName: string; dosage: string | null; frequency: string | null; route: string; decision: 'continue' | 'stop'; instructions: string | null; reason: string | null; reviewedAt: string; reviewedBy: { id: number; fullName: string } | null }[] }
+export interface DischargeMedicationReview { medicationsReviewedAt: string | null; medicationsReviewedById: number | null; items: { id: number; prescriptionId: number; medicineName: string; dosage: string | null; frequency: string | null; route: string; decision: 'continue' | 'stop'; instructions: string | null; reason: string | null; reviewedAt: string; reviewedBy: { id: number; fullName: string } | null }[]; homeItems: { id: number; homeMedicationId: number; medicineName: string; dosage: string | null; frequency: string | null; route: string | null; source: string; decision: 'continue' | 'stop'; instructions: string | null; reason: string | null; reviewedAt: string; reviewedBy: { id: number; fullName: string } | null }[] }
 export interface MedicationAdministrationPayload { prescriptionId: number; outcome: MedicationAdministration['outcome']; doseGiven?: string; route?: string; notes?: string }
 
 export interface CreateAdmissionPayload {

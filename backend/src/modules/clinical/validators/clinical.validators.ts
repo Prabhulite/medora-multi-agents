@@ -3,6 +3,10 @@ import { z } from 'zod';
 const optionalText = (max: number) => z.union([z.string().trim().max(max), z.literal('')]).nullable().optional().transform((value) => value === '' ? null : value);
 
 export const patientClinicalParamSchema = z.object({ patientId: z.coerce.number().int().positive() });
+export const homeMedicationParamSchema = patientClinicalParamSchema.extend({ id: z.coerce.number().int().positive() });
+export const createHomeMedicationSchema = z.object({ medicineName: z.string().trim().min(2).max(160), dosage: z.string().trim().max(80).nullable().optional(), frequency: z.string().trim().max(80).nullable().optional(), route: z.string().trim().max(40).nullable().optional(), source: z.enum(['patient', 'caregiver', 'records', 'other']), sourceDetail: z.string().trim().max(500).nullable().optional() });
+export const ceaseHomeMedicationSchema = z.object({ reason: z.string().trim().min(5).max(500) });
+export type CreateHomeMedicationInput = z.infer<typeof createHomeMedicationSchema>;
 export const consentParamSchema = patientClinicalParamSchema.extend({ consentId: z.coerce.number().int().positive() });
 export const createConsentSchema = z.object({
   consentType: z.enum(['general', 'procedure', 'investigation', 'transfusion', 'anaesthesia', 'other']),

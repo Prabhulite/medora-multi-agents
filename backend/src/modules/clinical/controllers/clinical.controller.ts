@@ -6,8 +6,12 @@ import { medicalHistoryService } from '../services/medical-history.service.js';
 import { consentService } from '../services/consent.service.js';
 import { timelineService } from '../services/timeline.service.js';
 import { diagnosisService } from '../services/diagnosis.service.js';
+import { homeMedicationService } from '../services/home-medication.service.js';
 
 export const clinicalController = {
+  async listHomeMedications(req: Request, res: Response) { return sendSuccess(res, await homeMedicationService.list(Number(req.params.patientId)), 'Home medication history fetched'); },
+  async createHomeMedication(req: Request, res: Response) { return sendCreated(res, await homeMedicationService.create(Number(req.params.patientId), req.body, req.user!.id), 'Home medication history recorded'); },
+  async ceaseHomeMedication(req: Request, res: Response) { return sendSuccess(res, await homeMedicationService.cease(Number(req.params.patientId), Number(req.params.id), req.body.reason, req.user!.id), 'Home medication marked not current'); },
   async listDiagnoses(req: Request, res: Response) {
     return sendSuccess(res, await diagnosisService.list(String(req.query.search ?? '')), 'Diagnosis terms fetched');
   },

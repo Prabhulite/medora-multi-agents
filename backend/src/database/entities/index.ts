@@ -9,6 +9,8 @@ export { Ward } from './Ward.js';
 export { Bed } from './Bed.js';
 export { Admission } from './Admission.js';
 export { DischargeMedicationReview } from './DischargeMedicationReview.js';
+export { HomeMedication } from './HomeMedication.js';
+export { DischargeHomeMedicationReview } from './DischargeHomeMedicationReview.js';
 export { NursingObservation } from './NursingObservation.js';
 export { Invoice } from './Invoice.js';
 export { InvoiceItem } from './InvoiceItem.js';

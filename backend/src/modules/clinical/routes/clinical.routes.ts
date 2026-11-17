@@ -4,10 +4,13 @@ import { authorize } from '../../../middleware/authorize.js';
 import { validate } from '../../../middleware/validate.js';
 import { asyncHandler } from '../../../shared/utils/asyncHandler.js';
 import { clinicalController } from '../controllers/clinical.controller.js';
-import { allergyParamSchema, clinicalEncounterIdParamSchema, consentParamSchema, createAllergySchema, createClinicalEncounterSchema, createConsentSchema, createDiagnosisTermSchema, createEncounterAddendumSchema, createMedicalHistorySchema, diagnosisTermParamSchema, diagnosisTermQuerySchema, medicalHistoryParamSchema, patientClinicalParamSchema, revokeConsentSchema } from '../validators/clinical.validators.js';
+import { allergyParamSchema, ceaseHomeMedicationSchema, clinicalEncounterIdParamSchema, consentParamSchema, createAllergySchema, createClinicalEncounterSchema, createConsentSchema, createDiagnosisTermSchema, createEncounterAddendumSchema, createHomeMedicationSchema, createMedicalHistorySchema, diagnosisTermParamSchema, diagnosisTermQuerySchema, homeMedicationParamSchema, medicalHistoryParamSchema, patientClinicalParamSchema, revokeConsentSchema } from '../validators/clinical.validators.js';
 
 const router = Router();
 router.use(authenticate);
+router.get('/patients/:patientId/home-medications', authorize('clinical.view'), validate(patientClinicalParamSchema, 'params'), asyncHandler(clinicalController.listHomeMedications));
+router.post('/patients/:patientId/home-medications', authorize('clinical.create'), validate(patientClinicalParamSchema, 'params'), validate(createHomeMedicationSchema), asyncHandler(clinicalController.createHomeMedication));
+router.post('/patients/:patientId/home-medications/:id/cease', authorize('clinical.create'), validate(homeMedicationParamSchema, 'params'), validate(ceaseHomeMedicationSchema), asyncHandler(clinicalController.ceaseHomeMedication));
 router.get('/diagnoses', authorize('clinical.view'), validate(diagnosisTermQuerySchema, 'query'), asyncHandler(clinicalController.listDiagnoses));
 router.post('/diagnoses', authorize('clinical.catalog.manage'), validate(createDiagnosisTermSchema), asyncHandler(clinicalController.createDiagnosis));
 router.patch('/diagnoses/:id/deactivate', authorize('clinical.catalog.manage'), validate(diagnosisTermParamSchema, 'params'), asyncHandler(clinicalController.deactivateDiagnosis));

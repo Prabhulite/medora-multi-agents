@@ -7,6 +7,7 @@ import { Select } from '../../components/ui/Select';
 import { getErrorMessage } from '../../lib/api';
 import { hasPermission } from '../../lib/permissions';
 import type { ClinicalEncounter } from '../../types';
+import { HomeMedicationPanel } from './HomeMedicationPanel';
 import { useAuth } from '../auth/AuthContext';
 import { clinicalApi } from './clinical.api';
 import { prescriptionsApi } from './prescriptions.api';
@@ -184,6 +185,7 @@ export function ClinicalEncountersPanel({ patientId, onAllergiesChanged }: { pat
       <div className="pd-card__head"><h3>Clinical Encounters</h3><Badge tone="info">EMR</Badge></div>
       {error ? <Alert tone="error">{error}</Alert> : null}
       <ConsentPanel patientId={patientId} canCreate={canCreateClinical} />
+      <HomeMedicationPanel patientId={patientId} canCreate={canCreateClinical} />
       <div className="clinical-prescription-section">
         <h4>Medical history</h4>
         {medicalHistory.length ? medicalHistory.map((item) => <div key={item.id} className="pd-visit-row"><div><div className="ui-table__cell-title">{item.conditionName}</div><div className="ui-table__cell-sub">{[item.diagnosedOn ? `Diagnosed: ${item.diagnosedOn}` : null, item.notes].filter(Boolean).join(' · ') || 'Date and notes not recorded'}</div></div>{canCreateClinical ? <Button size="sm" variant="secondary" disabled={busy} onClick={() => void removeMedicalHistory(item.id)}>Remove</Button> : null}</div>) : <p className="pd-empty">No medical history recorded.</p>}

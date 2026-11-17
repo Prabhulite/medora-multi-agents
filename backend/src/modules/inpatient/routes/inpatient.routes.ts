@@ -22,5 +22,5 @@ router.get('/admissions/:id/transfers', authorize('inpatient.view'), validate(ad
 router.post('/admissions/:id/transfers', authorize('inpatient.update'), validate(admissionIdParamSchema, 'params'), validate(transferBedSchema), asyncHandler(inpatientController.transfer));
 router.get('/admissions/:id/observations', authorize('inpatient.view'), validate(admissionIdParamSchema, 'params'), asyncHandler(inpatientController.observations));
 router.post('/admissions/:id/observations', authorize('inpatient.update'), validate(admissionIdParamSchema, 'params'), validate(nursingObservationSchema), asyncHandler(inpatientController.addObservation));
-router.patch('/admissions/:id/discharge', authorize('inpatient.update', 'clinical.update'), validate(admissionIdParamSchema, 'params'), validate(dischargeSummarySchema), asyncHandler(inpatientController.discharge));
+router.patch('/admissions/:id/discharge', authorize('inpatient.view', 'inpatient.update', 'clinical.view', 'clinical.update'), validate(admissionIdParamSchema, 'params'), validate(dischargeSummarySchema), asyncHandler(inpatientController.discharge));
 export default router;
