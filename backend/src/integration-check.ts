@@ -482,6 +482,7 @@ try {
   assert.equal((await ok('GET', '/api/patients/1/audit-logs')).some((row: { action: string; changeSummary: string }) => row.action === 'laboratory_sample_collected' && row.changeSummary.includes(laboratory.orderNumber)), true);
   assert.equal((await request('POST', `/api/laboratory/orders/${laboratory.id}/cancel`, { reason: 'Too late to cancel' })).status, 409);
   assert.equal((await request('POST', `/api/laboratory/orders/${laboratory.id}/release`)).status, 409);
+  assert.equal((await request('POST', `/api/laboratory/orders/${laboratory.id}/communications`, { outcome: 'attempted', method: 'phone', recipientName: 'Dr Integration', resultSummary: 'Early contact', occurredAt: new Date().toISOString() })).status, 409);
   assert.equal((await request('POST', `/api/laboratory/orders/${laboratory.id}/addenda`, { reason: 'Corrected observation', addendum: 'Updated interpretation' })).status, 409);
   assert.equal((await ok('PATCH', `/api/laboratory/orders/${laboratory.id}/result`, { status: 'processing', resultValue: 'Normal' })).status, 'processing');
   assert.equal((await request('POST', `/api/laboratory/orders/${laboratory.id}/verify`, { patientAndSpecimenChecked: false, qualityControlChecked: true })).status, 422);
@@ -498,6 +499,7 @@ try {
   const maskedDraft = (await ok('GET', '/api/laboratory/orders?patientId=1')).find((row: { id: number }) => row.id === laboratory.id);
   assert.equal(maskedDraft.resultValue, null);
   assert.equal((await request('POST', `/api/laboratory/orders/${laboratory.id}/verify`, { patientAndSpecimenChecked: true, qualityControlChecked: true })).status, 403);
+  assert.equal((await request('POST', `/api/laboratory/orders/${laboratory.id}/communications`, { outcome: 'attempted', method: 'phone', recipientName: 'Dr Integration', resultSummary: 'Unauthorized contact', occurredAt: new Date().toISOString() })).status, 403);
   token = adminToken;
   await dataSource.query('INSERT INTO users (employee_id,username,full_name,password_hash,is_active,is_super_admin,session_version) VALUES (?,?,?,?,1,1,1)', ['IT-LAB-VERIFIER', 'integration_lab_verifier', 'Integration Lab Verifier', hash]);
   token = (await ok('POST', '/api/auth/login', { username: 'integration_lab_verifier', password: 'Temporary!Pass123' })).token;
@@ -508,6 +510,14 @@ try {
   assert.equal((await request('PATCH', `/api/laboratory/orders/${laboratory.id}/result`, { status: 'processing', resultValue: 'Changed after verification' })).status, 409);
   token = adminToken;
   assert.equal((await ok('POST', `/api/laboratory/orders/${laboratory.id}/release`)).status, 'completed');
+  const laboratoryContact = { outcome: 'attempted', method: 'phone', recipientName: 'Dr Integration', resultSummary: 'Urgent laboratory result relayed', occurredAt: new Date().toISOString() };
+  assert.equal((await request('POST', `/api/laboratory/orders/${laboratory.id}/communications`, { ...laboratoryContact, recipientName: 'X' })).status, 422);
+  assert.equal((await request('POST', `/api/laboratory/orders/${laboratory.id}/communications`, { ...laboratoryContact, occurredAt: new Date(Date.now() + 10 * 60_000).toISOString() })).status, 422);
+  const laboratoryAttempt = await ok('POST', `/api/laboratory/orders/${laboratory.id}/communications`, laboratoryContact, 201);
+  assert.equal(laboratoryAttempt.outcome, 'attempted');
+  const laboratoryDelivery = await ok('POST', `/api/laboratory/orders/${laboratory.id}/communications`, { ...laboratoryContact, outcome: 'delivered' }, 201);
+  assert.equal((await ok('GET', `/api/laboratory/orders/${laboratory.id}/communications`)).map((row: { id: number }) => row.id).join(','), `${laboratoryAttempt.id},${laboratoryDelivery.id}`);
+  assert.equal((await ok('GET', '/api/patients/1/audit-logs')).some((row: { action: string }) => row.action === 'laboratory_result_communication'), true);
   assert.equal((await request('POST', `/api/laboratory/orders/${laboratory.id}/release`)).status, 409);
   assert.equal((await request('POST', `/api/laboratory/orders/${laboratory.id}/addenda`, { reason: 'short', addendum: '' })).status, 422);
   const labAddendum = await ok('POST', `/api/laboratory/orders/${laboratory.id}/addenda`, { reason: 'Corrected interpretation', addendum: 'Interpret as within expected limits' }, 201);

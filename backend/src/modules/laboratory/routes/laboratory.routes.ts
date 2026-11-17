@@ -4,7 +4,7 @@ import { authorize } from '../../../middleware/authorize.js';
 import { validate } from '../../../middleware/validate.js';
 import { asyncHandler } from '../../../shared/utils/asyncHandler.js';
 import { laboratoryController } from '../controllers/laboratory.controller.js';
-import { cancelLaboratoryOrderSchema, collectLaboratorySampleSchema, createLaboratoryAddendumSchema, createLaboratoryOrderSchema, createLaboratoryTestSchema, laboratoryDoctorLookupSchema, laboratoryOrderIdParamSchema, laboratoryOrderListSchema, laboratoryPatientLookupSchema, laboratoryTestIdParamSchema, updateLaboratoryResultSchema, verifyLaboratoryResultSchema } from '../validators/laboratory.validators.js';
+import { cancelLaboratoryOrderSchema, collectLaboratorySampleSchema, createLaboratoryAddendumSchema, createLaboratoryCommunicationSchema, createLaboratoryOrderSchema, createLaboratoryTestSchema, laboratoryDoctorLookupSchema, laboratoryOrderIdParamSchema, laboratoryOrderListSchema, laboratoryPatientLookupSchema, laboratoryTestIdParamSchema, updateLaboratoryResultSchema, verifyLaboratoryResultSchema } from '../validators/laboratory.validators.js';
 const router = Router(); router.use(authenticate);
 router.get('/tests', authorize('laboratory.view'), asyncHandler(laboratoryController.listTests));
 router.get('/tests/all', authorize('laboratory.catalog.manage'), asyncHandler(laboratoryController.listAllTests));
@@ -22,4 +22,6 @@ router.post('/orders/:id/verify', authorize('laboratory.verify'), validate(labor
 router.post('/orders/:id/release', authorize('laboratory.release'), validate(laboratoryOrderIdParamSchema, 'params'), asyncHandler(laboratoryController.releaseResult));
 router.get('/orders/:id/addenda', authorize('laboratory.view'), validate(laboratoryOrderIdParamSchema, 'params'), asyncHandler(laboratoryController.listAddenda));
 router.post('/orders/:id/addenda', authorize('laboratory.amend'), validate(laboratoryOrderIdParamSchema, 'params'), validate(createLaboratoryAddendumSchema), asyncHandler(laboratoryController.addAddendum));
+router.get('/orders/:id/communications', authorize('laboratory.view'), validate(laboratoryOrderIdParamSchema, 'params'), asyncHandler(laboratoryController.listCommunications));
+router.post('/orders/:id/communications', authorize('laboratory.release'), validate(laboratoryOrderIdParamSchema, 'params'), validate(createLaboratoryCommunicationSchema), asyncHandler(laboratoryController.recordCommunication));
 export default router;

@@ -17,4 +17,6 @@ export const laboratoryController = {
   releaseResult: async (req: Request, res: Response) => res.json({ success: true, data: await laboratoryService.releaseResult(Number(req.params.id), req.user!.id) }),
   listAddenda: async (req: Request, res: Response) => res.json({ success: true, data: await laboratoryService.listAddenda(Number(req.params.id)) }),
   addAddendum: async (req: Request, res: Response) => res.status(201).json({ success: true, data: await laboratoryService.addAddendum(Number(req.params.id), req.body, req.user!.id) }),
+  listCommunications: async (req: Request, res: Response) => res.json({ success: true, data: await laboratoryService.listCommunications(Number(req.params.id)) }),
+  recordCommunication: async (req: Request, res: Response) => res.status(201).json({ success: true, data: await laboratoryService.recordCommunication(Number(req.params.id), req.body, req.user!.id) }),
 };

@@ -10,10 +10,10 @@ import { Table, type TableColumn } from '../../components/ui/Table';
 import { getErrorMessage } from '../../lib/api';
 import { hasPermission } from '../../lib/permissions';
 import { useAuth } from '../auth/AuthContext';
-import { laboratoryApi, type CreateLaboratoryOrderPayload, type CreateLaboratoryTestPayload, type LaboratoryAddendum, type LaboratoryDoctorCandidate, type LaboratoryOrder, type LaboratoryPatientCandidate, type LaboratoryTest, type UpdateLaboratoryResultPayload } from './laboratory.api';
+import { laboratoryApi, type CreateLaboratoryOrderPayload, type CreateLaboratoryTestPayload, type LaboratoryAddendum, type LaboratoryCommunication, type LaboratoryDoctorCandidate, type LaboratoryOrder, type LaboratoryPatientCandidate, type LaboratoryTest, type UpdateLaboratoryResultPayload } from './laboratory.api';
 import './LaboratoryDiagnosticsPage.css';
 
-type Modal = 'order' | 'catalog' | 'collect' | 'result' | 'verify' | 'view' | null;
+type Modal = 'order' | 'catalog' | 'collect' | 'result' | 'verify' | 'view' | 'communications' | null;
 
 const statusTone: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'neutral'> = {
   ordered: 'info', collected: 'warning', processing: 'warning', verified: 'info', completed: 'success', cancelled: 'danger',
@@ -79,6 +79,7 @@ export function LaboratoryDiagnosticsPage() {
       {row.status === 'processing' && canVerify && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('verify'); }}>Verify</Button>}
       {row.status === 'verified' && canRelease && <Button size="sm" onClick={() => setReleaseTarget(row)}>Release</Button>}
       {(row.status === 'completed' || row.status === 'verified' && (canUpdate || canVerify || canRelease)) && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('view'); }}>View result</Button>}
+      {row.status === 'completed' && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('communications'); }}>Communications</Button>}
     </div> },
   ], [canUpdate, canVerify, canRelease, canCancel]);
 
@@ -175,6 +176,7 @@ export function LaboratoryDiagnosticsPage() {
     {modal === 'result' && selectedOrder ? <ResultForm order={selectedOrder} saving={saving} error={error} onClose={() => { setModal(null); setSelectedOrder(null); }} onSubmit={(payload) => void saveResult(payload)} /> : null}
     {modal === 'verify' && selectedOrder ? <VerifyForm order={selectedOrder} saving={saving} error={error} onClose={() => { setModal(null); setSelectedOrder(null); }} onSubmit={() => void verifyResult()} /> : null}
     {modal === 'view' && selectedOrder ? <ResultView order={selectedOrder} canAmend={canAmend} onClose={() => { setModal(null); setSelectedOrder(null); }} /> : null}
+    {modal === 'communications' && selectedOrder ? <CommunicationView order={selectedOrder} canRecord={canRelease} onClose={() => { setModal(null); setSelectedOrder(null); }} /> : null}
     <ConfirmDialog open={Boolean(releaseTarget)} title="Release laboratory result" message="Release this verified result to the care team? The released result cannot be edited in place." confirmLabel="Release result" confirming={saving} onConfirm={() => void releaseResult()} onCancel={() => setReleaseTarget(null)} />
     <ConfirmDialog open={Boolean(retireTarget)} title="Retire laboratory test" message={`Retire ${retireTarget?.name || 'this test'} from new orders? Existing orders remain available.`} confirmLabel="Retire test" tone="danger" confirming={saving} onConfirm={() => void retireTest()} onCancel={() => setRetireTarget(null)} />
     {cancelTarget && <ModalShell title="Cancel laboratory order" eyebrow={cancelTarget.orderNumber} onClose={() => setCancelTarget(null)}><form className="laboratory-form" onSubmit={(event) => { event.preventDefault(); void cancelOrder(); }}><p>Cancel the uncollected order for {cancelTarget.patientName || `patient #${cancelTarget.patientId}`}?</p><label className="laboratory-textarea"><span>Reason</span><textarea required minLength={5} maxLength={500} rows={3} value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} /></label>{error && <Alert tone="error">{error}</Alert>}<FormFooter saving={saving} onClose={() => setCancelTarget(null)} submitLabel="Cancel order" disabled={cancelReason.trim().length < 5} /></form></ModalShell>}
@@ -269,6 +271,48 @@ function ResultView({ order, canAmend, onClose }: { order: LaboratoryOrder; canA
     {error && <Alert tone="error">{error}</Alert>}
     <div className="laboratory-modal__footer laboratory-report__actions"><Button type="button" variant="secondary" onClick={onClose}>Close</Button>{released && <Button type="button" disabled={loadingAddenda || Boolean(error)} onClick={() => window.print()}>Print report</Button>}</div>
   </div>{released && canAmend && <form className="laboratory-form laboratory-report__correction" onSubmit={(event) => void saveAddendum(event)}><h3>Add a correction</h3><Input label="Reason" required minLength={5} maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} /><label className="laboratory-textarea"><span>Addendum</span><textarea required rows={4} maxLength={10000} value={addendum} onChange={(event) => setAddendum(event.target.value)} /></label><Button type="submit" loading={savingAddendum} disabled={savingAddendum || reason.trim().length < 5 || !addendum.trim()}>Save addendum</Button></form>}</ModalShell>;
+}
+
+function CommunicationView({ order, canRecord, onClose }: { order: LaboratoryOrder; canRecord: boolean; onClose: () => void }) {
+  const [rows, setRows] = useState<LaboratoryCommunication[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [form, setForm] = useState({ outcome: 'attempted' as LaboratoryCommunication['outcome'], method: 'phone' as LaboratoryCommunication['method'], recipientName: '', resultSummary: '', note: '', occurredAt: new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16) });
+  useEffect(() => {
+    let active = true;
+    laboratoryApi.listCommunications(order.id).then((items) => { if (active) setRows(items); }).catch((err) => { if (active) setError(getErrorMessage(err, 'Unable to load result communications')); }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [order.id]);
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault(); setSaving(true); setError('');
+    try {
+      const item = await laboratoryApi.recordCommunication(order.id, { outcome: form.outcome, method: form.method, recipientName: form.recipientName.trim(), resultSummary: form.resultSummary.trim(), note: form.note.trim() || null, occurredAt: new Date(form.occurredAt).toISOString() });
+      setRows((current) => [...current, item]);
+      setForm((current) => ({ ...current, resultSummary: '', note: '' }));
+    } catch (err) { setError(getErrorMessage(err, 'Unable to record result communication')); }
+    finally { setSaving(false); }
+  };
+  return <ModalShell title={`Result communications · ${order.testName}`} eyebrow={order.orderNumber} onClose={onClose}>
+    <div className="laboratory-form">
+      <div className="laboratory-result-context"><strong>{order.patientName || `Patient #${order.patientId}`}</strong><span>{order.patientMrdNumber || `Patient ID ${order.patientId}`}</span></div>
+      <Alert tone="warning">Record actual contact attempts and confirmed delivery. An in-app notification does not confirm receipt.</Alert>
+      {error && <Alert tone="error">{error}</Alert>}
+      <section className="laboratory-report__communications"><h3>Contact history</h3>{loading ? <p>Loading…</p> : rows.length ? rows.map((row) => <article key={row.id}><strong>{row.outcome === 'delivered' ? 'Delivered' : 'Attempted'} · {dateLabel(row.occurredAt)}</strong><p>{row.method.replace('_', ' ')} · {row.recipientName}</p><p>{row.resultSummary}</p>{row.note && <p>{row.note}</p>}<small>Recorded by {row.recorderName || 'Former user'} · {dateLabel(row.createdAt)}</small></article>) : <p>No communication recorded.</p>}</section>
+    </div>
+    {canRecord && <form className="laboratory-form laboratory-report__contact-form" onSubmit={(event) => void save(event)}>
+      <h3>Record contact</h3>
+      <div className="laboratory-form__grid">
+        <Select label="Outcome" value={form.outcome} onChange={(event) => setForm((current) => ({ ...current, outcome: event.target.value as LaboratoryCommunication['outcome'] }))} options={[{ value: 'attempted', label: 'Attempted contact' }, { value: 'delivered', label: 'Delivered to recipient' }]} />
+        <Select label="Method" value={form.method} onChange={(event) => setForm((current) => ({ ...current, method: event.target.value as LaboratoryCommunication['method'] }))} options={[{ value: 'phone', label: 'Phone' }, { value: 'in_person', label: 'In person' }, { value: 'secure_message', label: 'Secure message with receipt' }, { value: 'other', label: 'Other' }]} />
+        <Input label="Recipient name" required maxLength={160} value={form.recipientName} onChange={(event) => setForm((current) => ({ ...current, recipientName: event.target.value }))} />
+        <Input label="Contact time" type="datetime-local" required value={form.occurredAt} onChange={(event) => setForm((current) => ({ ...current, occurredAt: event.target.value }))} />
+      </div>
+      <label className="laboratory-textarea"><span>Result communicated</span><textarea required minLength={5} maxLength={1000} rows={3} value={form.resultSummary} onChange={(event) => setForm((current) => ({ ...current, resultSummary: event.target.value }))} /></label>
+      <label className="laboratory-textarea"><span>Notes (optional)</span><textarea maxLength={1000} rows={2} value={form.note} onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))} /></label>
+      <Button type="submit" loading={saving} disabled={saving || !form.occurredAt || form.recipientName.trim().length < 2 || form.resultSummary.trim().length < 5}>Record communication</Button>
+    </form>}
+  </ModalShell>;
 }
 
 function FormFooter({ saving, onClose, submitLabel, disabled = false }: { saving: boolean; onClose: () => void; submitLabel: string; disabled?: boolean }) {

@@ -1,8 +1,8 @@
 import { AppDataSource } from '../../../config/data-source.js';
-import { Doctor, LaboratoryOrder, LaboratoryResultAddendum, LaboratoryTest, Patient, PatientAuditLog, User, UserNotification } from '../../../database/entities/index.js';
+import { Doctor, LaboratoryCommunication, LaboratoryOrder, LaboratoryResultAddendum, LaboratoryTest, Patient, PatientAuditLog, User, UserNotification } from '../../../database/entities/index.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { nextSequenceNumber } from '../../patients/services/number-sequence.service.js';
-import type { CollectLaboratorySampleInput, CreateLaboratoryAddendumInput, CreateLaboratoryOrderInput, CreateLaboratoryTestInput, UpdateLaboratoryResultInput } from '../validators/laboratory.validators.js';
+import type { CollectLaboratorySampleInput, CreateLaboratoryAddendumInput, CreateLaboratoryCommunicationInput, CreateLaboratoryOrderInput, CreateLaboratoryTestInput, UpdateLaboratoryResultInput } from '../validators/laboratory.validators.js';
 
 const orderRelations = { patient: true, test: true, doctor: true, collectedBy: true } as const;
 function orderResponse(order: LaboratoryOrder, canViewDraft = true) {
@@ -18,6 +18,26 @@ function orderResponse(order: LaboratoryOrder, canViewDraft = true) {
 }
 
 export const laboratoryService = {
+  async listCommunications(orderId: number) {
+    if (!await AppDataSource.getRepository(LaboratoryOrder).exist({ where: { id: orderId } })) throw new NotFoundError('Laboratory order not found');
+    const rows = await AppDataSource.getRepository(LaboratoryCommunication).find({ where: { orderId }, relations: { recordedBy: true }, order: { id: 'ASC' } });
+    return rows.map(({ id, outcome, method, recipientName, resultSummary, note, occurredAt, recordedById, createdAt, recordedBy }) => ({ id, outcome, method, recipientName, resultSummary, note, occurredAt, recordedById, createdAt, recorderName: recordedBy?.fullName ?? null }));
+  },
+  async recordCommunication(orderId: number, input: CreateLaboratoryCommunicationInput, userId: number) {
+    const occurredAt = new Date(input.occurredAt);
+    if (occurredAt.getTime() > Date.now() + 5 * 60_000) throw new ValidationError('Communication time cannot be in the future');
+    return AppDataSource.transaction(async (manager) => {
+      const order = await manager.getRepository(LaboratoryOrder).findOne({ where: { id: orderId } });
+      if (!order) throw new NotFoundError('Laboratory order not found');
+      if (order.status !== 'completed') throw new ConflictError('Only released laboratory results can have a communication record');
+      if (occurredAt < order.orderedAt) throw new ValidationError('Communication time cannot precede the order');
+      const repo = manager.getRepository(LaboratoryCommunication);
+      const row = await repo.save(repo.create({ orderId, outcome: input.outcome, method: input.method, recipientName: input.recipientName, resultSummary: input.resultSummary, note: input.note ?? null, occurredAt, recordedById: userId }));
+      await manager.getRepository(PatientAuditLog).save({ patientId: order.patientId, action: 'laboratory_result_communication', changedById: userId, changeSummary: `Laboratory result communication ${input.outcome}: ${order.orderNumber}`, beforeData: null, afterData: JSON.stringify({ orderId, communicationId: row.id, outcome: row.outcome, method: row.method }) });
+      const recorder = await manager.getRepository(User).findOne({ where: { id: userId } });
+      return { id: row.id, outcome: row.outcome, method: row.method, recipientName: row.recipientName, resultSummary: row.resultSummary, note: row.note, occurredAt: row.occurredAt, recordedById: row.recordedById, createdAt: row.createdAt, recorderName: recorder?.fullName ?? null };
+    });
+  },
   async createTest(input: CreateLaboratoryTestInput) {
     const repo = AppDataSource.getRepository(LaboratoryTest);
     if (await repo.exist({ where: { testCode: input.testCode } })) throw new ConflictError('Laboratory test code already exists');

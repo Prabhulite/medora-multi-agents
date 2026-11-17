@@ -38,6 +38,9 @@
 .laboratory-report__addenda article { border-top: 1px solid var(--color-border); padding: 10px 0; }
 .laboratory-report__addenda article p { margin: 5px 0; }
 .laboratory-report__correction { border-top: 1px solid var(--color-border); }
+.laboratory-report__communications article { border-top: 1px solid var(--color-border); padding: 10px 0; }
+.laboratory-report__communications article p { margin: 5px 0; }
+.laboratory-report__contact-form { border-top: 1px solid var(--color-border); }
 @media print {
   body:has(.laboratory-report) * { visibility: hidden; }
   body:has(.laboratory-report) .laboratory-report, body:has(.laboratory-report) .laboratory-report * { visibility: visible; }

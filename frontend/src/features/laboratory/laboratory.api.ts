@@ -15,6 +15,8 @@ export interface CreateLaboratoryTestPayload { testCode: string; testName: strin
 export type LaboratoryOrderStatus = 'ordered' | 'collected' | 'processing' | 'verified' | 'completed' | 'cancelled';
 
 export interface LaboratoryAddendum { id: number; reason: string; addendum: string; createdAt: string; createdById: number | null; authorName: string | null; }
+export interface LaboratoryCommunication { id: number; outcome: 'attempted' | 'delivered'; method: 'phone' | 'in_person' | 'secure_message' | 'other'; recipientName: string; resultSummary: string; note: string | null; occurredAt: string; recordedById: number | null; recorderName: string | null; createdAt: string; }
+export type CreateLaboratoryCommunicationPayload = Pick<LaboratoryCommunication, 'outcome' | 'method' | 'recipientName' | 'resultSummary' | 'occurredAt'> & { note?: string | null };
 export interface LaboratoryPatientCandidate { id: number; mrdNumber: string; fullName: string; }
 export interface LaboratoryDoctorCandidate { id: number; name: string; doctorCode: string; medicalRegistrationNumber: string; }
 
@@ -120,6 +122,14 @@ function mapOrder(row: any): LaboratoryOrder {
 }
 
 export const laboratoryApi = {
+  async listCommunications(orderId: number): Promise<LaboratoryCommunication[]> {
+    const response = await api.get<ApiEnvelope<LaboratoryCommunication[]>>(`/laboratory/orders/${orderId}/communications`);
+    return response.data.data;
+  },
+  async recordCommunication(orderId: number, payload: CreateLaboratoryCommunicationPayload): Promise<LaboratoryCommunication> {
+    const response = await api.post<ApiEnvelope<LaboratoryCommunication>>(`/laboratory/orders/${orderId}/communications`, payload);
+    return response.data.data;
+  },
   async listAllTests(): Promise<LaboratoryTest[]> {
     const response = await api.get<ApiEnvelope<any[]>>('/laboratory/tests/all');
     return response.data.data.map(mapTest);
