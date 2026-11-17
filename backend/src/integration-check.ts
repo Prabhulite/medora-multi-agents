@@ -214,6 +214,35 @@ try {
   assert.equal((await ok('GET', '/api/notifications')).items.filter((item: { kind: string; sourceId: number }) => item.kind === 'radiology_report_final' && item.sourceId === concurrentImaging.id).length, 1);
   token = adminToken;
 
+  const cancellableImaging = await ok('POST', '/api/radiology/orders', { patientId: 1, modalityId: 1, studyName: 'Cancel before booking' }, 201);
+  assert.equal((await request('POST', `/api/radiology/orders/${cancellableImaging.id}/cancel`, { reason: 'No' })).status, 422);
+  token = radiologyViewerToken;
+  assert.equal((await request('POST', `/api/radiology/orders/${cancellableImaging.id}/cancel`, { reason: 'Order entered in error' })).status, 403);
+  token = adminToken;
+  const cancelledImaging = await ok('POST', `/api/radiology/orders/${cancellableImaging.id}/cancel`, { reason: 'Order entered in error' });
+  assert.equal(cancelledImaging.status, 'cancelled');
+  assert.equal(cancelledImaging.cancellationReason, 'Order entered in error');
+  assert.ok(cancelledImaging.cancelledAt);
+  assert.ok(cancelledImaging.cancelledById);
+  assert.equal((await request('POST', `/api/radiology/orders/${cancellableImaging.id}/cancel`, { reason: 'Second cancellation' })).status, 409);
+  assert.equal((await request('PATCH', `/api/radiology/orders/${cancellableImaging.id}/report`, { status: 'performed' })).status, 422);
+  assert.equal((await request('PATCH', `/api/radiology/orders/${cancellableImaging.id}/schedule`, { scheduledAt: new Date(Date.now() + 48 * 60 * 60_000).toISOString() })).status, 409);
+  assert.equal((await ok('GET', '/api/patients/1/audit-logs')).some((row: { action: string; changeSummary: string }) => row.action === 'radiology_order_cancelled' && row.changeSummary.includes(cancellableImaging.orderNumber)), true);
+
+  const bookedImaging = await ok('POST', '/api/radiology/orders', { patientId: 1, modalityId: 1, doctorId: 1, studyName: 'Cancelled scanner booking' }, 201);
+  const reusableSlot = new Date(Date.now() + 48 * 60 * 60_000).toISOString();
+  await ok('PATCH', `/api/radiology/orders/${bookedImaging.id}/schedule`, { scheduledAt: reusableSlot, durationMinutes: 45, resourceId: scanner.id });
+  const replacementImaging = await ok('POST', '/api/radiology/orders', { patientId: 1, modalityId: 1, studyName: 'Replacement scanner booking' }, 201);
+  assert.equal((await request('PATCH', `/api/radiology/orders/${replacementImaging.id}/schedule`, { scheduledAt: reusableSlot, durationMinutes: 45, resourceId: scanner.id })).status, 409);
+  const cancelledBooking = await ok('POST', `/api/radiology/orders/${bookedImaging.id}/cancel`, { reason: 'Imaging no longer required' });
+  assert.equal(cancelledBooking.status, 'cancelled');
+  assert.equal(cancelledBooking.resourceId, scanner.id);
+  assert.equal((await ok('PATCH', `/api/radiology/orders/${replacementImaging.id}/schedule`, { scheduledAt: reusableSlot, durationMinutes: 45, resourceId: scanner.id })).status, 'scheduled');
+  token = radiologyViewerToken;
+  assert.equal((await ok('GET', '/api/notifications')).items.some((item: { kind: string; sourceId: number; message: string }) => item.kind === 'radiology_order_cancelled' && item.sourceId === bookedImaging.id && !item.message.includes('Imaging no longer required')), true);
+  token = adminToken;
+  assert.equal((await request('POST', `/api/radiology/orders/${imaging.id}/cancel`, { reason: 'Too late after performance' })).status, 409);
+
   assert.equal((await request('POST', '/api/blood-bank/units', { unitNumber: 'BAD-DATE', component: 'Red cells', bloodGroup: 'O+', collectedOn: '2027-02-30', expiresOn: '2030-01-01', storageLocation: 'Integration fridge' })).status, 422);
   assert.equal((await ok('GET', '/api/blood-bank/patients?search=IT-MRD-001'))[0].mrdNumber, 'IT-MRD-001');
   const bloodUnit = await ok('POST', '/api/blood-bank/units', { unitNumber: 'IT-BLOOD-001', component: 'Red cells', bloodGroup: 'O+', collectedOn: '2027-01-01', expiresOn: '2030-01-01', storageLocation: 'Integration fridge' }, 201);

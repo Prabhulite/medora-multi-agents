@@ -26,6 +26,9 @@ export class RadiologyOrder {
   @ManyToOne(() => RadiologyResource, { onDelete: 'RESTRICT', nullable: true }) @JoinColumn({ name: 'resource_id' }) resource!: RadiologyResource | null;
   @Column({ name: 'performed_at', type: 'timestamp', nullable: true }) performedAt!: Date | null;
   @Column({ name: 'reported_at', type: 'timestamp', nullable: true }) reportedAt!: Date | null;
+  @Column({ name: 'cancelled_at', type: 'timestamp', precision: 6, nullable: true }) cancelledAt!: Date | null;
+  @Column({ name: 'cancelled_by_id', type: 'int', unsigned: true, nullable: true }) cancelledById!: number | null;
+  @Column({ name: 'cancellation_reason', type: 'varchar', length: 500, nullable: true }) cancellationReason!: string | null;
   @Column({ name: 'report_text', type: 'text', nullable: true }) reportText!: string | null;
   @Column({ name: 'impression', type: 'text', nullable: true }) impression!: string | null;
   @Column({ name: 'created_by_id', type: 'int', unsigned: true, nullable: true }) createdById!: number | null;

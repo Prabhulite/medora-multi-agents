@@ -2,6 +2,8 @@
 
 View-only access to a performed study does not expose draft report text or impression through the order list or worklist. Contact history shows outcome, recipient, method, time, and attribution before finalization, but withholds finding summary and notes from view-only staff. Users with `radiology.update` can see draft content for reporting and direct communication; finalized content is visible to `radiology.view`.
 
+Cancellation is available to `radiology.cancel` for ordered or scheduled studies only. It records reason, actor, and time, preserves booking details, writes a patient audit event, and releases the reserved scanner slot by changing the order status. A linked active doctor receives an in-app notice. Cancellation never removes a performed study or final report.
+
 ## Scope
 
 Provide an imaging modality catalog, patient-linked radiology orders, priority and clinical notes, and a report workflow from ordered through performed/reported.

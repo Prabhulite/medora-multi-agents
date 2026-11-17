@@ -27,6 +27,7 @@ export function RadiologyDiagnosticsPage() {
   const { user } = useAuth();
   const canCreate = hasPermission(user, 'radiology.create');
   const canUpdate = hasPermission(user, 'radiology.update');
+  const canCancel = hasPermission(user, 'radiology.cancel');
   const canManageResources = hasPermission(user, 'radiology.resources.manage');
   const [modalities, setModalities] = useState<RadiologyModality[]>([]);
   const [orders, setOrders] = useState<RadiologyOrder[]>([]);
@@ -53,6 +54,8 @@ export function RadiologyDiagnosticsPage() {
   const [notice, setNotice] = useState('');
   const [modal, setModal] = useState<Modal>(null);
   const [selectedOrder, setSelectedOrder] = useState<RadiologyOrder | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<RadiologyOrder | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
 
   const load = async () => {
     const currentRequest = ++worklistRequestId.current;
@@ -99,9 +102,17 @@ export function RadiologyDiagnosticsPage() {
     { key: 'study', header: 'Study', render: (row) => <div><div className="ui-table__cell-title">{row.studyName}</div><div className="ui-table__cell-sub">{row.modalityCode || row.modalityName} · {row.priority || 'routine'}</div></div> },
     { key: 'scheduled', header: 'Scheduled', render: (row) => row.scheduledAt ? <div><div>{dateLabel(row.scheduledAt)}</div><small>{row.resourceName || 'Unassigned resource'}</small></div> : 'Not scheduled' },
     { key: 'report', header: 'Report', render: (row) => row.report || row.impression ? <div><div className="ui-table__cell-title">Report available</div><div className="ui-table__cell-sub">{row.reportedAt ? dateLabel(row.reportedAt) : 'Draft report'}</div></div> : <span className="radiology-muted">Awaiting report</span> },
-    { key: 'status', header: 'Status', render: (row) => <Badge tone={statusTone[row.status] || 'neutral'}>{row.status.replace('_', ' ')}</Badge> },
-    { key: 'actions', header: 'Actions', render: (row) => <div className="radiology-actions">{canUpdate && ['ordered', 'scheduled'].includes(row.status) && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('schedule'); }}>{row.scheduledAt ? 'Reschedule' : 'Schedule'}</Button>}{canUpdate && ['ordered', 'scheduled'].includes(row.status) && <Button size="sm" variant="secondary" onClick={() => void markPerformed(row)}>Mark performed</Button>}{(row.status === 'performed' && canUpdate || row.status === 'reported') && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('report'); }}>{row.status === 'reported' ? 'View final report' : row.report ? 'Edit draft' : 'Enter report'}</Button>}{['performed', 'reported'].includes(row.status) && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('communications'); }}>Communications</Button>}</div> },
-  ], [canUpdate]);
+    { key: 'status', header: 'Status', render: (row) => <div><Badge tone={statusTone[row.status] || 'neutral'}>{row.status.replace('_', ' ')}</Badge>{row.status === 'cancelled' && row.cancellationReason && <div className="ui-table__cell-sub" title={row.cancellationReason}>Reason: {row.cancellationReason}</div>}</div> },
+    { key: 'actions', header: 'Actions', render: (row) => <div className="radiology-actions">{canUpdate && ['ordered', 'scheduled'].includes(row.status) && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('schedule'); }}>{row.scheduledAt ? 'Reschedule' : 'Schedule'}</Button>}{canUpdate && ['ordered', 'scheduled'].includes(row.status) && <Button size="sm" variant="secondary" onClick={() => void markPerformed(row)}>Mark performed</Button>}{(row.status === 'performed' && canUpdate || row.status === 'reported') && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('report'); }}>{row.status === 'reported' ? 'View final report' : row.report ? 'Edit draft' : 'Enter report'}</Button>}{['performed', 'reported'].includes(row.status) && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('communications'); }}>Communications</Button>}{canCancel && ['ordered', 'scheduled'].includes(row.status) && <Button size="sm" variant="secondary" onClick={() => { setCancelTarget(row); setCancelReason(''); setError(''); }}>Cancel</Button>}</div> },
+  ], [canUpdate, canCancel]);
+
+  const cancelOrder = async () => {
+    if (!cancelTarget) return;
+    setSaving(true); setError(''); setNotice('');
+    try { await radiologyApi.cancelOrder(cancelTarget.id, cancelReason.trim()); setCancelTarget(null); setNotice('Radiology order cancelled.'); void load(); }
+    catch (err) { setError(getErrorMessage(err, 'Unable to cancel radiology order')); }
+    finally { setSaving(false); }
+  };
 
   const markPerformed = async (order: RadiologyOrder) => {
     setSaving(true); setError(''); setNotice('');
@@ -149,6 +160,7 @@ export function RadiologyDiagnosticsPage() {
     {modal === 'communications' && selectedOrder ? <CommunicationView order={selectedOrder} canUpdate={canUpdate} onRecorded={() => void loadQueue()} onClose={() => { setModal(null); setSelectedOrder(null); void loadQueue(); }} /> : null}
     {modal === 'schedule' && selectedOrder ? <ScheduleView order={selectedOrder} onSaved={(updated) => { void load(); setSelectedOrder(updated); setNotice('Study schedule saved.'); }} onClose={() => { setModal(null); setSelectedOrder(null); }} /> : null}
     {modal === 'resources' ? <ResourceManager modalities={modalities} onClose={() => setModal(null)} /> : null}
+    {cancelTarget && <ModalShell title="Cancel radiology order" eyebrow={cancelTarget.orderNumber} onClose={() => setCancelTarget(null)}><form className="radiology-form" onSubmit={(event) => { event.preventDefault(); void cancelOrder(); }}><p>Cancel the unperformed study for {cancelTarget.patientName || `patient #${cancelTarget.patientId}`}?</p><label className="radiology-textarea"><span>Reason</span><textarea required minLength={5} maxLength={500} rows={3} value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} /></label>{error && <Alert tone="error">{error}</Alert>}<FormFooter saving={saving} onClose={() => setCancelTarget(null)} submitLabel="Cancel order" disabled={cancelReason.trim().length < 5} /></form></ModalShell>}
   </div>;
 }
 

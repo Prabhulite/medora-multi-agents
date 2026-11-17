@@ -1,6 +1,6 @@
 import { AppDataSource } from '../../../config/data-source.js';
 import { Brackets } from 'typeorm';
-import { Doctor, Patient, RadiologyCommunication, RadiologyModality, RadiologyOrder, RadiologyReportAddendum, RadiologyResource, RadiologyScheduleEvent, User, UserNotification } from '../../../database/entities/index.js';
+import { Doctor, Patient, PatientAuditLog, RadiologyCommunication, RadiologyModality, RadiologyOrder, RadiologyReportAddendum, RadiologyResource, RadiologyScheduleEvent, User, UserNotification } from '../../../database/entities/index.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { nextSequenceNumber } from '../../patients/services/number-sequence.service.js';
 import type { CreateRadiologyAddendumInput, CreateRadiologyCommunicationInput, CreateRadiologyOrderInput, CreateRadiologyResourceInput, RadiologyCommunicationQueueInput, RadiologyWorklistInput, ScheduleRadiologyOrderInput, UpdateRadiologyReportInput } from '../validators/radiology.validators.js';
@@ -11,6 +11,28 @@ function orderResponse(order: RadiologyOrder, canViewDraft: boolean) {
 }
 
 export const radiologyService = {
+  async cancelOrder(orderId: number, reason: string, userId: number) {
+    return AppDataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(RadiologyOrder);
+      const order = await repo.createQueryBuilder('study').setLock('pessimistic_write').where('study.id = :id', { id: orderId }).getOne();
+      if (!order) throw new NotFoundError('Radiology order not found');
+      if (!['ordered', 'scheduled'].includes(order.status)) throw new ConflictError('Only unperformed imaging orders can be cancelled');
+      const previousStatus = order.status;
+      order.status = 'cancelled';
+      order.cancelledAt = new Date();
+      order.cancelledById = userId;
+      order.cancellationReason = reason;
+      await repo.save(order);
+      await manager.getRepository(PatientAuditLog).save({ patientId: order.patientId, action: 'radiology_order_cancelled', changedById: userId, changeSummary: `Radiology order cancelled: ${order.orderNumber}`, beforeData: JSON.stringify({ orderId, status: previousStatus, scheduledAt: order.scheduledAt, resourceId: order.resourceId }), afterData: JSON.stringify({ orderId, status: 'cancelled', reason }) });
+      if (order.doctorId) {
+        const doctor = await manager.getRepository(Doctor).findOne({ where: { id: order.doctorId, isActive: true } });
+        if (doctor?.accountUserId && await manager.getRepository(User).exist({ where: { id: doctor.accountUserId, isActive: true } })) {
+          await manager.getRepository(UserNotification).save({ recipientId: doctor.accountUserId, kind: 'radiology_order_cancelled', sourceId: order.id, title: 'Radiology order cancelled', message: `Radiology order ${order.orderNumber} was cancelled. Open the radiology module to review it.`, route: '/radiology' });
+        }
+      }
+      return repo.findOneOrFail({ where: { id: orderId }, relations: orderRelations });
+    });
+  },
   async communicationQueue({ page, pageSize, search }: RadiologyCommunicationQueueInput) {
     const latestCorrection = '(SELECT MAX(correction.created_at) FROM radiology_report_addenda correction WHERE correction.order_id = study.id)';
     const followUpAt = `COALESCE(${latestCorrection}, CASE WHEN study.status = 'reported' THEN study.reported_at END, study.performed_at, study.ordered_at)`;

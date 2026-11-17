@@ -43,6 +43,9 @@ export interface RadiologyOrder {
   findings?: string | null;
   impression?: string | null;
   reportedAt?: string | null;
+  cancelledAt?: string | null;
+  cancelledById?: number | null;
+  cancellationReason?: string | null;
   orderedBy?: string | null;
   reportedBy?: string | null;
 }
@@ -106,12 +109,19 @@ function mapOrder(row: any): RadiologyOrder {
     findings: row.findings ?? null,
     impression: row.impression ?? null,
     reportedAt: row.reportedAt || row.reported_at || null,
+    cancelledAt: row.cancelledAt || row.cancelled_at || null,
+    cancelledById: row.cancelledById ?? row.cancelled_by_id ?? null,
+    cancellationReason: row.cancellationReason || row.cancellation_reason || null,
     orderedBy: row.orderedBy?.fullName || row.orderedByName || row.orderedBy || null,
     reportedBy: row.reportedBy?.fullName || row.reportedByName || row.reportedBy || null,
   };
 }
 
 export const radiologyApi = {
+  async cancelOrder(orderId: number, reason: string): Promise<RadiologyOrder> {
+    const response = await api.post<ApiEnvelope<any>>(`/radiology/orders/${orderId}/cancel`, { reason });
+    return mapOrder(response.data.data);
+  },
   async worklist(params: { page: number; pageSize: number; search?: string; status?: RadiologyOrderStatus }): Promise<RadiologyWorklist> {
     const response = await api.get<ApiEnvelope<{ items: any[]; total: number; page: number; pageSize: number; summary: RadiologyWorklist['summary'] }>>('/radiology/worklist', { params });
     return { ...response.data.data, items: response.data.data.items.map(mapOrder) };

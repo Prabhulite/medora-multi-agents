@@ -7,6 +7,7 @@ import { radiologyController } from '../controllers/radiology.controller.js';
 import { createRadiologyAddendumSchema, createRadiologyCommunicationSchema, createRadiologyOrderSchema, createRadiologyResourceSchema, radiologyDoctorLookupSchema, radiologyOrderIdParamSchema, radiologyOrderListSchema, radiologyResourceIdParamSchema, scheduleRadiologyOrderSchema, updateRadiologyResourceStatusSchema, updateRadiologyReportSchema } from '../validators/radiology.validators.js';
 import { radiologyCommunicationQueueSchema } from '../validators/radiology.validators.js';
 import { radiologyWorklistSchema } from '../validators/radiology.validators.js';
+import { cancelRadiologyOrderSchema } from '../validators/radiology.validators.js';
 const router = Router();
 router.use(authenticate);
 router.get('/communication-queue', authorize('radiology.view'), validate(radiologyCommunicationQueueSchema, 'query'), asyncHandler(radiologyController.communicationQueue));
@@ -18,6 +19,7 @@ router.patch('/resources/:id/status', authorize('radiology.resources.manage'), v
 router.get('/doctors', authorize('radiology.create'), validate(radiologyDoctorLookupSchema, 'query'), asyncHandler(radiologyController.doctorCandidates));
 router.get('/orders', authorize('radiology.view'), validate(radiologyOrderListSchema, 'query'), asyncHandler(radiologyController.listOrders));
 router.post('/orders', authorize('radiology.create'), validate(createRadiologyOrderSchema), asyncHandler(radiologyController.createOrder));
+router.post('/orders/:id/cancel', authorize('radiology.cancel'), validate(radiologyOrderIdParamSchema, 'params'), validate(cancelRadiologyOrderSchema), asyncHandler(radiologyController.cancelOrder));
 router.patch('/orders/:id/report', authorize('radiology.update'), validate(radiologyOrderIdParamSchema, 'params'), validate(updateRadiologyReportSchema), asyncHandler(radiologyController.updateReport));
 router.get('/orders/:id/addenda', authorize('radiology.view'), validate(radiologyOrderIdParamSchema, 'params'), asyncHandler(radiologyController.listAddenda));
 router.post('/orders/:id/addenda', authorize('radiology.update'), validate(radiologyOrderIdParamSchema, 'params'), validate(createRadiologyAddendumSchema), asyncHandler(radiologyController.addAddendum));

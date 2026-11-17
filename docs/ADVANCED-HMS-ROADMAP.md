@@ -105,6 +105,8 @@ The radiology order worklist now pages and searches on the server, filters by st
 
 View-only radiology staff now see draft study status without draft report text or impression in order lists and the worklist. Free-text finding summaries and notes in communication history are also withheld from view-only staff until the report is final. Staff with `radiology.update` can review draft content to complete reporting and direct contact. Finalized content remains available to `radiology.view`.
 
+Staff with `radiology.cancel` can cancel an ordered or scheduled study with a reason. The transaction stores actor and time, adds a patient audit entry, and notifies a linked active referring doctor without putting the reason in notification text. A cancelled scheduled study no longer blocks its scanner slot; its prior booking and schedule events remain for review. Performed and reported studies cannot be cancelled.
+
 ### Phase 7: Operations and integrations
 
 - Operations dashboard KPI totals now use full database counts and billing balance aggregation; preview queues remain bounded. Waiting appointments count checked-in patients. The CSV export includes KPI and alert totals and escapes spreadsheet formula prefixes in patient-entered text. The isolated integration suite covers values beyond the preview limits.

@@ -8,6 +8,7 @@ export const createRadiologyOrderSchema = z.object({ patientId: positiveInt, mod
 export const updateRadiologyReportSchema = z.object({ status: z.enum(['performed', 'reported']), reportText: z.string().trim().max(10000).nullable().optional(), impression: z.string().trim().max(5000).nullable().optional() });
 export const radiologyOrderIdParamSchema = z.object({ id: z.coerce.number().int().positive() });
 export const createRadiologyAddendumSchema = z.object({ reason: z.string().trim().min(5).max(500), addendum: z.string().trim().min(1).max(10000) });
+export const cancelRadiologyOrderSchema = z.object({ reason: z.string().trim().min(5).max(500) });
 export const createRadiologyCommunicationSchema = z.object({ outcome: z.enum(['attempted', 'delivered']), method: z.enum(['phone', 'in_person', 'secure_message', 'other']), recipientName: z.string().trim().min(2).max(160), findingSummary: z.string().trim().min(5).max(1000), note: z.string().trim().max(1000).nullable().optional(), occurredAt: z.string().datetime({ offset: true }) });
 export const scheduleRadiologyOrderSchema = z.object({ scheduledAt: z.string().datetime({ offset: true }), durationMinutes: z.number().int().min(15).max(240).default(30), resourceId: positiveInt.nullable().optional(), reason: z.string().trim().min(5).max(500).nullable().optional() });
 export const createRadiologyResourceSchema = z.object({ modalityId: positiveInt, code: z.string().trim().toUpperCase().regex(/^[A-Z0-9_-]{2,40}$/), name: z.string().trim().min(2).max(160), location: z.string().trim().max(160).nullable().optional() });

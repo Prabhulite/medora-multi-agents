@@ -146,6 +146,7 @@ const PERMISSIONS = [
   { code: 'radiology.view', module: 'radiology', action: 'view', description: 'View radiology modalities and orders' },
   { code: 'radiology.create', module: 'radiology', action: 'create', description: 'Order radiology studies' },
   { code: 'radiology.update', module: 'radiology', action: 'update', description: 'Enter radiology reports' },
+  { code: 'radiology.cancel', module: 'radiology', action: 'cancel', description: 'Cancel a pending imaging order with a reason' },
   { code: 'radiology.resources.manage', module: 'radiology', action: 'resources_manage', description: 'Manage radiology scanner and room resources' },
   { code: 'operations.view', module: 'operations', action: 'view', description: 'View hospital operations dashboard' },
   { code: 'audit.view', module: 'audit', action: 'view', description: 'View system audit logs' },
