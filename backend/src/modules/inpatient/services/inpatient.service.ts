@@ -1,11 +1,12 @@
 import { AppDataSource } from '../../../config/data-source.js';
-import { Admission, AdmissionHomeMedicationReview, Bed, BedTransfer, Department, DischargeHomeMedicationReview, DischargeMedicationReview, Doctor, HomeMedication, MedicationAdministration, NursingCarePlan, NursingCarePlanReview, NursingObservation, Patient, PatientAuditLog, Prescription, Ward, Medication, User } from '../../../database/entities/index.js';
+import { IsNull } from 'typeorm';
+import { Admission, AdmissionHomeMedicationReview, Bed, BedTransfer, Department, DischargeHomeMedicationReview, DischargeMedicationReview, Doctor, HomeMedication, MedicationAdministration, NursingCarePlan, NursingCarePlanReview, NursingHandoff, NursingObservation, Patient, PatientAuditLog, Prescription, Ward, Medication, User } from '../../../database/entities/index.js';
 import { assertNoRecordedAllergy } from '../../clinical/services/allergy-check.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { nextSequenceNumber } from '../../patients/services/number-sequence.service.js';
 import type { CreateAdmissionInput } from '../validators/inpatient.validators.js';
 import type { z } from 'zod';
-import { admissionMedicationReviewSchema, closeCarePlanSchema, continueCarePlanSchema, createCarePlanSchema, dischargeSummarySchema, medicationAdministrationSchema, nursingObservationSchema, transferBedSchema } from '../validators/inpatient.validators.js';
+import { admissionMedicationReviewSchema, closeCarePlanSchema, continueCarePlanSchema, createCarePlanSchema, createNursingHandoffSchema, dischargeSummarySchema, medicationAdministrationSchema, nursingObservationSchema, transferBedSchema } from '../validators/inpatient.validators.js';
 
 function carePlanResponse(plan: NursingCarePlan | null) {
   if (!plan) throw new NotFoundError('Care plan not found');
@@ -17,8 +18,43 @@ const staffReference = (user: User | null | undefined) => user ? { id: user.id, 
 const medicationAdministrationResponse = (row: MedicationAdministration | null) => row ? { ...row, administeredBy: staffReference(row.administeredBy) } : null;
 const transferResponse = (row: BedTransfer | null) => row ? { ...row, transferredBy: staffReference(row.transferredBy) } : null;
 const observationResponse = (row: NursingObservation) => ({ ...row, recordedBy: staffReference(row.recordedBy) });
+const handoffResponse = (row: NursingHandoff) => { const { outgoingBy, acknowledgedBy, ...fields } = row; return { ...fields, outgoingBy: staffReference(outgoingBy), acknowledgedBy: staffReference(acknowledgedBy) }; };
 
 export const inpatientService = {
+  async nursingHandoffs(admissionId: number) {
+    if (!(await AppDataSource.getRepository(Admission).exist({ where: { id: admissionId } }))) throw new NotFoundError('Admission not found');
+    const rows = await AppDataSource.getRepository(NursingHandoff).find({ where: { admissionId }, relations: { outgoingBy: true, acknowledgedBy: true }, order: { id: 'DESC' }, take: 100 });
+    return rows.map(handoffResponse);
+  },
+  async createNursingHandoff(admissionId: number, input: z.infer<typeof createNursingHandoffSchema>, userId: number | null) {
+    if (!userId) throw new ValidationError('Staff identity is required');
+    return AppDataSource.transaction(async (manager) => {
+      const admission = await manager.getRepository(Admission).createQueryBuilder('admission').setLock('pessimistic_write').where('admission.id = :id', { id: admissionId }).getOne();
+      if (!admission) throw new NotFoundError('Admission not found');
+      if (admission.status === 'discharged') throw new ConflictError('Cannot hand off a discharged admission');
+      const pending = await manager.getRepository(NursingHandoff).exist({ where: { admissionId, acknowledgedAt: IsNull() } });
+      if (pending) throw new ConflictError('A handoff is still awaiting acknowledgement');
+      const record = await manager.getRepository(NursingHandoff).save({ admissionId, conditionSummary: input.conditionSummary, pendingTasks: input.pendingTasks, safetyConcerns: input.safetyConcerns ?? null, outgoingById: userId });
+      await manager.getRepository(PatientAuditLog).save({ patientId: admission.patientId, action: 'nursing_handoff_created', changedById: userId, changeSummary: `Nursing handoff created for admission ${admission.admissionNumber}`, beforeData: null, afterData: JSON.stringify({ admissionId, handoffId: record.id }) });
+      return handoffResponse((await manager.getRepository(NursingHandoff).findOne({ where: { id: record.id }, relations: { outgoingBy: true, acknowledgedBy: true } }))!);
+    });
+  },
+  async acknowledgeNursingHandoff(admissionId: number, handoffId: number, userId: number | null) {
+    if (!userId) throw new ValidationError('Staff identity is required');
+    return AppDataSource.transaction(async (manager) => {
+      const admission = await manager.getRepository(Admission).createQueryBuilder('admission').setLock('pessimistic_write').where('admission.id = :id', { id: admissionId }).getOne();
+      if (!admission) throw new NotFoundError('Admission not found');
+      if (admission.status === 'discharged') throw new ConflictError('Cannot acknowledge a handoff after discharge');
+      const handoff = await manager.getRepository(NursingHandoff).createQueryBuilder('handoff').setLock('pessimistic_write').where('handoff.id = :handoffId AND handoff.admission_id = :admissionId', { handoffId, admissionId }).getOne();
+      if (!handoff) throw new NotFoundError('Handoff not found');
+      if (handoff.acknowledgedAt) throw new ConflictError('Handoff is already acknowledged');
+      if (handoff.outgoingById === userId) throw new ConflictError('Outgoing staff cannot acknowledge their own handoff');
+      handoff.acknowledgedAt = new Date(); handoff.acknowledgedById = userId;
+      await manager.getRepository(NursingHandoff).save(handoff);
+      await manager.getRepository(PatientAuditLog).save({ patientId: admission.patientId, action: 'nursing_handoff_acknowledged', changedById: userId, changeSummary: `Nursing handoff acknowledged for admission ${admission.admissionNumber}`, beforeData: JSON.stringify({ admissionId, handoffId, acknowledged: false }), afterData: JSON.stringify({ admissionId, handoffId, acknowledged: true }) });
+      return handoffResponse((await manager.getRepository(NursingHandoff).findOne({ where: { id: handoffId }, relations: { outgoingBy: true, acknowledgedBy: true } }))!);
+    });
+  },
   async dueCarePlans(page: number, pageSize: number) {
     const query = AppDataSource.getRepository(NursingCarePlan).createQueryBuilder('plan')
       .innerJoin('plan.admission', 'admission')

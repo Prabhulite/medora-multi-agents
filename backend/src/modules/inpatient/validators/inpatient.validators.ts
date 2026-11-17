@@ -6,6 +6,8 @@ export const dueCarePlanQuerySchema = z.object({ page: z.coerce.number().int().m
 export const createCarePlanSchema = z.object({ problem: z.string().trim().min(2).max(500), goal: z.string().trim().min(2).max(1000), interventions: z.string().trim().min(2).max(10000), reviewAt: z.string().datetime({ offset: true }).nullable().optional() });
 export const closeCarePlanSchema = z.object({ status: z.enum(['completed', 'discontinued']), reviewNote: z.string().trim().min(2).max(2000) });
 export const continueCarePlanSchema = z.object({ reviewNote: z.string().trim().min(2).max(2000), nextReviewAt: z.string().datetime({ offset: true }) });
+export const nursingHandoffIdParamSchema = admissionIdParamSchema.extend({ handoffId: z.coerce.number().int().positive() });
+export const createNursingHandoffSchema = z.object({ conditionSummary: z.string().trim().min(2).max(5000), pendingTasks: z.string().trim().min(2).max(5000), safetyConcerns: z.string().trim().max(5000).nullable().optional() });
 export const transferBedSchema = z.object({ toBedId: z.number().int().positive(), reason: z.string().trim().min(2).max(500) });
 export const medicationAdministrationSchema = z.object({ prescriptionId: z.number().int().positive(), outcome: z.enum(['given', 'withheld', 'refused']), doseGiven: z.string().trim().max(80).nullable().optional(), route: z.string().trim().max(40).nullable().optional(), notes: z.string().trim().max(1000).nullable().optional() }).superRefine((value, context) => {
   if (value.outcome === 'given' && !value.doseGiven) context.addIssue({ code: z.ZodIssueCode.custom, path: ['doseGiven'], message: 'Dose is required when medication is given' });

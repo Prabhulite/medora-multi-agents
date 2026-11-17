@@ -3,6 +3,9 @@ import { sendCreated, sendSuccess } from '../../../shared/utils/response.js';
 import { inpatientService } from '../services/inpatient.service.js';
 
 export const inpatientController = {
+  async nursingHandoffs(req: Request, res: Response) { return sendSuccess(res, await inpatientService.nursingHandoffs(Number(req.params.id)), 'Nursing handoffs fetched'); },
+  async createNursingHandoff(req: Request, res: Response) { return sendCreated(res, await inpatientService.createNursingHandoff(Number(req.params.id), req.body, req.user?.id ?? null), 'Nursing handoff created'); },
+  async acknowledgeNursingHandoff(req: Request, res: Response) { return sendSuccess(res, await inpatientService.acknowledgeNursingHandoff(Number(req.params.id), Number(req.params.handoffId), req.user?.id ?? null), 'Nursing handoff acknowledged'); },
   async dueCarePlans(req: Request, res: Response) { return sendSuccess(res, await inpatientService.dueCarePlans(Number(req.query.page), Number(req.query.pageSize)), 'Due care plans fetched'); },
   async carePlans(req: Request, res: Response) { return sendSuccess(res, await inpatientService.carePlans(Number(req.params.id)), 'Care plans fetched'); },
   async carePlanReviews(req: Request, res: Response) { return sendSuccess(res, await inpatientService.carePlanReviews(Number(req.params.id), Number(req.params.planId)), 'Care plan reviews fetched'); },
