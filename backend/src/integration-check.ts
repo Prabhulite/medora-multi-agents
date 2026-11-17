@@ -913,6 +913,8 @@ try {
   await ok('POST', '/api/patients/merge', { sourcePatientId: 2, targetPatientId: 1 });
   assert.deepEqual((await ok('GET', '/api/patients/search?mrdNumber=IT-MRD-002')).map((row: { id: number }) => row.id), [1]);
   assert.deepEqual((await ok('GET', '/api/patients/search?q=IT-MRD-002')).map((row: { id: number }) => row.id), [1]);
+  assert.equal((await ok('GET', '/api/patients/1/audit-logs')).some((row: { action: string; sourceMrdNumber: string | null }) => row.action === 'pharmacy_dispensed' && row.sourceMrdNumber === 'IT-MRD-002'), true);
+  assert.equal((await ok('GET', '/api/clinical/patients/1/timeline')).some((row: { kind: string; title: string }) => row.kind === 'pharmacy-dispensed' && row.title.includes('IT-MRD-002')), true);
   assert.equal((await request('POST', '/api/pharmacy/prescriptions', { patientId: 2, medicineName: 'Late Source Medicine' })).status, 404);
   assert.equal((await request('POST', '/api/pharmacy/inventory/dispense', { batchId: stock.id, patientId: 2, quantity: 1 })).status, 404);
   assert.equal((await ok('GET', '/api/pharmacy/patients/1/prescriptions')).some((row: { id: number }) => row.id === sourcePrescription.id), true);

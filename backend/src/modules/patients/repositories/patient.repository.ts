@@ -1,4 +1,4 @@
-import { Brackets } from 'typeorm';
+import { Brackets, In } from 'typeorm';
 import { AppDataSource } from '../../../config/data-source.js';
 import {
   Patient,
@@ -947,8 +947,13 @@ export const patientRepository = {
   },
 
   async listAuditLogs(patientId: number) {
+    const mergedSources = await AppDataSource.getRepository(Patient).find({
+      where: { mergedIntoPatientId: patientId },
+      select: { id: true, mrdNumber: true },
+    });
+    const sourceMrdById = new Map(mergedSources.map((source) => [source.id, source.mrdNumber]));
     const rows = await AppDataSource.getRepository(PatientAuditLog).find({
-      where: { patientId },
+      where: { patientId: In([patientId, ...sourceMrdById.keys()]) },
       relations: { changedBy: true },
       order: { createdAt: 'DESC' },
       take: 100,
@@ -958,6 +963,7 @@ export const patientRepository = {
       action: row.action,
       changeSummary: row.changeSummary,
       changedByName: row.changedBy?.fullName ?? null,
+      sourceMrdNumber: sourceMrdById.get(row.patientId) ?? null,
       createdAt: row.createdAt,
     }));
   },

@@ -1,6 +1,7 @@
 import { AppDataSource } from '../../../config/data-source.js';
 import { Admission, Appointment, AppointmentStatusHistory, ClinicalEncounter, ClinicalEncounterAddendum, EmergencyCase, LaboratoryOrder, Patient, PatientAuditLog, PatientCommunication, PatientConsent, PatientVisit, Prescription, RadiologyOrder, SurgeryCase } from '../../../database/entities/index.js';
 import { NotFoundError } from '../../../shared/errors/AppError.js';
+import { In } from 'typeorm';
 
 export type TimelineEvent = { key: string; kind: string; at: Date; title: string; detail: string | null; status: string | null };
 const event = (kind: string, id: number, at: Date, title: string, detail: string | null = null, status: string | null = null): TimelineEvent => ({ key: `${kind}-${id}-${at.toISOString()}`, kind, at, title, detail, status });
@@ -9,6 +10,8 @@ export const timelineService = {
   async list(patientId: number) {
     const patient = await AppDataSource.getRepository(Patient).findOne({ where: { id: patientId } });
     if (!patient) throw new NotFoundError('Patient not found');
+    const mergedSources = await AppDataSource.getRepository(Patient).find({ where: { mergedIntoPatientId: patientId }, select: { id: true, mrdNumber: true } });
+    const sourceMrdById = new Map(mergedSources.map((source) => [source.id, source.mrdNumber]));
     const [visits, encounters, addenda, prescriptions, admissions, labs, radiology, consents, appointments, appointmentChanges, emergencies, surgeries, communications, auditChanges] = await Promise.all([
       AppDataSource.getRepository(PatientVisit).find({ where: { patientId }, order: { visitAt: 'DESC' }, take: 100 }),
       AppDataSource.getRepository(ClinicalEncounter).find({ where: { patientId }, order: { createdAt: 'DESC' }, take: 100 }),
@@ -23,7 +26,7 @@ export const timelineService = {
       AppDataSource.getRepository(EmergencyCase).find({ where: { patientId }, order: { triagedAt: 'DESC' }, take: 100 }),
       AppDataSource.getRepository(SurgeryCase).find({ where: { patientId }, order: { createdAt: 'DESC' }, take: 100 }),
       AppDataSource.getRepository(PatientCommunication).find({ where: { patientId }, order: { occurredAt: 'DESC' }, take: 100 }),
-      AppDataSource.getRepository(PatientAuditLog).find({ where: { patientId }, order: { createdAt: 'DESC' }, take: 100 }),
+      AppDataSource.getRepository(PatientAuditLog).find({ where: { patientId: In([patientId, ...sourceMrdById.keys()]) }, order: { createdAt: 'DESC' }, take: 100 }),
     ]);
     const events: TimelineEvent[] = [event('registration', patient.id, patient.registrationAt ?? patient.createdAt, 'Patient registered', patient.mrdNumber)];
     for (const row of visits) events.push(event('visit', row.id, row.visitAt, `${row.visitType} visit`, row.visitNumber, row.status));
@@ -61,13 +64,15 @@ export const timelineService = {
       if (row.followUpCompletedAt) events.push(event('follow-up-completed', row.id, row.followUpCompletedAt, 'Patient follow-up completed', row.subject, 'completed'));
     }
     for (const row of auditChanges) {
-      if (row.action === 'pharmacy_dispensed') events.push(event('pharmacy-dispensed', row.id, row.createdAt, row.changeSummary || 'Medication dispensed'));
-      if (['radiology_order_scheduled', 'radiology_order_rescheduled', 'radiology_order_cancelled', 'radiology_study_performed', 'radiology_draft_saved', 'radiology_report_amended', 'radiology_finding_communication'].includes(row.action)) events.push(event(row.action.replaceAll('_', '-'), row.id, row.createdAt, row.changeSummary || row.action.replaceAll('_', ' ')));
-      if (['allergy_added', 'allergy_removed', 'history_added', 'history_removed'].includes(row.action)) events.push(event(row.action.replaceAll('_', '-'), row.id, row.createdAt, row.changeSummary || row.action.replaceAll('_', ' ')));
-      if (row.action === 'home_medication_recorded') events.push(event('home-medication-reported', row.id, row.createdAt, row.changeSummary || 'Reported home medicine recorded', null, 'reported'));
-      if (row.action === 'home_medication_ceased') events.push(event('home-medication-ceased', row.id, row.createdAt, row.changeSummary || 'Reported home medicine marked not current', null, 'not current'));
-      if (row.action === 'admission_medications_reviewed') events.push(event('admission-medications-reviewed', row.id, row.createdAt, row.changeSummary || 'Admission home medicines reviewed', null, 'reviewed'));
-      if (row.action === 'admission_medications_review_added') events.push(event('admission-medications-follow-up', row.id, row.createdAt, row.changeSummary || 'Newly reported home medicines reviewed', null, 'reviewed'));
+      const origin = sourceMrdById.get(row.patientId);
+      const summary = `${row.changeSummary || row.action.replaceAll('_', ' ')}${origin ? ` (from ${origin})` : ''}`;
+      if (row.action === 'pharmacy_dispensed') events.push(event('pharmacy-dispensed', row.id, row.createdAt, summary));
+      if (['radiology_order_scheduled', 'radiology_order_rescheduled', 'radiology_order_cancelled', 'radiology_study_performed', 'radiology_draft_saved', 'radiology_report_amended', 'radiology_finding_communication'].includes(row.action)) events.push(event(row.action.replaceAll('_', '-'), row.id, row.createdAt, summary));
+      if (['allergy_added', 'allergy_removed', 'history_added', 'history_removed'].includes(row.action)) events.push(event(row.action.replaceAll('_', '-'), row.id, row.createdAt, summary));
+      if (row.action === 'home_medication_recorded') events.push(event('home-medication-reported', row.id, row.createdAt, summary, null, 'reported'));
+      if (row.action === 'home_medication_ceased') events.push(event('home-medication-ceased', row.id, row.createdAt, summary, null, 'not current'));
+      if (row.action === 'admission_medications_reviewed') events.push(event('admission-medications-reviewed', row.id, row.createdAt, summary, null, 'reviewed'));
+      if (row.action === 'admission_medications_review_added') events.push(event('admission-medications-follow-up', row.id, row.createdAt, summary, null, 'reviewed'));
     }
     for (const row of consents) {
       events.push(event('consent', row.id, row.createdAt, `Consent recorded: ${row.subject}`, row.consentType, row.status));

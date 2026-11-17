@@ -526,6 +526,7 @@ export interface PatientAuditLog {
   action: string;
   changeSummary: string | null;
   changedByName: string | null;
+  sourceMrdNumber: string | null;
   createdAt: string;
 }
 

@@ -371,7 +371,7 @@ export function PatientsPage() {
                   <div>
                     <div className="ui-table__cell-title">{log.changeSummary || log.action}</div>
                     <div className="ui-table__cell-sub">
-                      {log.changedByName || 'System'} · {new Date(log.createdAt).toLocaleString()}
+                      {log.changedByName || 'System'} · {new Date(log.createdAt).toLocaleString()}{log.sourceMrdNumber ? ` · From ${log.sourceMrdNumber}` : ''}
                     </div>
                   </div>
                   <Badge tone="neutral">{log.action}</Badge>
