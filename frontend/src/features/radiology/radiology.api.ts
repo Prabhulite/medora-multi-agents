@@ -39,6 +39,7 @@ export interface RadiologyOrder {
   resourceId?: number | null;
   resourceName?: string | null;
   completedAt?: string | null;
+  performedAt?: string | null;
   report?: string | null;
   findings?: string | null;
   impression?: string | null;
@@ -105,6 +106,7 @@ function mapOrder(row: any): RadiologyOrder {
     resourceId: row.resourceId ?? row.resource_id ?? null,
     resourceName: row.resource?.name ?? null,
     completedAt: row.completedAt || row.completed_at || null,
+    performedAt: row.performedAt || row.performed_at || null,
     report: row.report ?? row.reportText ?? row.report_text ?? null,
     findings: row.findings ?? null,
     impression: row.impression ?? null,

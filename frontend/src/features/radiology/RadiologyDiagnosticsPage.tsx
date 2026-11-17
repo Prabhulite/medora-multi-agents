@@ -164,8 +164,8 @@ export function RadiologyDiagnosticsPage() {
   </div>;
 }
 
-function ModalShell({ title, eyebrow, onClose, children }: { title: string; eyebrow: string; onClose: () => void; children: React.ReactNode }) {
-  return <div className="radiology-modal-backdrop" role="presentation" onClick={onClose}><section className="radiology-modal" role="dialog" aria-modal="true" aria-labelledby="radiology-modal-title" onClick={(event) => event.stopPropagation()}><div className="radiology-modal__header"><div><span className="radiology-eyebrow">{eyebrow}</span><h2 id="radiology-modal-title">{title}</h2></div><button type="button" onClick={onClose} aria-label={`Close ${title}`}>×</button></div>{children}</section></div>;
+function ModalShell({ title, eyebrow, onClose, children, className = '' }: { title: string; eyebrow: string; onClose: () => void; children: React.ReactNode; className?: string }) {
+  return <div className="radiology-modal-backdrop" role="presentation" onClick={onClose}><section className={`radiology-modal ${className}`.trim()} role="dialog" aria-modal="true" aria-labelledby="radiology-modal-title" onClick={(event) => event.stopPropagation()}><div className="radiology-modal__header"><div><span className="radiology-eyebrow">{eyebrow}</span><h2 id="radiology-modal-title">{title}</h2></div><button type="button" onClick={onClose} aria-label={`Close ${title}`}>×</button></div>{children}</section></div>;
 }
 
 function OrderForm({ modalities, saving, onClose, onSubmit }: { modalities: RadiologyModality[]; saving: boolean; onClose: () => void; onSubmit: (payload: CreateRadiologyOrderPayload) => void }) {
@@ -208,16 +208,17 @@ function FinalReportView({ order, canUpdate, onClose }: { order: RadiologyOrder;
     } catch (err) { setError(getErrorMessage(err, 'Unable to save report addendum')); }
     finally { setSaving(false); }
   };
-  return <ModalShell title={`Final report · ${order.studyName}`} eyebrow={order.orderNumber} onClose={onClose}>
+  return <ModalShell title={`Final report · ${order.studyName}`} eyebrow={order.orderNumber} onClose={onClose} className="radiology-report">
     <div className="radiology-form">
       <div className="radiology-result-context"><strong>{order.patientName || `Patient #${order.patientId}`}</strong><span>{order.patientMrdNumber || `Patient ID ${order.patientId}`} · {order.modalityName}</span></div>
-      <Alert tone="info">The original final report is preserved. Corrections are dated addenda.</Alert>
+      <dl className="radiology-report__details"><div><dt>Study</dt><dd>{order.studyName}</dd></div><div><dt>Order number</dt><dd>{order.orderNumber}</dd></div><div><dt>Priority</dt><dd>{order.priority || 'routine'}</dd></div><div><dt>Ordered</dt><dd>{dateLabel(order.orderedAt)}</dd></div><div><dt>Performed</dt><dd>{dateLabel(order.performedAt)}</dd></div><div><dt>Finalized</dt><dd>{dateLabel(order.reportedAt)}</dd></div><div><dt>Reporting staff</dt><dd>{order.reportedBy || 'Not recorded'}</dd></div></dl>
+      <div className="radiology-report__notice"><Alert tone="info">The original final report is preserved. Corrections are dated addenda.</Alert></div>
       <section><h3>Report</h3><p>{order.report || 'No report text recorded.'}</p></section>
       {order.impression && <section><h3>Impression</h3><p>{order.impression}</p></section>}
       <section><h3>Addenda</h3>{loading ? <p>Loading addenda…</p> : addenda.length ? addenda.map((row) => <article key={row.id}><strong>{dateLabel(row.createdAt)} · {row.authorName || 'Former user'}</strong><p>Reason: {row.reason}</p><p>{row.addendum}</p></article>) : <p>No addenda recorded.</p>}</section>
       {error && <Alert tone="error">{error}</Alert>}
-      {canUpdate && <form className="radiology-form" onSubmit={(event) => void saveAddendum(event)}><h3>Add a correction</h3><Input label="Reason" required minLength={5} maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} /><label className="radiology-textarea"><span>Addendum</span><textarea required rows={4} maxLength={10000} value={addendum} onChange={(event) => setAddendum(event.target.value)} /></label><Button type="submit" loading={saving} disabled={saving || reason.trim().length < 5 || !addendum.trim()}>Save addendum</Button></form>}
-      <Button type="button" variant="secondary" onClick={onClose}>Close</Button>
+      {canUpdate && <form className="radiology-form radiology-report__correction" onSubmit={(event) => void saveAddendum(event)}><h3>Add a correction</h3><Input label="Reason" required minLength={5} maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} /><label className="radiology-textarea"><span>Addendum</span><textarea required rows={4} maxLength={10000} value={addendum} onChange={(event) => setAddendum(event.target.value)} /></label><Button type="submit" loading={saving} disabled={saving || reason.trim().length < 5 || !addendum.trim()}>Save addendum</Button></form>}
+      <div className="radiology-modal__footer radiology-report__actions"><Button type="button" variant="secondary" onClick={onClose}>Close</Button><Button type="button" disabled={loading || Boolean(error)} onClick={() => window.print()}>Print report</Button></div>
     </div>
   </ModalShell>;
 }
