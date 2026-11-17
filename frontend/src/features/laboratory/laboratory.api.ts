@@ -13,6 +13,10 @@ export interface LaboratoryTest {
 
 export type LaboratoryOrderStatus = 'ordered' | 'collected' | 'processing' | 'verified' | 'completed' | 'cancelled';
 
+export interface LaboratoryAddendum { id: number; reason: string; addendum: string; createdAt: string; createdById: number | null; authorName: string | null; }
+export interface LaboratoryPatientCandidate { id: number; mrdNumber: string; fullName: string; }
+export interface LaboratoryDoctorCandidate { id: number; name: string; doctorCode: string; medicalRegistrationNumber: string; }
+
 export interface LaboratoryOrder {
   id: number;
   orderNumber: string;
@@ -21,9 +25,11 @@ export interface LaboratoryOrder {
   patientMrdNumber?: string | null;
   testId: number;
   testName: string;
+  doctorName?: string | null;
   testCode?: string | null;
   status: LaboratoryOrderStatus;
   priority?: 'routine' | 'urgent' | 'stat' | string;
+  clinicalNotes?: string | null;
   orderedAt?: string | null;
   collectedAt?: string | null;
   specimenLabel?: string | null;
@@ -42,6 +48,7 @@ export interface LaboratoryOrder {
 export interface CreateLaboratoryOrderPayload {
   patientId: number;
   testId: number;
+  doctorId?: number | null;
   priority?: 'routine' | 'urgent' | 'stat';
   clinicalNotes?: string | null;
 }
@@ -86,9 +93,11 @@ function mapOrder(row: any): LaboratoryOrder {
     patientMrdNumber: patient.mrdNumber || patient.mrd_number || row.patientMrdNumber || null,
     testId: Number(row.testId ?? test.id),
     testName: test.name || test.testName || row.testName || row.test_name || 'Laboratory test',
+    doctorName: row.doctor?.name ?? null,
     testCode: test.code || test.testCode || row.testCode || row.test_code || null,
     status: row.status || 'ordered',
     priority: row.priority || test.priority || 'routine',
+    clinicalNotes: row.clinicalNotes ?? null,
     orderedAt: row.orderedAt || row.ordered_at || row.createdAt || null,
     collectedAt: row.collectedAt || row.collected_at || null,
     specimenLabel: row.specimenLabel || null,
@@ -106,6 +115,22 @@ function mapOrder(row: any): LaboratoryOrder {
 }
 
 export const laboratoryApi = {
+  async doctorCandidates(search: string): Promise<LaboratoryDoctorCandidate[]> {
+    const response = await api.get<ApiEnvelope<LaboratoryDoctorCandidate[]>>('/laboratory/doctors', { params: { search } });
+    return response.data.data;
+  },
+  async patientCandidates(search: string): Promise<LaboratoryPatientCandidate[]> {
+    const response = await api.get<ApiEnvelope<LaboratoryPatientCandidate[]>>('/laboratory/patients', { params: { search } });
+    return response.data.data;
+  },
+  async listAddenda(orderId: number): Promise<LaboratoryAddendum[]> {
+    const response = await api.get<ApiEnvelope<LaboratoryAddendum[]>>(`/laboratory/orders/${orderId}/addenda`);
+    return response.data.data;
+  },
+  async addAddendum(orderId: number, payload: { reason: string; addendum: string }): Promise<LaboratoryAddendum> {
+    const response = await api.post<ApiEnvelope<LaboratoryAddendum>>(`/laboratory/orders/${orderId}/addenda`, payload);
+    return response.data.data;
+  },
   async verifyResult(orderId: number): Promise<LaboratoryOrder> {
     const response = await api.post<ApiEnvelope<any>>(`/laboratory/orders/${orderId}/verify`, { patientAndSpecimenChecked: true, qualityControlChecked: true });
     return mapOrder(response.data.data);
@@ -127,7 +152,7 @@ export const laboratoryApi = {
   },
 
   async createOrder(payload: CreateLaboratoryOrderPayload): Promise<LaboratoryOrder> {
-    const response = await api.post<ApiEnvelope<any> | any>('/laboratory/orders', { patientId: payload.patientId, testId: payload.testId });
+    const response = await api.post<ApiEnvelope<any> | any>('/laboratory/orders', payload);
     return mapOrder(unwrap(response.data));
   },
 

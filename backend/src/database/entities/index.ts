@@ -22,6 +22,7 @@ export { LaboratoryOrder } from './LaboratoryOrder.js';
 export { RadiologyModality } from './RadiologyModality.js';
 export { RadiologyOrder } from './RadiologyOrder.js';
 export { RadiologyReportAddendum } from './RadiologyReportAddendum.js';
+export { LaboratoryResultAddendum } from './LaboratoryResultAddendum.js';
 export { RadiologyCommunication } from './RadiologyCommunication.js';
 export { RadiologyScheduleEvent } from './RadiologyScheduleEvent.js';
 export { RadiologyResource } from './RadiologyResource.js';

@@ -20,7 +20,7 @@ export const operationsService = {
       appointmentRepo.find({ where: { appointmentDate: reportDate }, relations: { patient: true, doctor: true }, order: { appointmentTime: 'ASC' }, take: 12 }),
       admissionRepo.find({ where: { status: In(['admitted', 'transferred']) }, relations: { patient: true, bed: { ward: true } }, order: { admittedAt: 'DESC' }, take: 10 }),
       invoiceRepo.find({ where: { status: In(['open', 'partially_paid']) }, relations: { patient: true }, order: { createdAt: 'DESC' }, take: 10 }),
-      labRepo.find({ where: { status: In(['ordered', 'collected', 'processing']) }, relations: { patient: true, test: true }, order: { orderedAt: 'ASC' }, take: 10 }),
+      labRepo.find({ where: { status: In(['ordered', 'collected', 'processing', 'verified']) }, relations: { patient: true, test: true }, order: { orderedAt: 'ASC' }, take: 10 }),
       radiologyRepo.find({ where: { status: In(['ordered', 'scheduled', 'performed']) }, relations: { patient: true, modality: true }, order: { orderedAt: 'ASC' }, take: 10 }),
       AppDataSource.getRepository(Bed).count({ where: { status: 'available' } }),
       appointmentRepo.count({ where: { appointmentDate: reportDate } }),
@@ -29,7 +29,7 @@ export const operationsService = {
       invoiceRepo.createQueryBuilder('invoice').select('COUNT(*)', 'count').addSelect('COALESCE(SUM(invoice.balanceAmount), 0)', 'balance').where('invoice.status IN (:...statuses)', { statuses: ['open', 'partially_paid'] }).getRawOne<{ count: string; balance: string }>(),
       batchRepo.createQueryBuilder('batch').where('batch.isActive = :active', { active: true }).andWhere('batch.quantity <= batch.reorderLevel').getCount(),
       batchRepo.count({ where: { isActive: true, expiryDate: LessThan(expiryCutoff) } }),
-      labRepo.count({ where: { status: In(['ordered', 'collected', 'processing']) } }),
+      labRepo.count({ where: { status: In(['ordered', 'collected', 'processing', 'verified']) } }),
       radiologyRepo.count({ where: { status: In(['ordered', 'scheduled', 'performed']) } }),
     ]);
     const openInvoiceCount = Number(invoiceTotals?.count ?? 0);

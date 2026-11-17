@@ -15,6 +15,8 @@ export class LaboratoryOrder {
   @Column({ name: 'doctor_id', type: 'int', unsigned: true, nullable: true }) doctorId!: number | null;
   @ManyToOne(() => Doctor, { onDelete: 'SET NULL', nullable: true }) @JoinColumn({ name: 'doctor_id' }) doctor!: Doctor | null;
   @Column({ type: 'varchar', length: 30, default: 'ordered' }) status!: 'ordered' | 'collected' | 'processing' | 'verified' | 'completed' | 'cancelled';
+  @Column({ type: 'varchar', length: 10, default: 'routine' }) priority!: 'routine' | 'urgent' | 'stat';
+  @Column({ name: 'clinical_notes', type: 'text', nullable: true }) clinicalNotes!: string | null;
   @Column({ name: 'ordered_at', type: 'timestamp' }) orderedAt!: Date;
   @Column({ name: 'collected_at', type: 'timestamp', nullable: true }) collectedAt!: Date | null;
   @Column({ name: 'specimen_label', type: 'varchar', length: 80, nullable: true }) specimenLabel!: string | null;
