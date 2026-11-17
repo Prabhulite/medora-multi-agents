@@ -23,6 +23,8 @@ The implementation will be delivered as tested vertical slices. Existing authent
 - OPD visits, queue/status tracking, consultation handoff
 - Registration sources and patient communication history
 
+Patient merge now moves visit, clinical, pharmacy, billing, and operational records to the surviving chart in one transaction while retaining the source identity and audit trail. It rejects merges when both records have active admissions or both have active emergency cases; staff must resolve those workflows first. The merge audit stores the source and target IDs and counts of moved records. Unique contact and identification details remain attached to the inactive source record for manual review.
+
 Current communication history: authorized staff can manually record inbound or outbound patient contact by phone, SMS, email, in person, or other channel, including subject, summary, time, and optional follow-up due time. Entries are append-only, patient scoped, audited, and shown on the patient dashboard and timeline. Staff can complete a follow-up with a note; open and overdue tasks appear in the patient API, and an open queue appears on Operations for users with patient view permission. Recording an SMS or email here does not send it.
 
 ### Phase 2: Clinical EMR

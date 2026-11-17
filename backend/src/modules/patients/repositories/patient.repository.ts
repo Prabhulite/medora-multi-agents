@@ -14,6 +14,7 @@ import {
   type PatientGender,
 } from '../../../database/entities/index.js';
 import { nextSequenceNumber } from '../services/number-sequence.service.js';
+import { ConflictError } from '../../../shared/errors/AppError.js';
 
 export interface PatientListView {
   id: number;
@@ -862,6 +863,21 @@ export const patientRepository = {
       if (!source || !target) return null;
       if (!source.isActive || source.mergedIntoPatientId) return null;
       if (!target.isActive || target.mergedIntoPatientId) return null;
+
+      const activeAdmissions: Array<{ patientId: number }> = await manager.query(
+        "SELECT DISTINCT patient_id AS patientId FROM admissions WHERE patient_id IN (?, ?) AND status <> 'discharged'",
+        [sourcePatientId, targetPatientId],
+      );
+      if (activeAdmissions.length > 1) {
+        throw new ConflictError('Both patients have active admissions. Resolve one before merging.');
+      }
+      const activeEmergencyCases: Array<{ patientId: number }> = await manager.query(
+        "SELECT DISTINCT patient_id AS patientId FROM emergency_cases WHERE patient_id IN (?, ?) AND status IN ('waiting', 'in_care')",
+        [sourcePatientId, targetPatientId],
+      );
+      if (activeEmergencyCases.length > 1) {
+        throw new ConflictError('Both patients have active emergency cases. Resolve one before merging.');
+      }
 
       source.isActive = false;
       source.mergedIntoPatientId = targetPatientId;

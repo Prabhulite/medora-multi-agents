@@ -900,6 +900,13 @@ try {
   assert.equal((await ok('GET', '/api/patients/1/audit-logs')).some((row: { action: string }) => row.action === 'fhir_exported'), true);
   assert.equal((await request('GET', '/api/fhir/r4/Patient/999999')).status, 404);
   assert.equal((await request('GET', '/api/fhir/r4/Patient/invalid')).status, 422);
+  await dataSource.query("INSERT INTO admissions (admission_number,patient_id,bed_id,status) VALUES ('IT-MERGE-ADM-1',1,1,'admitted'),('IT-MERGE-ADM-2',2,2,'admitted')");
+  assert.equal((await request('POST', '/api/patients/merge', { sourcePatientId: 2, targetPatientId: 1 })).status, 409);
+  assert.equal((await dataSource.query('SELECT merged_into_patient_id AS mergedIntoPatientId FROM patients WHERE id = 2'))[0].mergedIntoPatientId, null);
+  await dataSource.query("DELETE FROM admissions WHERE admission_number IN ('IT-MERGE-ADM-1','IT-MERGE-ADM-2')");
+  await dataSource.query("INSERT INTO emergency_cases (case_number,patient_id,triage_category,chief_complaint,triaged_at,status) VALUES ('IT-MERGE-ER-1',1,'yellow','Merge conflict',CURRENT_TIMESTAMP(6),'waiting'),('IT-MERGE-ER-2',2,'yellow','Merge conflict',CURRENT_TIMESTAMP(6),'in_care')");
+  assert.equal((await request('POST', '/api/patients/merge', { sourcePatientId: 2, targetPatientId: 1 })).status, 409);
+  await dataSource.query("DELETE FROM emergency_cases WHERE case_number IN ('IT-MERGE-ER-1','IT-MERGE-ER-2')");
   const sourcePrescription = await ok('POST', '/api/pharmacy/prescriptions', { patientId: 2, medicineName: 'Merged Chart Medicine' }, 201);
   await ok('POST', '/api/pharmacy/inventory/dispense', { batchId: stock.id, patientId: 2, quantity: 1, reference: 'IT-MERGE-DISPENSE' });
   await dataSource.query("UPDATE patients SET gender = 'transgender' WHERE id = 2");
