@@ -1,12 +1,31 @@
 import { AppDataSource } from '../../../config/data-source.js';
-import { Doctor, Patient, RadiologyModality, RadiologyOrder, RadiologyReportAddendum, User, UserNotification } from '../../../database/entities/index.js';
+import { Doctor, Patient, RadiologyCommunication, RadiologyModality, RadiologyOrder, RadiologyReportAddendum, User, UserNotification } from '../../../database/entities/index.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { nextSequenceNumber } from '../../patients/services/number-sequence.service.js';
-import type { CreateRadiologyAddendumInput, CreateRadiologyOrderInput, UpdateRadiologyReportInput } from '../validators/radiology.validators.js';
+import type { CreateRadiologyAddendumInput, CreateRadiologyCommunicationInput, CreateRadiologyOrderInput, UpdateRadiologyReportInput } from '../validators/radiology.validators.js';
 
 const orderRelations = { patient: true, modality: true, doctor: true } as const;
 
 export const radiologyService = {
+  async listCommunications(orderId: number) {
+    if (!await AppDataSource.getRepository(RadiologyOrder).exist({ where: { id: orderId } })) throw new NotFoundError('Radiology order not found');
+    const rows = await AppDataSource.getRepository(RadiologyCommunication).find({ where: { orderId }, relations: { recordedBy: true }, order: { id: 'ASC' } });
+    return rows.map(({ id, outcome, method, recipientName, findingSummary, note, occurredAt, recordedById, createdAt, recordedBy }) => ({ id, outcome, method, recipientName, findingSummary, note, occurredAt, recordedById, createdAt, recorderName: recordedBy?.fullName ?? null }));
+  },
+  async recordCommunication(orderId: number, input: CreateRadiologyCommunicationInput, userId: number | null) {
+    const occurredAt = new Date(input.occurredAt);
+    if (occurredAt.getTime() > Date.now() + 5 * 60_000) throw new ValidationError('Communication time cannot be in the future');
+    return AppDataSource.transaction(async (manager) => {
+      const order = await manager.getRepository(RadiologyOrder).findOne({ where: { id: orderId } });
+      if (!order) throw new NotFoundError('Radiology order not found');
+      if (!['performed', 'reported'].includes(order.status)) throw new ConflictError('Communication can only be recorded after a study is performed');
+      if (occurredAt < order.orderedAt) throw new ValidationError('Communication time cannot precede the order');
+      const repo = manager.getRepository(RadiologyCommunication);
+      const row = await repo.save(repo.create({ orderId, outcome: input.outcome, method: input.method, recipientName: input.recipientName, findingSummary: input.findingSummary, note: input.note ?? null, occurredAt, recordedById: userId }));
+      const recorder = userId ? await manager.getRepository(User).findOne({ where: { id: userId } }) : null;
+      return { id: row.id, outcome: row.outcome, method: row.method, recipientName: row.recipientName, findingSummary: row.findingSummary, note: row.note, occurredAt: row.occurredAt, recordedById: row.recordedById, createdAt: row.createdAt, recorderName: recorder?.fullName ?? null };
+    });
+  },
   async listAddenda(orderId: number) {
     if (!await AppDataSource.getRepository(RadiologyOrder).exist({ where: { id: orderId } })) throw new NotFoundError('Radiology order not found');
     const rows = await AppDataSource.getRepository(RadiologyReportAddendum).find({ where: { orderId }, relations: { createdBy: true }, order: { id: 'ASC' } });

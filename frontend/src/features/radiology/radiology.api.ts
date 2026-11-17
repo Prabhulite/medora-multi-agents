@@ -11,6 +11,8 @@ export interface RadiologyModality {
 export type RadiologyOrderStatus = 'ordered' | 'scheduled' | 'performed' | 'reported' | 'cancelled';
 export interface ReferringDoctor { id: number; name: string; doctorCode: string; medicalRegistrationNumber: string }
 export interface RadiologyAddendum { id: number; reason: string; addendum: string; createdById: number | null; createdAt: string; authorName: string | null }
+export interface RadiologyCommunication { id: number; outcome: 'attempted' | 'delivered'; method: 'phone' | 'in_person' | 'secure_message' | 'other'; recipientName: string; findingSummary: string; note: string | null; occurredAt: string; recordedById: number | null; createdAt: string; recorderName: string | null }
+export type CreateRadiologyCommunicationPayload = Pick<RadiologyCommunication, 'outcome' | 'method' | 'recipientName' | 'findingSummary' | 'occurredAt'> & { note?: string | null };
 
 export interface RadiologyOrder {
   id: number;
@@ -99,6 +101,14 @@ function mapOrder(row: any): RadiologyOrder {
 }
 
 export const radiologyApi = {
+  async listCommunications(orderId: number): Promise<RadiologyCommunication[]> {
+    const response = await api.get<ApiEnvelope<RadiologyCommunication[]>>(`/radiology/orders/${orderId}/communications`);
+    return response.data.data;
+  },
+  async recordCommunication(orderId: number, payload: CreateRadiologyCommunicationPayload): Promise<RadiologyCommunication> {
+    const response = await api.post<ApiEnvelope<RadiologyCommunication>>(`/radiology/orders/${orderId}/communications`, payload);
+    return response.data.data;
+  },
   async listAddenda(orderId: number): Promise<RadiologyAddendum[]> {
     const response = await api.get<ApiEnvelope<RadiologyAddendum[]>>(`/radiology/orders/${orderId}/addenda`);
     return response.data.data;

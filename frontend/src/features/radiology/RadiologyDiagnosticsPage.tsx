@@ -9,10 +9,10 @@ import { Table, type TableColumn } from '../../components/ui/Table';
 import { getErrorMessage } from '../../lib/api';
 import { hasPermission } from '../../lib/permissions';
 import { useAuth } from '../auth/AuthContext';
-import { radiologyApi, type CreateRadiologyOrderPayload, type RadiologyAddendum, type RadiologyModality, type RadiologyOrder, type ReferringDoctor, type UpdateRadiologyReportPayload } from './radiology.api';
+import { radiologyApi, type CreateRadiologyOrderPayload, type RadiologyAddendum, type RadiologyCommunication, type RadiologyModality, type RadiologyOrder, type ReferringDoctor, type UpdateRadiologyReportPayload } from './radiology.api';
 import './RadiologyDiagnosticsPage.css';
 
-type Modal = 'order' | 'report' | null;
+type Modal = 'order' | 'report' | 'communications' | null;
 const statusTone: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'neutral'> = {
   ordered: 'info', scheduled: 'warning', performed: 'warning', reported: 'success', cancelled: 'danger',
 };
@@ -59,7 +59,7 @@ export function RadiologyDiagnosticsPage() {
     { key: 'study', header: 'Study', render: (row) => <div><div className="ui-table__cell-title">{row.studyName}</div><div className="ui-table__cell-sub">{row.modalityCode || row.modalityName} · {row.priority || 'routine'}</div></div> },
     { key: 'report', header: 'Report', render: (row) => row.report || row.impression ? <div><div className="ui-table__cell-title">Report available</div><div className="ui-table__cell-sub">{row.reportedAt ? dateLabel(row.reportedAt) : 'Draft report'}</div></div> : <span className="radiology-muted">Awaiting report</span> },
     { key: 'status', header: 'Status', render: (row) => <Badge tone={statusTone[row.status] || 'neutral'}>{row.status.replace('_', ' ')}</Badge> },
-    { key: 'actions', header: 'Actions', render: (row) => <div className="radiology-actions">{canUpdate && ['ordered', 'scheduled'].includes(row.status) && <Button size="sm" variant="secondary" onClick={() => void markPerformed(row)}>Mark performed</Button>}{(row.status === 'performed' && canUpdate || row.status === 'reported') && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('report'); }}>{row.status === 'reported' ? 'View final report' : row.report ? 'Edit draft' : 'Enter report'}</Button>}</div> },
+    { key: 'actions', header: 'Actions', render: (row) => <div className="radiology-actions">{canUpdate && ['ordered', 'scheduled'].includes(row.status) && <Button size="sm" variant="secondary" onClick={() => void markPerformed(row)}>Mark performed</Button>}{(row.status === 'performed' && canUpdate || row.status === 'reported') && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('report'); }}>{row.status === 'reported' ? 'View final report' : row.report ? 'Edit draft' : 'Enter report'}</Button>}{['performed', 'reported'].includes(row.status) && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('communications'); }}>Communications</Button>}</div> },
   ], [canUpdate]);
 
   const markPerformed = async (order: RadiologyOrder) => {
@@ -100,6 +100,7 @@ export function RadiologyDiagnosticsPage() {
     </section>
     {modal === 'order' ? <OrderForm modalities={modalities} saving={saving} onClose={() => setModal(null)} onSubmit={(payload) => void saveOrder(payload)} /> : null}
     {modal === 'report' && selectedOrder ? selectedOrder.status === 'reported' ? <FinalReportView order={selectedOrder} canUpdate={canUpdate} onClose={() => { setModal(null); setSelectedOrder(null); }} /> : <ReportForm order={selectedOrder} saving={saving} onClose={() => { setModal(null); setSelectedOrder(null); }} onSubmit={(payload) => void saveReport(payload)} /> : null}
+    {modal === 'communications' && selectedOrder ? <CommunicationView order={selectedOrder} canUpdate={canUpdate} onClose={() => { setModal(null); setSelectedOrder(null); }} /> : null}
   </div>;
 }
 

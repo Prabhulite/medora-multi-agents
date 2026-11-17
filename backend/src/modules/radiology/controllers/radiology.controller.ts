@@ -8,4 +8,6 @@ export const radiologyController = {
   updateReport: async (req: Request, res: Response) => res.json({ success: true, data: await radiologyService.updateReport(Number(req.params.id), req.body, req.user?.id ?? null) }),
   listAddenda: async (req: Request, res: Response) => res.json({ success: true, data: await radiologyService.listAddenda(Number(req.params.id)) }),
   addAddendum: async (req: Request, res: Response) => res.status(201).json({ success: true, data: await radiologyService.addAddendum(Number(req.params.id), req.body, req.user?.id ?? null) }),
+  listCommunications: async (req: Request, res: Response) => res.json({ success: true, data: await radiologyService.listCommunications(Number(req.params.id)) }),
+  recordCommunication: async (req: Request, res: Response) => res.status(201).json({ success: true, data: await radiologyService.recordCommunication(Number(req.params.id), req.body, req.user?.id ?? null) }),
 };
