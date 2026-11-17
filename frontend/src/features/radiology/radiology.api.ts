@@ -12,6 +12,7 @@ export interface RadiologyResource { id: number; code: string; name: string; loc
 export type RadiologyOrderStatus = 'ordered' | 'scheduled' | 'performed' | 'reported' | 'cancelled';
 export interface RadiologyWorklist { items: RadiologyOrder[]; total: number; page: number; pageSize: number; summary: { total: number; pending: number; inProgress: number; reported: number } }
 export interface ReferringDoctor { id: number; name: string; doctorCode: string; medicalRegistrationNumber: string }
+export interface RadiologyPatientCandidate { id: number; mrdNumber: string; fullName: string }
 export interface RadiologyAddendum { id: number; reason: string; addendum: string; createdById: number | null; createdAt: string; authorName: string | null }
 export interface RadiologyCommunication { id: number; outcome: 'attempted' | 'delivered'; method: 'phone' | 'in_person' | 'secure_message' | 'other'; recipientName: string; findingSummary: string | null; note: string | null; occurredAt: string; recordedById: number | null; createdAt: string; recorderName: string | null }
 export interface RadiologyCommunicationQueueItem { id: number; orderNumber: string; patientId: number; patientMrdNumber: string; patientName: string; studyName: string; modalityId: number; priority: 'routine' | 'urgent' | 'stat'; status: 'performed' | 'reported'; performedAt: string | null; reportedAt: string | null; latestAddendumAt: string | null; attemptCount: number; lastAttemptAt: string | null }
@@ -171,6 +172,10 @@ export const radiologyApi = {
   },
   async doctors(search: string): Promise<ReferringDoctor[]> {
     const response = await api.get<ApiEnvelope<ReferringDoctor[]>>('/radiology/doctors', { params: { search } });
+    return response.data.data;
+  },
+  async patients(search: string): Promise<RadiologyPatientCandidate[]> {
+    const response = await api.get<ApiEnvelope<RadiologyPatientCandidate[]>>('/radiology/patients', { params: { search } });
     return response.data.data;
   },
   async listModalities(): Promise<RadiologyModality[]> {

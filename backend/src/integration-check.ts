@@ -103,6 +103,11 @@ try {
   assert.equal((await request('POST', '/api/radiology/resources', { modalityId: 1, code: 'IT-SCAN-1', name: 'Duplicate scanner' })).status, 409);
   assert.equal((await ok('GET', '/api/radiology/resources')).some((row: { id: number }) => row.id === scanner.id), true);
   assert.equal((await ok('GET', '/api/radiology/doctors?search=IT-DOC-1'))[0].id, 1);
+  assert.equal((await request('GET', '/api/radiology/patients?search=A')).status, 422);
+  assert.equal((await ok('GET', '/api/radiology/patients?search=IT-MRD-001'))[0].id, 1);
+  token = radiologyViewerToken;
+  assert.equal((await request('GET', '/api/radiology/patients?search=IT-MRD-001')).status, 403);
+  token = adminToken;
   assert.equal((await request('POST', '/api/radiology/orders', { patientId: 1, modalityId: 1 })).status, 422);
   const imaging = await ok('POST', '/api/radiology/orders', { patientId: 1, modalityId: 1, doctorId: 1, studyName: 'Integration chest image', priority: 'routine' }, 201);
   assert.equal(imaging.studyName, 'Integration chest image');

@@ -102,6 +102,9 @@ try {
   assert.ok(radiologyWorklistReady, 'Radiology worklist did not finish loading');
   assert.equal(await evaluate('Boolean(document.querySelector(".radiology-worklist .ui-table-search input")) && Boolean(document.querySelector(".radiology-worklist .ui-table-toolbar__entries select"))'), true, 'Radiology worklist search and paging controls did not render');
   assert.equal(await evaluate('document.body.innerText.includes("Unable to load radiology worklist")'), false, 'Radiology worklist showed a load error');
+  await evaluate('Array.from(document.querySelectorAll("button")).find(button => button.innerText === "Order imaging")?.click(); true');
+  assert.equal(await evaluate('document.querySelector(".radiology-modal")?.innerText.includes("Search patient by name or MRD") && Boolean(document.querySelector(".radiology-modal button[type=submit]:disabled"))'), true, 'Radiology order form did not require patient selection');
+  await evaluate('document.querySelector(".radiology-modal__header button").click(); true');
   const finalOrderLookup = await evaluate('fetch("/api/radiology/worklist?status=reported&page=1&pageSize=10", { credentials: "include" }).then(async response => ({ status: response.status, body: await response.json() }))') as { status: number; body: { data?: { items?: Array<{ orderNumber: string; reportedById: number | null; reportedByName: string | null; reportText: string | null }> } } };
   assert.equal(finalOrderLookup.status, 200, `Finalized radiology worklist returned ${finalOrderLookup.status}`);
   const finalOrder = finalOrderLookup.body.data?.items?.[0];

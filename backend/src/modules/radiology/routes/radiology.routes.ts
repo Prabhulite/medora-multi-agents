@@ -4,7 +4,7 @@ import { authorize } from '../../../middleware/authorize.js';
 import { validate } from '../../../middleware/validate.js';
 import { asyncHandler } from '../../../shared/utils/asyncHandler.js';
 import { radiologyController } from '../controllers/radiology.controller.js';
-import { createRadiologyAddendumSchema, createRadiologyCommunicationSchema, createRadiologyOrderSchema, createRadiologyResourceSchema, radiologyDoctorLookupSchema, radiologyOrderIdParamSchema, radiologyOrderListSchema, radiologyResourceIdParamSchema, scheduleRadiologyOrderSchema, updateRadiologyResourceStatusSchema, updateRadiologyReportSchema } from '../validators/radiology.validators.js';
+import { createRadiologyAddendumSchema, createRadiologyCommunicationSchema, createRadiologyOrderSchema, createRadiologyResourceSchema, radiologyDoctorLookupSchema, radiologyOrderIdParamSchema, radiologyOrderListSchema, radiologyPatientLookupSchema, radiologyResourceIdParamSchema, scheduleRadiologyOrderSchema, updateRadiologyResourceStatusSchema, updateRadiologyReportSchema } from '../validators/radiology.validators.js';
 import { radiologyCommunicationQueueSchema } from '../validators/radiology.validators.js';
 import { radiologyWorklistSchema } from '../validators/radiology.validators.js';
 import { cancelRadiologyOrderSchema } from '../validators/radiology.validators.js';
@@ -17,6 +17,7 @@ router.get('/resources', authorize('radiology.view'), asyncHandler(radiologyCont
 router.post('/resources', authorize('radiology.resources.manage'), validate(createRadiologyResourceSchema), asyncHandler(radiologyController.createResource));
 router.patch('/resources/:id/status', authorize('radiology.resources.manage'), validate(radiologyResourceIdParamSchema, 'params'), validate(updateRadiologyResourceStatusSchema), asyncHandler(radiologyController.setResourceActive));
 router.get('/doctors', authorize('radiology.create'), validate(radiologyDoctorLookupSchema, 'query'), asyncHandler(radiologyController.doctorCandidates));
+router.get('/patients', authorize('radiology.create'), validate(radiologyPatientLookupSchema, 'query'), asyncHandler(radiologyController.patientCandidates));
 router.get('/orders', authorize('radiology.view'), validate(radiologyOrderListSchema, 'query'), asyncHandler(radiologyController.listOrders));
 router.post('/orders', authorize('radiology.create'), validate(createRadiologyOrderSchema), asyncHandler(radiologyController.createOrder));
 router.post('/orders/:id/cancel', authorize('radiology.cancel'), validate(radiologyOrderIdParamSchema, 'params'), validate(cancelRadiologyOrderSchema), asyncHandler(radiologyController.cancelOrder));

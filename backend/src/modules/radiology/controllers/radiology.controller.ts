@@ -7,6 +7,7 @@ export const radiologyController = {
   communicationQueue: async (req: Request, res: Response) => res.json({ success: true, data: await radiologyService.communicationQueue(req.query as unknown as RadiologyCommunicationQueueInput) }),
   listModalities: async (_req: Request, res: Response) => res.json({ success: true, data: await radiologyService.listModalities() }),
   doctorCandidates: async (req: Request, res: Response) => res.json({ success: true, data: await radiologyService.doctorCandidates(String(req.query.search)) }),
+  patientCandidates: async (req: Request, res: Response) => res.json({ success: true, data: await radiologyService.patientCandidates(String(req.query.search)) }),
   listOrders: async (req: Request, res: Response) => res.json({ success: true, data: await radiologyService.listOrders(req.query as { patientId?: number; status?: any }, canViewDraft(req)) }),
   createOrder: async (req: Request, res: Response) => res.status(201).json({ success: true, data: await radiologyService.createOrder(req.body, req.user?.id ?? null) }),
   cancelOrder: async (req: Request, res: Response) => res.json({ success: true, data: await radiologyService.cancelOrder(Number(req.params.id), req.body.reason, req.user!.id) }),

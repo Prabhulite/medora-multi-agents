@@ -9,6 +9,7 @@ Patient audit entries are saved transactionally for creation, scheduling/resched
 The final report modal supports browser printing after addenda load. The print layout includes the patient identifier, study and order identifiers, report, impression, reporting dates and staff, and all recorded addenda. Draft reports have no print action. The browser output is not an immutable or signed report archive.
 The radiology list APIs expose `reportedByName` for finalized reports without serializing the related staff account.
 Finalization now requires the reporting staff member to explicitly confirm review of the patient identifier, study, report, and impression. The API enforces the confirmation and records it with the actor in the patient audit event. This is an internal attestation, not an independent clinical verification or regulated signature; historical final reports predate this requirement.
+Order entry uses a limited search of active, unmerged patients by MRD or name. Only users with `radiology.create` may use the lookup; the form requires selecting a returned patient before submission. The order API independently rechecks that the patient remains active.
 
 ## Scope
 

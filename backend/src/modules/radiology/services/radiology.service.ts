@@ -235,6 +235,15 @@ export const radiologyService = {
       .orderBy('doctor.name', 'ASC').take(20).getMany();
     return doctors.map((doctor) => ({ id: doctor.id, name: doctor.name, doctorCode: doctor.doctorCode, medicalRegistrationNumber: doctor.medicalRegistrationNumber }));
   },
+  async patientCandidates(search: string) {
+    const escaped = search.replace(/[%_\\]/g, '\\$&');
+    const patients = await AppDataSource.getRepository(Patient).createQueryBuilder('patient')
+      .select(['patient.id', 'patient.mrdNumber', 'patient.firstName', 'patient.middleName', 'patient.lastName'])
+      .where('patient.is_active = 1 AND patient.merged_into_patient_id IS NULL')
+      .andWhere('(patient.mrd_number LIKE :search OR patient.first_name LIKE :search OR patient.last_name LIKE :search)', { search: `%${escaped}%` })
+      .orderBy('patient.id', 'DESC').take(10).getMany();
+    return patients.map((patient) => ({ id: patient.id, mrdNumber: patient.mrdNumber, fullName: [patient.firstName, patient.middleName, patient.lastName].filter(Boolean).join(' ') }));
+  },
   async createOrder(input: CreateRadiologyOrderInput, userId: number | null) {
     return AppDataSource.transaction(async (manager) => {
       const [patient, modality, doctor] = await Promise.all([
