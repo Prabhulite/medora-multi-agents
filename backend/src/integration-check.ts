@@ -483,6 +483,11 @@ try {
   const stock = await ok('POST', '/api/pharmacy/inventory/receipts', { medicationId: 1, batchNumber: 'IT-BATCH', expiryDate: '2030-12-31', purchasePrice: 1, sellingPrice: 2, quantity: 20, reorderLevel: 2 }, 201);
   await Promise.all([3, 4].map((quantity) => ok('POST', '/api/pharmacy/inventory/receipts', { medicationId: 1, batchNumber: 'IT-BATCH', expiryDate: '2030-12-31', purchasePrice: 1, sellingPrice: 2, quantity, reorderLevel: 2 }, 201)));
   const inventoryAfterReceipts = await ok('GET', '/api/pharmacy/inventory?medicationId=1');
+  assert.equal((await request('GET', '/api/pharmacy/inventory/patients?search=A')).status, 422);
+  assert.deepEqual((await ok('GET', '/api/pharmacy/inventory/patients?search=IT-MRD-001'))[0], { id: 1, mrdNumber: 'IT-MRD-001', fullName: 'Integration Patient' });
+  token = radiologyViewerToken;
+  assert.equal((await request('GET', '/api/pharmacy/inventory/patients?search=IT-MRD-001')).status, 403);
+  token = adminToken;
   assert.equal(inventoryAfterReceipts.find((row: { id: number }) => row.id === stock.id).quantity, 27);
   assert.equal((await request('POST', '/api/pharmacy/inventory/receipts', { medicationId: 1, batchNumber: 'IT-BATCH', expiryDate: '2031-01-01', purchasePrice: 1, sellingPrice: 2, quantity: 1, reorderLevel: 2 })).status, 409);
   const laterAllergy = await ok('POST', '/api/clinical/patients/1/allergies', { allergen: 'Integration Medicine', severity: 'severe' }, 201);

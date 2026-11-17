@@ -5,6 +5,15 @@ import type { DispenseStockInput, ReceiveStockInput } from '../validators/invent
 import { assertNoRecordedAllergy } from '../../clinical/services/allergy-check.js';
 
 export const inventoryService = {
+  async patients(search: string) {
+    const escaped = search.replace(/[%_\\]/g, '\\$&');
+    const rows = await AppDataSource.getRepository(Patient).createQueryBuilder('patient')
+      .select(['patient.id', 'patient.mrdNumber', 'patient.firstName', 'patient.middleName', 'patient.lastName'])
+      .where('patient.is_active = 1 AND patient.merged_into_patient_id IS NULL')
+      .andWhere('(patient.mrd_number LIKE :search OR patient.first_name LIKE :search OR patient.last_name LIKE :search)', { search: `%${escaped}%` })
+      .orderBy('patient.id', 'DESC').take(10).getMany();
+    return rows.map((patient) => ({ id: patient.id, mrdNumber: patient.mrdNumber, fullName: [patient.firstName, patient.middleName, patient.lastName].filter(Boolean).join(' ') }));
+  },
   async dispenses(patientId: number) {
     const rows = await AppDataSource.getRepository(StockTransaction).find({ where: { patientId, type: 'dispense' }, relations: { batch: { medication: true }, prescription: true, createdBy: true }, order: { createdAt: 'DESC' }, take: 200 });
     return rows.map((row) => ({ ...row, createdBy: row.createdBy ? { id: row.createdBy.id, fullName: row.createdBy.fullName } : null }));
@@ -54,7 +63,7 @@ export const inventoryService = {
       }
       if (input.patientId) {
         const patient = await manager.getRepository(Patient).findOne({ where: { id: input.patientId, isActive: true } });
-        if (!patient) throw new NotFoundError('Patient not found');
+        if (!patient || patient.mergedIntoPatientId) throw new NotFoundError('Active patient not found');
         await assertNoRecordedAllergy(manager, input.patientId, [batch.medication.brandName, batch.medication.genericName, prescription?.medicineName]);
       }
       batch.quantity -= input.quantity; await repo.save(batch);

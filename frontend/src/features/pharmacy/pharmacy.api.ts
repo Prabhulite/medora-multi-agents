@@ -34,6 +34,7 @@ export interface DispenseStockPayload {
   reference?: string | null;
 }
 export interface DispenseRecord { id: number; quantity: number; createdAt: string; reference: string | null; batch: { batchNumber: string; medication: { brandName: string } }; prescription: { id: number; medicineName: string } | null; createdBy: { fullName: string } | null }
+export interface PharmacyPatientCandidate { id: number; mrdNumber: string; fullName: string }
 
 interface ApiEnvelope<T> { data: T; }
 
@@ -61,6 +62,10 @@ function mapBatch(row: any): InventoryBatch {
 }
 
 export const pharmacyApi = {
+  async patients(search: string): Promise<PharmacyPatientCandidate[]> {
+    const response = await api.get<ApiEnvelope<PharmacyPatientCandidate[]>>('/pharmacy/inventory/patients', { params: { search } });
+    return response.data.data;
+  },
   async listDispenses(patientId: number): Promise<DispenseRecord[]> {
     const response = await api.get<ApiEnvelope<DispenseRecord[]> | DispenseRecord[]>('/pharmacy/inventory/dispenses', { params: { patientId } });
     return unwrap(response.data) || [];

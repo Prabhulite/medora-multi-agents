@@ -19,6 +19,7 @@
 .pharmacy-modal__header h2 { margin-top: 5px; font-size: 21px; }
 .pharmacy-modal__header > button { border: 0; background: transparent; color: var(--color-text-secondary); font-size: 27px; line-height: 1; padding: 0 3px; }
 .pharmacy-form { display: grid; gap: 16px; padding: 22px 24px 24px; }
+.pharmacy-patient-picker { display: grid; gap: 8px; }
 .pharmacy-form__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 16px; }
 .pharmacy-modal__footer { display: flex; justify-content: flex-end; gap: 10px; padding-top: 7px; }
 .pharmacy-fefo-note { padding: 12px 14px; border: 1px solid #d7e9dc; border-radius: var(--radius-sm); background: var(--color-selected); color: var(--color-brand-deep); font-size: 13px; line-height: 1.45; }

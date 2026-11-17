@@ -72,6 +72,7 @@ Current patient chart tabs: Profile and MRD show identity details and audit hist
 - Drug catalog, batches, expiry, stock ledger, locations
 - Purchase orders, suppliers, goods receipt, stock transfers
 - Pharmacy dispensing and prescription fulfillment
+- Pharmacy inventory dispensing and dispense-history forms now search active, unmerged patients by MRD or name, replacing free-entry patient IDs. General stock issue may still omit a patient; prescription fulfillment requires one. The limited lookup returns ID, MRD, and name under `pharmacy.inventory.view`, and the dispense service rejects merged patients. The browser smoke check opens both pharmacy forms without creating a stock transaction.
 - Reorder levels and stock/expiry alerts
 
 ### Phase 6: Laboratory and radiology

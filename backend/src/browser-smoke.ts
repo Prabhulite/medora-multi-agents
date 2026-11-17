@@ -65,7 +65,7 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   assert.ok(sessionRestored, 'Frontend did not restore the authenticated session after login');
-  await send('Page.navigate', { url: 'http://localhost:5173/laboratory' });
+  await evaluate('history.pushState({}, "", "/laboratory"); window.dispatchEvent(new PopStateEvent("popstate")); true');
   let loaded = false;
   for (let attempt = 0; attempt < 100; attempt++) {
     try { loaded = await evaluate('document.body.innerText.includes("Laboratory diagnostics") && document.body.innerText.includes("Laboratory orders")'); } catch { /* navigation resets the execution context */ }
@@ -159,6 +159,20 @@ try {
     assert.ok(printed.data?.startsWith('JVBERi0') && printed.data.length > 5000, 'Radiology report PDF print output was empty');
     await send('Emulation.setEmulatedMedia', { media: 'screen' });
   }
+  await evaluate('history.pushState({}, "", "/pharmacy"); window.dispatchEvent(new PopStateEvent("popstate")); true');
+  let pharmacyReady = false;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    pharmacyReady = await evaluate('document.body.innerText.includes("Pharmacy inventory") && Boolean(Array.from(document.querySelectorAll("button")).find(button => button.innerText === "Dispense stock"))');
+    if (pharmacyReady) break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.ok(pharmacyReady, 'Pharmacy inventory did not render');
+  await evaluate('Array.from(document.querySelectorAll("button")).find(button => button.innerText === "Dispense stock").click(); true');
+  assert.equal(await evaluate('document.querySelector(".pharmacy-modal")?.innerText.includes("Patient (optional)")'), true, 'Pharmacy dispense form did not show patient search');
+  await evaluate('document.querySelector(".pharmacy-modal__header button").click(); true');
+  await evaluate('Array.from(document.querySelectorAll("button")).find(button => button.innerText === "Dispense history").click(); true');
+  assert.equal(await evaluate('document.querySelector(".pharmacy-modal")?.innerText.includes("Search patient by name or MRD") && Boolean(document.querySelector(".pharmacy-modal button[type=submit]:disabled"))'), true, 'Pharmacy history did not require patient selection');
+  await evaluate('document.querySelector(".pharmacy-modal__header button").click(); true');
   await evaluate('history.pushState({}, "", "/inpatient"); window.dispatchEvent(new PopStateEvent("popstate")); true');
   let inpatientLoaded = false;
   for (let attempt = 0; attempt < 100; attempt++) {
@@ -169,7 +183,7 @@ try {
   const inpatientState = await evaluate('({ path: location.pathname, login: document.body.innerText.includes("Sign in"), inpatient: document.body.innerText.includes("Inpatient Management"), active: document.body.innerText.includes("Active admissions"), page: Boolean(document.querySelector(".inpatient-page")), kpis: Boolean(document.querySelector(".inpatient-kpis")), loadError: document.body.innerText.includes("Unable to load inpatient dashboard") })');
   assert.ok(inpatientLoaded, `Inpatient dashboard did not render: ${JSON.stringify(inpatientState)}`);
   assert.equal(await evaluate('document.body.innerText.includes("Unable to load inpatient dashboard")'), false, 'Inpatient dashboard showed a load error');
-  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, communication queues, inpatient dashboard${patientLookup.body.data?.length ? ', radiology patient selection' : ''}${finalOrderNumber ? ', and finalized radiology report print output' : ''} rendered in headless Chrome.`);
+  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, communication queues, pharmacy patient forms, inpatient dashboard${patientLookup.body.data?.length ? ', radiology patient selection' : ''}${finalOrderNumber ? ', and finalized radiology report print output' : ''} rendered in headless Chrome.`);
   await send('Browser.close').catch(() => undefined);
   socket.close();
 } finally {
