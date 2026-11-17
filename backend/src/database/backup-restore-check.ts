@@ -36,7 +36,7 @@ try {
   await runFile(process.execPath, [restoreScript, dump, target], { env: childEnv });
   const [rows] = await admin.query<mysql.RowDataPacket[]>(`SELECT label FROM \`${target}\`.probe WHERE id = 1`);
   assert.equal(rows[0]?.label, 'synthetic');
-    for (const table of ['migrations', 'users', 'roles', 'menus', 'laboratory_orders', 'laboratory_result_addenda', 'radiology_orders', 'radiology_resources', 'radiology_schedule_events', 'radiology_communications', 'radiology_report_addenda', 'blood_units']) {
+  for (const table of ['migrations', 'users', 'roles', 'menus', 'laboratory_orders', 'laboratory_result_addenda', 'radiology_orders', 'radiology_resources', 'radiology_schedule_events', 'radiology_communications', 'radiology_report_addenda', 'blood_units']) {
     const [sourceCount] = await admin.query<mysql.RowDataPacket[]>(`SELECT COUNT(*) AS total FROM \`${source}\`.\`${table}\``);
     const [targetCount] = await admin.query<mysql.RowDataPacket[]>(`SELECT COUNT(*) AS total FROM \`${target}\`.\`${table}\``);
     assert.equal(targetCount[0]?.total, sourceCount[0]?.total, `Restored count mismatch for ${table}`);

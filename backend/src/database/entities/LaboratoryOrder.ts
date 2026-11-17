@@ -23,6 +23,9 @@ export class LaboratoryOrder {
   @Column({ name: 'collected_by_id', type: 'int', unsigned: true, nullable: true }) collectedById!: number | null;
   @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true }) @JoinColumn({ name: 'collected_by_id' }) collectedBy!: User | null;
   @Column({ name: 'completed_at', type: 'timestamp', nullable: true }) completedAt!: Date | null;
+  @Column({ name: 'cancelled_at', type: 'timestamp', precision: 6, nullable: true }) cancelledAt!: Date | null;
+  @Column({ name: 'cancelled_by_id', type: 'int', unsigned: true, nullable: true }) cancelledById!: number | null;
+  @Column({ name: 'cancellation_reason', type: 'varchar', length: 500, nullable: true }) cancellationReason!: string | null;
   @Column({ name: 'verified_at', type: 'timestamp', precision: 6, nullable: true }) verifiedAt!: Date | null;
   @Column({ name: 'verified_by_id', type: 'int', unsigned: true, nullable: true }) verifiedById!: number | null;
   @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true }) @JoinColumn({ name: 'verified_by_id' }) verifiedBy!: User | null;

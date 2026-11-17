@@ -1,10 +1,49 @@
 import { AppDataSource } from '../../../config/data-source.js';
-import { Doctor, LaboratoryOrder, LaboratoryResultAddendum, LaboratoryTest, Patient, User, UserNotification } from '../../../database/entities/index.js';
+import { Doctor, LaboratoryOrder, LaboratoryResultAddendum, LaboratoryTest, Patient, PatientAuditLog, User, UserNotification } from '../../../database/entities/index.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { nextSequenceNumber } from '../../patients/services/number-sequence.service.js';
-import type { CollectLaboratorySampleInput, CreateLaboratoryAddendumInput, CreateLaboratoryOrderInput, UpdateLaboratoryResultInput } from '../validators/laboratory.validators.js';
+import type { CollectLaboratorySampleInput, CreateLaboratoryAddendumInput, CreateLaboratoryOrderInput, CreateLaboratoryTestInput, UpdateLaboratoryResultInput } from '../validators/laboratory.validators.js';
+
+const orderRelations = { patient: true, test: true, doctor: true, collectedBy: true } as const;
+function orderResponse(order: LaboratoryOrder, canViewDraft = true) {
+  const { patient, test, doctor, collectedBy, ...fields } = order;
+  return {
+    ...fields,
+    patient: { id: patient.id, mrdNumber: patient.mrdNumber, firstName: patient.firstName, middleName: patient.middleName, lastName: patient.lastName },
+    test: { id: test.id, testCode: test.testCode, testName: test.testName },
+    doctor: doctor ? { id: doctor.id, name: doctor.name } : null,
+    collectedBy: collectedBy ? { id: collectedBy.id, fullName: collectedBy.fullName } : null,
+    ...(!canViewDraft && order.status !== 'completed' ? { resultValue: null, resultUnit: null, referenceRange: null, resultNotes: null } : {}),
+  };
+}
 
 export const laboratoryService = {
+  async createTest(input: CreateLaboratoryTestInput) {
+    const repo = AppDataSource.getRepository(LaboratoryTest);
+    if (await repo.exist({ where: { testCode: input.testCode } })) throw new ConflictError('Laboratory test code already exists');
+    try { return await repo.save(repo.create({ testCode: input.testCode, testName: input.testName, category: input.category ?? null, priority: input.priority, turnaroundHours: input.turnaroundHours, price: input.price.toFixed(2), isActive: true })); }
+    catch (error) { if (error && typeof error === 'object' && 'driverError' in error && (error.driverError as { code?: string })?.code === 'ER_DUP_ENTRY') throw new ConflictError('Laboratory test code already exists'); throw error; }
+  },
+  async retireTest(id: number) {
+    return AppDataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(LaboratoryTest);
+      const row = await repo.createQueryBuilder('test').setLock('pessimistic_write').where('test.id = :id', { id }).getOne();
+      if (!row) throw new NotFoundError('Laboratory test not found');
+      if (!row.isActive) throw new ConflictError('Laboratory test is already inactive');
+      row.isActive = false;
+      return repo.save(row);
+    });
+  },
+  async reactivateTest(id: number) {
+    return AppDataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(LaboratoryTest);
+      const row = await repo.createQueryBuilder('test').setLock('pessimistic_write').where('test.id = :id', { id }).getOne();
+      if (!row) throw new NotFoundError('Laboratory test not found');
+      if (row.isActive) throw new ConflictError('Laboratory test is already active');
+      row.isActive = true;
+      return repo.save(row);
+    });
+  },
   async patientCandidates(search: string) {
     const term = `%${search.replace(/[%_\\]/g, '\\$&')}%`;
     const rows = await AppDataSource.getRepository(Patient).createQueryBuilder('patient')
@@ -37,6 +76,7 @@ export const laboratoryService = {
       if (order.status !== 'completed') throw new ConflictError('Only released results can receive addenda');
       const repo = manager.getRepository(LaboratoryResultAddendum);
       const row = await repo.save(repo.create({ orderId, reason: input.reason, addendum: input.addendum, createdById: userId }));
+      await manager.getRepository(PatientAuditLog).save({ patientId: order.patientId, action: 'laboratory_result_amended', changedById: userId, changeSummary: `Laboratory result amended: ${order.orderNumber}`, beforeData: JSON.stringify({ orderId, status: 'completed' }), afterData: JSON.stringify({ orderId, addendumId: row.id, reason: row.reason }) });
       if (order.doctorId) {
         const doctor = await manager.getRepository(Doctor).findOne({ where: { id: order.doctorId, isActive: true } });
         if (doctor?.accountUserId && await manager.getRepository(User).exist({ where: { id: doctor.accountUserId, isActive: true } })) {
@@ -48,9 +88,22 @@ export const laboratoryService = {
     });
   },
   listTests() { return AppDataSource.getRepository(LaboratoryTest).find({ where: { isActive: true }, order: { category: 'ASC', testName: 'ASC' } }); },
+  listAllTests() { return AppDataSource.getRepository(LaboratoryTest).find({ order: { category: 'ASC', testName: 'ASC' } }); },
+  async cancelOrder(orderId: number, reason: string, userId: number) {
+    return AppDataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(LaboratoryOrder);
+      const order = await repo.createQueryBuilder('order').setLock('pessimistic_write').where('order.id = :id', { id: orderId }).getOne();
+      if (!order) throw new NotFoundError('Laboratory order not found');
+      if (order.status !== 'ordered') throw new ConflictError('Only uncollected laboratory orders can be cancelled');
+      order.status = 'cancelled'; order.cancelledAt = new Date(); order.cancelledById = userId; order.cancellationReason = reason;
+      await repo.save(order);
+      await manager.getRepository(PatientAuditLog).save({ patientId: order.patientId, action: 'laboratory_order_cancelled', changedById: userId, changeSummary: `Laboratory order cancelled: ${order.orderNumber}`, beforeData: JSON.stringify({ orderId, status: 'ordered' }), afterData: JSON.stringify({ orderId, status: 'cancelled', reason }) });
+      return orderResponse((await repo.findOneOrFail({ where: { id: orderId }, relations: orderRelations })));
+    });
+  },
   async listOrders(filters: { patientId?: number; status?: LaboratoryOrder['status'] }, canViewDraft: boolean) {
-    const rows = await AppDataSource.getRepository(LaboratoryOrder).find({ where: { ...(filters.patientId ? { patientId: filters.patientId } : {}), ...(filters.status ? { status: filters.status } : {}) }, relations: { patient: true, test: true, doctor: true }, order: { orderedAt: 'DESC' } });
-    return rows.map((row) => canViewDraft || row.status === 'completed' ? row : { ...row, resultValue: null, resultUnit: null, referenceRange: null, resultNotes: null });
+    const rows = await AppDataSource.getRepository(LaboratoryOrder).find({ where: { ...(filters.patientId ? { patientId: filters.patientId } : {}), ...(filters.status ? { status: filters.status } : {}) }, relations: orderRelations, order: { orderedAt: 'DESC' } });
+    return rows.map((row) => orderResponse(row, canViewDraft));
   },
   async createOrder(input: CreateLaboratoryOrderInput, userId: number | null) {
     return AppDataSource.transaction(async (manager) => {
@@ -63,7 +116,8 @@ export const laboratoryService = {
       if (!test) throw new NotFoundError('Active laboratory test not found');
       if (input.doctorId && !doctor) throw new NotFoundError('Active doctor not found');
       const order = await manager.getRepository(LaboratoryOrder).save(manager.getRepository(LaboratoryOrder).create({ orderNumber: await nextSequenceNumber(manager, 'LAB', 'LAB', 6), patientId: input.patientId, testId: input.testId, doctorId: input.doctorId ?? null, priority: input.priority, clinicalNotes: input.clinicalNotes ?? null, status: 'ordered', orderedAt: new Date(), createdById: userId, collectedAt: null, completedAt: null, resultValue: null, resultUnit: null, referenceRange: null, resultNotes: null, resultedById: null }));
-      return manager.getRepository(LaboratoryOrder).findOne({ where: { id: order.id }, relations: { patient: true, test: true, doctor: true } });
+      await manager.getRepository(PatientAuditLog).save({ patientId: order.patientId, action: 'laboratory_order_created', changedById: userId, changeSummary: `Laboratory order created: ${order.orderNumber}`, beforeData: null, afterData: JSON.stringify({ orderId: order.id, testId: order.testId, priority: order.priority, doctorId: order.doctorId }) });
+      return orderResponse((await manager.getRepository(LaboratoryOrder).findOneOrFail({ where: { id: order.id }, relations: orderRelations })));
     });
   },
   async collectSample(orderId: number, input: CollectLaboratorySampleInput, userId: number | null) {
@@ -74,7 +128,8 @@ export const laboratoryService = {
       if (order.status !== 'ordered') throw new ConflictError('Only ordered samples can be collected');
       order.status = 'collected'; order.collectedAt = new Date(); order.specimenLabel = input.specimenLabel; order.collectedById = userId;
       await repo.save(order);
-      return repo.findOne({ where: { id: orderId }, relations: { patient: true, test: true, doctor: true, collectedBy: true } });
+      await manager.getRepository(PatientAuditLog).save({ patientId: order.patientId, action: 'laboratory_sample_collected', changedById: userId, changeSummary: `Laboratory sample collected: ${order.orderNumber}`, beforeData: JSON.stringify({ orderId, status: 'ordered' }), afterData: JSON.stringify({ orderId, status: 'collected', specimenLabel: order.specimenLabel }) });
+      return orderResponse((await repo.findOneOrFail({ where: { id: orderId }, relations: orderRelations })));
     });
   },
   async updateResult(orderId: number, input: UpdateLaboratoryResultInput, userId: number | null) {
@@ -85,9 +140,11 @@ export const laboratoryService = {
       if (order.status === 'cancelled') throw new ValidationError('Cancelled laboratory order cannot be updated');
       if (order.status === 'ordered') throw new ConflictError('Collect the sample before entering a result');
       if (order.status === 'verified' || order.status === 'completed') throw new ConflictError('Verified and released results cannot be edited');
+      const previousStatus = order.status;
       order.status = 'processing'; order.resultValue = input.resultValue; order.resultUnit = input.resultUnit ?? null; order.referenceRange = input.referenceRange ?? null; order.resultNotes = input.resultNotes ?? null; order.resultedById = userId;
       await repo.save(order);
-      return repo.findOne({ where: { id: orderId }, relations: { patient: true, test: true, doctor: true, collectedBy: true } });
+      await manager.getRepository(PatientAuditLog).save({ patientId: order.patientId, action: 'laboratory_draft_saved', changedById: userId, changeSummary: `Laboratory draft saved: ${order.orderNumber}`, beforeData: JSON.stringify({ orderId, status: previousStatus }), afterData: JSON.stringify({ orderId, status: 'processing' }) });
+      return orderResponse((await repo.findOneOrFail({ where: { id: orderId }, relations: orderRelations })));
     });
   },
   async verifyResult(orderId: number, userId: number) {
@@ -99,7 +156,8 @@ export const laboratoryService = {
       if (order.resultedById === userId) throw new ConflictError('A second staff member must verify this result');
       order.status = 'verified'; order.verifiedAt = new Date(); order.verifiedById = userId;
       await repo.save(order);
-      return repo.findOne({ where: { id: orderId }, relations: { patient: true, test: true, doctor: true } });
+      await manager.getRepository(PatientAuditLog).save({ patientId: order.patientId, action: 'laboratory_result_verified', changedById: userId, changeSummary: `Laboratory result verified: ${order.orderNumber}`, beforeData: JSON.stringify({ orderId, status: 'processing' }), afterData: JSON.stringify({ orderId, status: 'verified' }) });
+      return orderResponse((await repo.findOneOrFail({ where: { id: orderId }, relations: orderRelations })));
     });
   },
   async releaseResult(orderId: number, userId: number) {
@@ -110,13 +168,14 @@ export const laboratoryService = {
       if (order.status !== 'verified' || !order.verifiedAt) throw new ConflictError('Verify the result before release');
       order.status = 'completed'; order.completedAt = new Date(); order.releasedById = userId;
       await repo.save(order);
+      await manager.getRepository(PatientAuditLog).save({ patientId: order.patientId, action: 'laboratory_result_released', changedById: userId, changeSummary: `Laboratory result released: ${order.orderNumber}`, beforeData: JSON.stringify({ orderId, status: 'verified' }), afterData: JSON.stringify({ orderId, status: 'completed' }) });
       if (order.doctorId) {
         const doctor = await manager.getRepository(Doctor).findOne({ where: { id: order.doctorId, isActive: true } });
         if (doctor?.accountUserId && await manager.getRepository(User).exist({ where: { id: doctor.accountUserId, isActive: true } })) {
           await manager.getRepository(UserNotification).save({ recipientId: doctor.accountUserId, kind: 'lab_result_completed', sourceId: order.id, title: 'Laboratory result completed', message: `Laboratory order ${order.orderNumber} has a completed result. Open the laboratory module to review it.`, route: '/laboratory' });
         }
       }
-      return repo.findOne({ where: { id: orderId }, relations: { patient: true, test: true, doctor: true } });
+      return orderResponse((await repo.findOneOrFail({ where: { id: orderId }, relations: orderRelations })));
     });
   },
 };

@@ -10,10 +10,10 @@ import { Table, type TableColumn } from '../../components/ui/Table';
 import { getErrorMessage } from '../../lib/api';
 import { hasPermission } from '../../lib/permissions';
 import { useAuth } from '../auth/AuthContext';
-import { laboratoryApi, type CreateLaboratoryOrderPayload, type LaboratoryAddendum, type LaboratoryDoctorCandidate, type LaboratoryOrder, type LaboratoryPatientCandidate, type LaboratoryTest, type UpdateLaboratoryResultPayload } from './laboratory.api';
+import { laboratoryApi, type CreateLaboratoryOrderPayload, type CreateLaboratoryTestPayload, type LaboratoryAddendum, type LaboratoryDoctorCandidate, type LaboratoryOrder, type LaboratoryPatientCandidate, type LaboratoryTest, type UpdateLaboratoryResultPayload } from './laboratory.api';
 import './LaboratoryDiagnosticsPage.css';
 
-type Modal = 'order' | 'collect' | 'result' | 'verify' | 'view' | null;
+type Modal = 'order' | 'catalog' | 'collect' | 'result' | 'verify' | 'view' | null;
 
 const statusTone: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'neutral'> = {
   ordered: 'info', collected: 'warning', processing: 'warning', verified: 'info', completed: 'success', cancelled: 'danger',
@@ -31,7 +31,10 @@ export function LaboratoryDiagnosticsPage() {
   const canVerify = hasPermission(user, 'laboratory.verify');
   const canRelease = hasPermission(user, 'laboratory.release');
   const canAmend = hasPermission(user, 'laboratory.amend');
+  const canCancel = hasPermission(user, 'laboratory.cancel');
+  const canManageCatalog = hasPermission(user, 'laboratory.catalog.manage');
   const [tests, setTests] = useState<LaboratoryTest[]>([]);
+  const [catalogTests, setCatalogTests] = useState<LaboratoryTest[]>([]);
   const [orders, setOrders] = useState<LaboratoryOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -40,6 +43,9 @@ export function LaboratoryDiagnosticsPage() {
   const [modal, setModal] = useState<Modal>(null);
   const [selectedOrder, setSelectedOrder] = useState<LaboratoryOrder | null>(null);
   const [releaseTarget, setReleaseTarget] = useState<LaboratoryOrder | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<LaboratoryOrder | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [retireTarget, setRetireTarget] = useState<LaboratoryTest | null>(null);
 
   const load = async () => {
     setLoading(true); setError('');
@@ -65,15 +71,16 @@ export function LaboratoryDiagnosticsPage() {
     { key: 'patient', header: 'Patient', render: (row) => <div><div className="ui-table__cell-title">{row.patientName || `Patient #${row.patientId}`}</div><div className="ui-table__cell-sub">{row.patientMrdNumber || `ID ${row.patientId}`}</div></div> },
     { key: 'test', header: 'Investigation', render: (row) => <div><div className="ui-table__cell-title">{row.testName}</div><div className="ui-table__cell-sub">{row.testCode || 'Laboratory test'} · {row.priority || 'routine'}</div></div> },
     { key: 'result', header: 'Result', render: (row) => row.result ? <div><div className="ui-table__cell-title">{row.result} {row.resultUnit || ''}</div><div className="ui-table__cell-sub">{row.referenceRange ? `Reference: ${row.referenceRange}` : 'Result entered'}</div></div> : <span className="laboratory-muted">Awaiting result</span> },
-    { key: 'status', header: 'Status', render: (row) => <Badge tone={statusTone[row.status] || 'neutral'}>{row.status.replace('_', ' ')}</Badge> },
+    { key: 'status', header: 'Status', render: (row) => <div><Badge tone={statusTone[row.status] || 'neutral'}>{row.status.replace('_', ' ')}</Badge>{row.status === 'cancelled' && row.cancellationReason && <div className="ui-table__cell-sub" title={row.cancellationReason}>Reason: {row.cancellationReason}</div>}</div> },
     { key: 'actions', header: 'Actions', render: (row) => <div className="laboratory-actions">
       {row.status === 'ordered' && canUpdate && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('collect'); }}>Collect sample</Button>}
-      {['collected', 'processing'].includes(row.status) && canUpdate && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('result'); }}>{row.result ? 'Edit draft' : 'Enter draft'}</Button>}
+      {row.status === 'ordered' && canCancel && <Button size="sm" variant="secondary" onClick={() => { setCancelTarget(row); setCancelReason(''); setError(''); }}>Cancel</Button>}
+      {['collected', 'processing'].includes(row.status) && canUpdate && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('result'); setError(''); }}>{row.result ? 'Edit draft' : 'Enter draft'}</Button>}
       {row.status === 'processing' && canVerify && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('verify'); }}>Verify</Button>}
       {row.status === 'verified' && canRelease && <Button size="sm" onClick={() => setReleaseTarget(row)}>Release</Button>}
       {(row.status === 'completed' || row.status === 'verified' && (canUpdate || canVerify || canRelease)) && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('view'); }}>View result</Button>}
     </div> },
-  ], [canUpdate, canVerify, canRelease]);
+  ], [canUpdate, canVerify, canRelease, canCancel]);
 
   const saveOrder = async (payload: CreateLaboratoryOrderPayload) => {
     setSaving(true); setError(''); setNotice('');
@@ -81,6 +88,30 @@ export function LaboratoryDiagnosticsPage() {
       const created = await laboratoryApi.createOrder(payload);
       setOrders((current) => [created, ...current]); setModal(null); setNotice('Laboratory order created successfully.');
     } catch (err) { setError(getErrorMessage(err, 'Unable to create laboratory order')); }
+    finally { setSaving(false); }
+  };
+  const saveTest = async (payload: CreateLaboratoryTestPayload) => {
+    setSaving(true); setError('');
+    try { const created = await laboratoryApi.createTest(payload); setTests((current) => [...current, created].sort((a, b) => a.name.localeCompare(b.name))); setCatalogTests((current) => [...current, created].sort((a, b) => a.name.localeCompare(b.name))); setModal(null); setNotice('Laboratory test added.'); }
+    catch (err) { setError(getErrorMessage(err, 'Unable to add laboratory test')); }
+    finally { setSaving(false); }
+  };
+  const retireTest = async () => {
+    if (!retireTarget) return;
+    setSaving(true); setError('');
+    try { await laboratoryApi.retireTest(retireTarget.id); setTests((current) => current.filter((row) => row.id !== retireTarget.id)); setCatalogTests((current) => current.map((row) => row.id === retireTarget.id ? { ...row, isActive: false } : row)); setRetireTarget(null); setNotice('Laboratory test retired.'); }
+    catch (err) { setRetireTarget(null); setError(getErrorMessage(err, 'Unable to retire laboratory test')); }
+    finally { setSaving(false); }
+  };
+  const openCatalog = async () => {
+    setError('');
+    try { setCatalogTests(await laboratoryApi.listAllTests()); setModal('catalog'); }
+    catch (err) { setError(getErrorMessage(err, 'Unable to load laboratory catalog')); }
+  };
+  const reactivateTest = async (test: LaboratoryTest) => {
+    setSaving(true); setError('');
+    try { const updated = await laboratoryApi.reactivateTest(test.id); setCatalogTests((current) => current.map((row) => row.id === updated.id ? updated : row)); setTests((current) => [...current, updated].sort((a, b) => a.name.localeCompare(b.name))); setNotice('Laboratory test reactivated.'); }
+    catch (err) { setError(getErrorMessage(err, 'Unable to reactivate laboratory test')); }
     finally { setSaving(false); }
   };
 
@@ -116,9 +147,16 @@ export function LaboratoryDiagnosticsPage() {
     catch (err) { setReleaseTarget(null); setError(getErrorMessage(err, 'Unable to release result')); }
     finally { setSaving(false); }
   };
+  const cancelOrder = async () => {
+    if (!cancelTarget) return;
+    setSaving(true); setError('');
+    try { const updated = await laboratoryApi.cancelOrder(cancelTarget.id, cancelReason.trim()); setOrders((current) => current.map((row) => row.id === updated.id ? updated : row)); setCancelTarget(null); setNotice('Laboratory order cancelled.'); }
+    catch (err) { setError(getErrorMessage(err, 'Unable to cancel laboratory order')); }
+    finally { setSaving(false); }
+  };
 
   return <div className="laboratory-page">
-    <PageHeader title="Laboratory diagnostics" subtitle="Order investigations, track turnaround, and publish verified results." actions={canCreate ? <Button size="sm" onClick={() => setModal('order')}>Order a test</Button> : undefined} />
+    <PageHeader title="Laboratory diagnostics" subtitle="Order investigations, track turnaround, and publish verified results." actions={<div className="laboratory-actions">{canManageCatalog && <Button size="sm" variant="secondary" onClick={() => void openCatalog()}>Manage tests</Button>}{canCreate && <Button size="sm" onClick={() => setModal('order')}>Order a test</Button>}</div>} />
     {error ? <Alert tone="error">{error}</Alert> : null}
     {notice ? <Alert tone="success">{notice}</Alert> : null}
     <div className="laboratory-kpis" aria-label="Laboratory summary">
@@ -131,12 +169,15 @@ export function LaboratoryDiagnosticsPage() {
       <div className="laboratory-section__heading"><div><span className="laboratory-eyebrow">DIAGNOSTICS WORKBENCH</span><h2>Laboratory orders</h2><p>Review requests and enter results when the lab completes an investigation.</p></div><Button variant="secondary" size="sm" onClick={() => void load()}>Refresh</Button></div>
       <Table columns={columns} rows={orders} rowKey={(row) => row.id} loading={loading} searchText={(row) => `${row.orderNumber} ${row.patientName || ''} ${row.patientMrdNumber || ''} ${row.testName} ${row.testCode || ''} ${row.status}`} searchPlaceholder="Search orders, patients, or tests" emptyMessage="No laboratory orders found. Create an order to start the diagnostics workflow." />
     </section>
-    {modal === 'order' ? <OrderForm tests={tests} saving={saving} onClose={() => setModal(null)} onSubmit={(payload) => void saveOrder(payload)} /> : null}
+    {modal === 'order' ? <OrderForm tests={tests} saving={saving} error={error} onClose={() => setModal(null)} onSubmit={(payload) => void saveOrder(payload)} /> : null}
+    {modal === 'catalog' && <CatalogForm tests={catalogTests} saving={saving} error={error} onClose={() => setModal(null)} onSubmit={(payload) => void saveTest(payload)} onRetire={(test) => setRetireTarget(test)} onReactivate={(test) => void reactivateTest(test)} />}
     {modal === 'collect' && selectedOrder ? <CollectForm order={selectedOrder} saving={saving} onClose={() => { setModal(null); setSelectedOrder(null); }} onSubmit={(label) => void collectSample(label)} /> : null}
-    {modal === 'result' && selectedOrder ? <ResultForm order={selectedOrder} saving={saving} onClose={() => { setModal(null); setSelectedOrder(null); }} onSubmit={(payload) => void saveResult(payload)} /> : null}
+    {modal === 'result' && selectedOrder ? <ResultForm order={selectedOrder} saving={saving} error={error} onClose={() => { setModal(null); setSelectedOrder(null); }} onSubmit={(payload) => void saveResult(payload)} /> : null}
     {modal === 'verify' && selectedOrder ? <VerifyForm order={selectedOrder} saving={saving} error={error} onClose={() => { setModal(null); setSelectedOrder(null); }} onSubmit={() => void verifyResult()} /> : null}
     {modal === 'view' && selectedOrder ? <ResultView order={selectedOrder} canAmend={canAmend} onClose={() => { setModal(null); setSelectedOrder(null); }} /> : null}
     <ConfirmDialog open={Boolean(releaseTarget)} title="Release laboratory result" message="Release this verified result to the care team? The released result cannot be edited in place." confirmLabel="Release result" confirming={saving} onConfirm={() => void releaseResult()} onCancel={() => setReleaseTarget(null)} />
+    <ConfirmDialog open={Boolean(retireTarget)} title="Retire laboratory test" message={`Retire ${retireTarget?.name || 'this test'} from new orders? Existing orders remain available.`} confirmLabel="Retire test" tone="danger" confirming={saving} onConfirm={() => void retireTest()} onCancel={() => setRetireTarget(null)} />
+    {cancelTarget && <ModalShell title="Cancel laboratory order" eyebrow={cancelTarget.orderNumber} onClose={() => setCancelTarget(null)}><form className="laboratory-form" onSubmit={(event) => { event.preventDefault(); void cancelOrder(); }}><p>Cancel the uncollected order for {cancelTarget.patientName || `patient #${cancelTarget.patientId}`}?</p><label className="laboratory-textarea"><span>Reason</span><textarea required minLength={5} maxLength={500} rows={3} value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} /></label>{error && <Alert tone="error">{error}</Alert>}<FormFooter saving={saving} onClose={() => setCancelTarget(null)} submitLabel="Cancel order" disabled={cancelReason.trim().length < 5} /></form></ModalShell>}
   </div>;
 }
 
@@ -144,7 +185,13 @@ function ModalShell({ title, eyebrow, onClose, children, className = '' }: { tit
   return <div className="laboratory-modal-backdrop" role="presentation" onClick={onClose}><section className={`laboratory-modal ${className}`} role="dialog" aria-modal="true" aria-labelledby="laboratory-modal-title" onClick={(event) => event.stopPropagation()}><div className="laboratory-modal__header"><div><span className="laboratory-eyebrow">{eyebrow}</span><h2 id="laboratory-modal-title">{title}</h2></div><button type="button" onClick={onClose} aria-label={`Close ${title}`}>×</button></div>{children}</section></div>;
 }
 
-function OrderForm({ tests, saving, onClose, onSubmit }: { tests: LaboratoryTest[]; saving: boolean; onClose: () => void; onSubmit: (payload: CreateLaboratoryOrderPayload) => void }) {
+function CatalogForm({ tests, saving, error, onClose, onSubmit, onRetire, onReactivate }: { tests: LaboratoryTest[]; saving: boolean; error: string; onClose: () => void; onSubmit: (payload: CreateLaboratoryTestPayload) => void; onRetire: (test: LaboratoryTest) => void; onReactivate: (test: LaboratoryTest) => void }) {
+  const [form, setForm] = useState({ testCode: '', testName: '', category: '', priority: 'routine' as CreateLaboratoryTestPayload['priority'], turnaroundHours: '24', price: '0' });
+  const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
+  return <ModalShell title="Laboratory test catalog" eyebrow="INVESTIGATIONS" onClose={onClose}><div className="laboratory-form"><h3>Active tests</h3><div className="laboratory-catalog-list">{tests.map((test) => <div key={test.id}><span>{test.name} · {test.code} · {test.isActive ? 'Active' : 'Retired'}</span>{test.isActive ? <Button size="sm" variant="secondary" onClick={() => onRetire(test)}>Retire</Button> : <Button size="sm" variant="secondary" onClick={() => onReactivate(test)}>Reactivate</Button>}</div>)}</div></div><form className="laboratory-form" onSubmit={(event) => { event.preventDefault(); onSubmit({ testCode: form.testCode.trim(), testName: form.testName.trim(), category: form.category.trim() || null, priority: form.priority, turnaroundHours: Number(form.turnaroundHours), price: Number(form.price) }); }}><h3>Add test</h3><div className="laboratory-form__grid"><Input label="Code" required minLength={2} maxLength={40} value={form.testCode} onChange={(event) => update('testCode', event.target.value)} /><Input label="Name" required minLength={2} maxLength={180} value={form.testName} onChange={(event) => update('testName', event.target.value)} /><Input label="Category" maxLength={80} value={form.category} onChange={(event) => update('category', event.target.value)} /><Select label="Default priority" value={form.priority} onChange={(event) => update('priority', event.target.value)} options={[{ value: 'routine', label: 'Routine' }, { value: 'urgent', label: 'Urgent' }, { value: 'stat', label: 'STAT' }]} /><Input label="Turnaround hours" type="number" min="1" required value={form.turnaroundHours} onChange={(event) => update('turnaroundHours', event.target.value)} /><Input label="Price" type="number" min="0" required value={form.price} onChange={(event) => update('price', event.target.value)} /></div>{error && <Alert tone="error">{error}</Alert>}<FormFooter saving={saving} onClose={onClose} submitLabel="Add test" /></form></ModalShell>;
+}
+
+function OrderForm({ tests, saving, error, onClose, onSubmit }: { tests: LaboratoryTest[]; saving: boolean; error: string; onClose: () => void; onSubmit: (payload: CreateLaboratoryOrderPayload) => void }) {
   const [form, setForm] = useState({ patientId: '', doctorId: '', testId: tests[0]?.id ? String(tests[0].id) : '', priority: 'routine' as CreateLaboratoryOrderPayload['priority'], clinicalNotes: '' });
   const [patientQuery, setPatientQuery] = useState('');
   const [patientMatches, setPatientMatches] = useState<LaboratoryPatientCandidate[]>([]);
@@ -167,13 +214,13 @@ function OrderForm({ tests, saving, onClose, onSubmit }: { tests: LaboratoryTest
   return <ModalShell title="Order a laboratory test" eyebrow="NEW INVESTIGATION" onClose={onClose}><form className="laboratory-form" onSubmit={(event) => { event.preventDefault(); if (!form.patientId) return; onSubmit({ patientId: Number(form.patientId), testId: Number(form.testId), doctorId: form.doctorId ? Number(form.doctorId) : null, priority: form.priority, clinicalNotes: form.clinicalNotes || null }); }}>
     <div><Input label="Search patient by name or MRD" value={patientQuery} onChange={(event) => { setPatientQuery(event.target.value); update('patientId', ''); }} placeholder="Type at least 2 characters" />{patientMatches.length > 0 && <Select label="Matching patients" value={form.patientId} onChange={(event) => { const patient = patientMatches.find((row) => String(row.id) === event.target.value); update('patientId', event.target.value); if (patient) setPatientQuery(`${patient.fullName} (${patient.mrdNumber})`); }} options={[{ value: '', label: 'Select a patient' }, ...patientMatches.map((row) => ({ value: row.id, label: `${row.fullName} · ${row.mrdNumber}` }))]} />}{form.patientId && <small>Selected patient ID: {form.patientId}</small>}{lookupError && <Alert tone="error">{lookupError}</Alert>}</div>
     <div><Input label="Referring doctor (optional)" value={doctorQuery} onChange={(event) => { setDoctorQuery(event.target.value); update('doctorId', ''); }} placeholder="Search name, code, or registration number" />{doctorMatches.length > 0 && <Select label="Matching doctors" value={form.doctorId} onChange={(event) => { const doctor = doctorMatches.find((row) => String(row.id) === event.target.value); update('doctorId', event.target.value); if (doctor) setDoctorQuery(`${doctor.name} (${doctor.doctorCode})`); }} options={[{ value: '', label: 'Select a doctor' }, ...doctorMatches.map((row) => ({ value: row.id, label: `${row.name} · ${row.doctorCode}` }))]} />}{form.doctorId && <small>Selected doctor ID: {form.doctorId}</small>}</div>
-    <div className="laboratory-form__grid"><Select label="Investigation" required value={form.testId} onChange={(event) => update('testId', event.target.value)} options={[{ value: '', label: tests.length ? 'Select a test' : 'No tests available' }, ...tests.map((test) => ({ value: test.id, label: `${test.name}${test.code ? ` · ${test.code}` : ''}` }))]} /><Select label="Priority" value={form.priority} onChange={(event) => update('priority', event.target.value)} options={[{ value: 'routine', label: 'Routine' }, { value: 'urgent', label: 'Urgent' }, { value: 'stat', label: 'STAT' }]} /></div><label className="laboratory-textarea"><span>Clinical notes</span><textarea rows={4} maxLength={5000} value={form.clinicalNotes} onChange={(event) => update('clinicalNotes', event.target.value)} placeholder="Relevant symptoms, provisional diagnosis, or collection instructions" /></label><FormFooter saving={saving} onClose={onClose} submitLabel="Create order" disabled={!tests.length || !form.patientId} /></form></ModalShell>;
+    <div className="laboratory-form__grid"><Select label="Investigation" required value={form.testId} onChange={(event) => update('testId', event.target.value)} options={[{ value: '', label: tests.length ? 'Select a test' : 'No tests available' }, ...tests.map((test) => ({ value: test.id, label: `${test.name}${test.code ? ` · ${test.code}` : ''}` }))]} /><Select label="Priority" value={form.priority} onChange={(event) => update('priority', event.target.value)} options={[{ value: 'routine', label: 'Routine' }, { value: 'urgent', label: 'Urgent' }, { value: 'stat', label: 'STAT' }]} /></div><label className="laboratory-textarea"><span>Clinical notes</span><textarea rows={4} maxLength={5000} value={form.clinicalNotes} onChange={(event) => update('clinicalNotes', event.target.value)} placeholder="Relevant symptoms, provisional diagnosis, or collection instructions" /></label>{error && <Alert tone="error">{error}</Alert>}<FormFooter saving={saving} onClose={onClose} submitLabel="Create order" disabled={!tests.length || !form.patientId} /></form></ModalShell>;
 }
 
-function ResultForm({ order, saving, onClose, onSubmit }: { order: LaboratoryOrder; saving: boolean; onClose: () => void; onSubmit: (payload: UpdateLaboratoryResultPayload) => void }) {
+function ResultForm({ order, saving, error, onClose, onSubmit }: { order: LaboratoryOrder; saving: boolean; error: string; onClose: () => void; onSubmit: (payload: UpdateLaboratoryResultPayload) => void }) {
   const [form, setForm] = useState({ result: order.result || '', resultUnit: order.resultUnit || '', referenceRange: order.referenceRange || '', remarks: order.remarks || '', status: 'processing' as const });
   const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
-  return <ModalShell title={`Result · ${order.testName}`} eyebrow={order.orderNumber} onClose={onClose}><form className="laboratory-form" onSubmit={(event) => { event.preventDefault(); onSubmit({ result: form.result, resultUnit: form.resultUnit || null, referenceRange: form.referenceRange || null, remarks: form.remarks || null, status: form.status }); }}><div className="laboratory-result-context"><strong>{order.patientName || `Patient #${order.patientId}`}</strong><span>{order.patientMrdNumber || `Patient ID ${order.patientId}`} · {order.priority || 'routine'} priority</span></div><label className="laboratory-textarea"><span>Result value</span><textarea rows={4} required value={form.result} onChange={(event) => update('result', event.target.value)} placeholder="Enter the observed result or interpretation" /></label><div className="laboratory-form__grid"><Input label="Unit" value={form.resultUnit} onChange={(event) => update('resultUnit', event.target.value)} placeholder="e.g. mg/dL" /><Input label="Reference range" value={form.referenceRange} onChange={(event) => update('referenceRange', event.target.value)} placeholder="e.g. 70–100 mg/dL" /></div><label className="laboratory-textarea"><span>Remarks</span><textarea rows={3} value={form.remarks} onChange={(event) => update('remarks', event.target.value)} placeholder="Add interpretation or quality notes" /></label><FormFooter saving={saving} onClose={onClose} submitLabel="Save result" /></form></ModalShell>;
+  return <ModalShell title={`Result · ${order.testName}`} eyebrow={order.orderNumber} onClose={onClose}><form className="laboratory-form" onSubmit={(event) => { event.preventDefault(); onSubmit({ result: form.result, resultUnit: form.resultUnit || null, referenceRange: form.referenceRange || null, remarks: form.remarks || null, status: form.status }); }}><div className="laboratory-result-context"><strong>{order.patientName || `Patient #${order.patientId}`}</strong><span>{order.patientMrdNumber || `Patient ID ${order.patientId}`} · {order.priority || 'routine'} priority</span></div><label className="laboratory-textarea"><span>Result value</span><textarea rows={4} required value={form.result} onChange={(event) => update('result', event.target.value)} placeholder="Enter the observed result or interpretation" /></label><div className="laboratory-form__grid"><Input label="Unit" value={form.resultUnit} onChange={(event) => update('resultUnit', event.target.value)} placeholder="e.g. mg/dL" /><Input label="Reference range" value={form.referenceRange} onChange={(event) => update('referenceRange', event.target.value)} placeholder="e.g. 70–100 mg/dL" /></div><label className="laboratory-textarea"><span>Remarks</span><textarea rows={3} value={form.remarks} onChange={(event) => update('remarks', event.target.value)} placeholder="Add interpretation or quality notes" /></label>{error && <Alert tone="error">{error}</Alert>}<FormFooter saving={saving} onClose={onClose} submitLabel="Save draft" /></form></ModalShell>;
 }
 
 function VerifyForm({ order, saving, error, onClose, onSubmit }: { order: LaboratoryOrder; saving: boolean; error: string; onClose: () => void; onSubmit: () => void }) {

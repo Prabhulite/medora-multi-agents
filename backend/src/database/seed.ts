@@ -141,6 +141,8 @@ const PERMISSIONS = [
   { code: 'laboratory.verify', module: 'laboratory', action: 'verify', description: 'Verify laboratory results entered by another staff member' },
   { code: 'laboratory.release', module: 'laboratory', action: 'release', description: 'Release verified laboratory results' },
   { code: 'laboratory.amend', module: 'laboratory', action: 'amend', description: 'Append a correction to released laboratory results' },
+  { code: 'laboratory.cancel', module: 'laboratory', action: 'cancel', description: 'Cancel an uncollected laboratory order with a reason' },
+  { code: 'laboratory.catalog.manage', module: 'laboratory', action: 'catalog.manage', description: 'Manage laboratory test catalog' },
   { code: 'radiology.view', module: 'radiology', action: 'view', description: 'View radiology modalities and orders' },
   { code: 'radiology.create', module: 'radiology', action: 'create', description: 'Order radiology studies' },
   { code: 'radiology.update', module: 'radiology', action: 'update', description: 'Enter radiology reports' },

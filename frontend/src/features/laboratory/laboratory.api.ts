@@ -10,6 +10,7 @@ export interface LaboratoryTest {
   price?: number | null;
   isActive?: boolean;
 }
+export interface CreateLaboratoryTestPayload { testCode: string; testName: string; category: string | null; priority: 'routine' | 'urgent' | 'stat'; turnaroundHours: number; price: number; }
 
 export type LaboratoryOrderStatus = 'ordered' | 'collected' | 'processing' | 'verified' | 'completed' | 'cancelled';
 
@@ -35,6 +36,8 @@ export interface LaboratoryOrder {
   specimenLabel?: string | null;
   collectedBy?: string | null;
   completedAt?: string | null;
+  cancelledAt?: string | null;
+  cancellationReason?: string | null;
   verifiedAt?: string | null;
   verifiedById?: number | null;
   releasedById?: number | null;
@@ -103,6 +106,8 @@ function mapOrder(row: any): LaboratoryOrder {
     specimenLabel: row.specimenLabel || null,
     collectedBy: row.collectedBy?.fullName || null,
     completedAt: row.completedAt || row.completed_at || null,
+    cancelledAt: row.cancelledAt || null,
+    cancellationReason: row.cancellationReason || null,
     verifiedAt: row.verifiedAt || row.verified_at || null,
     verifiedById: row.verifiedById ?? row.verified_by_id ?? null,
     releasedById: row.releasedById ?? row.released_by_id ?? null,
@@ -115,6 +120,23 @@ function mapOrder(row: any): LaboratoryOrder {
 }
 
 export const laboratoryApi = {
+  async listAllTests(): Promise<LaboratoryTest[]> {
+    const response = await api.get<ApiEnvelope<any[]>>('/laboratory/tests/all');
+    return response.data.data.map(mapTest);
+  },
+  async reactivateTest(id: number): Promise<LaboratoryTest> {
+    const response = await api.post<ApiEnvelope<any>>(`/laboratory/tests/${id}/reactivate`);
+    return mapTest(response.data.data);
+  },
+  async createTest(payload: CreateLaboratoryTestPayload): Promise<LaboratoryTest> {
+    const response = await api.post<ApiEnvelope<any>>('/laboratory/tests', payload);
+    return mapTest(response.data.data);
+  },
+  async retireTest(id: number): Promise<void> { await api.post(`/laboratory/tests/${id}/retire`); },
+  async cancelOrder(orderId: number, reason: string): Promise<LaboratoryOrder> {
+    const response = await api.post<ApiEnvelope<any>>(`/laboratory/orders/${orderId}/cancel`, { reason });
+    return mapOrder(response.data.data);
+  },
   async doctorCandidates(search: string): Promise<LaboratoryDoctorCandidate[]> {
     const response = await api.get<ApiEnvelope<LaboratoryDoctorCandidate[]>>('/laboratory/doctors', { params: { search } });
     return response.data.data;
