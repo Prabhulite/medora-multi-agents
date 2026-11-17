@@ -157,7 +157,14 @@ try {
   assert.equal((await ok('GET', `/api/radiology/orders/${imaging.id}/communications`)).map((row: { id: number }) => row.id).join(','), `${callAttempt.id},${callDelivered.id}`);
   assert.equal((await ok('PATCH', `/api/radiology/orders/${imaging.id}/report`, { status: 'reported', reportText: 'Final image report' })).status, 'reported');
   token = radiologyViewerToken;
-  assert.equal((await ok('GET', '/api/radiology/orders?patientId=1')).find((row: { id: number }) => row.id === imaging.id).reportText, 'Final image report');
+  const finalizedImaging = (await ok('GET', '/api/radiology/orders?patientId=1')).find((row: { id: number }) => row.id === imaging.id);
+  assert.equal(finalizedImaging.reportText, 'Final image report');
+  assert.ok(finalizedImaging.reportedByName);
+  assert.equal('reportedBy' in finalizedImaging, false);
+  assert.ok(finalizedImaging.performedAt);
+  const worklistImaging = (await ok('GET', '/api/radiology/worklist?search=Integration%20chest%20image')).items[0];
+  assert.equal(worklistImaging.reportedByName, finalizedImaging.reportedByName);
+  assert.equal('reportedBy' in worklistImaging, false);
   assert.equal((await ok('GET', '/api/radiology/worklist?search=Integration%20chest%20image')).items[0].impression, 'Preliminary impression');
   assert.equal((await ok('GET', `/api/radiology/orders/${imaging.id}/communications`))[0].findingSummary, 'Urgent finding discussed');
   assert.equal((await ok('GET', `/api/radiology/orders/${imaging.id}/communications`))[0].note, 'Awaiting return call');

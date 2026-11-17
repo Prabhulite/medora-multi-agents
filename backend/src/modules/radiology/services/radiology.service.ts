@@ -6,11 +6,14 @@ import { nextSequenceNumber } from '../../patients/services/number-sequence.serv
 import type { CreateRadiologyAddendumInput, CreateRadiologyCommunicationInput, CreateRadiologyOrderInput, CreateRadiologyResourceInput, RadiologyCommunicationQueueInput, RadiologyWorklistInput, ScheduleRadiologyOrderInput, UpdateRadiologyReportInput } from '../validators/radiology.validators.js';
 
 const orderRelations = { patient: true, modality: true, doctor: true, resource: true } as const;
+const orderViewRelations = { ...orderRelations, reportedBy: true } as const;
 async function auditRadiology(manager: EntityManager, patientId: number, userId: number | null, action: string, changeSummary: string, beforeData: Record<string, unknown> | null, afterData: Record<string, unknown>) {
   await manager.getRepository(PatientAuditLog).save({ patientId, action, changedById: userId, changeSummary, beforeData: beforeData ? JSON.stringify(beforeData) : null, afterData: JSON.stringify(afterData) });
 }
 function orderResponse(order: RadiologyOrder, canViewDraft: boolean) {
-  return !canViewDraft && order.status !== 'reported' ? { ...order, reportText: null, impression: null } : order;
+  const { reportedBy, ...safeOrder } = order;
+  const response = { ...safeOrder, reportedByName: reportedBy?.fullName ?? null };
+  return !canViewDraft && order.status !== 'reported' ? { ...response, reportText: null, impression: null } : response;
 }
 
 export const radiologyService = {
@@ -190,14 +193,14 @@ export const radiologyService = {
     return AppDataSource.getRepository(RadiologyModality).find({ where: { isActive: true }, order: { category: 'ASC', modalityName: 'ASC' } });
   },
   async listOrders(filters: { patientId?: number; status?: RadiologyOrder['status'] }, canViewDraft: boolean) {
-    const rows = await AppDataSource.getRepository(RadiologyOrder).find({ where: { ...(filters.patientId ? { patientId: filters.patientId } : {}), ...(filters.status ? { status: filters.status } : {}) }, relations: orderRelations, order: { orderedAt: 'DESC', id: 'DESC' }, take: filters.patientId ? undefined : 100 });
+    const rows = await AppDataSource.getRepository(RadiologyOrder).find({ where: { ...(filters.patientId ? { patientId: filters.patientId } : {}), ...(filters.status ? { status: filters.status } : {}) }, relations: orderViewRelations, order: { orderedAt: 'DESC', id: 'DESC' }, take: filters.patientId ? undefined : 100 });
     return rows.map((row) => orderResponse(row, canViewDraft));
   },
   async worklist(input: RadiologyWorklistInput, canViewDraft: boolean) {
     const repo = AppDataSource.getRepository(RadiologyOrder);
     const query = repo.createQueryBuilder('study')
       .leftJoinAndSelect('study.patient', 'patient').leftJoinAndSelect('study.modality', 'modality')
-      .leftJoinAndSelect('study.doctor', 'doctor').leftJoinAndSelect('study.resource', 'resource');
+      .leftJoinAndSelect('study.doctor', 'doctor').leftJoinAndSelect('study.resource', 'resource').leftJoinAndSelect('study.reportedBy', 'reportedBy');
     if (input.status) query.andWhere('study.status = :status', { status: input.status });
     if (input.search) {
       const search = `%${input.search.replace(/[%_\\]/g, '\\$&')}%`;
