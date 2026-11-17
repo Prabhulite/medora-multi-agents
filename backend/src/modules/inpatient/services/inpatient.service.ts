@@ -31,22 +31,29 @@ export const inpatientService = {
       const admission = await admissionRepo.createQueryBuilder('admission').setLock('pessimistic_write').where('admission.id = :id', { id: admissionId }).getOne();
       if (!admission) throw new NotFoundError('Admission not found');
       if (admission.status === 'discharged') throw new ConflictError('Cannot review admission medications after discharge');
-      if (admission.admissionMedicationsReviewedAt) throw new ConflictError('Admission medications were already reviewed');
+      await manager.getRepository(Patient).createQueryBuilder('patient').setLock('pessimistic_write').where('patient.id = :patientId', { patientId: admission.patientId }).getOneOrFail();
       const homeRows = await manager.getRepository(HomeMedication).createQueryBuilder('home').setLock('pessimistic_write').where('home.patient_id = :patientId', { patientId: admission.patientId }).andWhere('home.is_current = 1').orderBy('home.id', 'ASC').getMany();
-      const decisions = new Map(input.homeMedicationReview.map((item) => [item.homeMedicationId, item]));
-      if (decisions.size !== input.homeMedicationReview.length || decisions.size !== homeRows.length || homeRows.some((home) => !decisions.has(home.id))) throw new ValidationError('Review every current reported home medication exactly once');
-      const reviewedAt = new Date();
       const reviewRepo = manager.getRepository(AdmissionHomeMedicationReview);
-      for (const home of homeRows) {
+      const previousItems = await reviewRepo.find({ where: { admissionId } });
+      const reviewedIds = new Set(previousItems.map((item) => item.homeMedicationId));
+      const pendingRows = homeRows.filter((home) => !reviewedIds.has(home.id));
+      if (admission.admissionMedicationsReviewedAt && pendingRows.length === 0) throw new ConflictError('No new current home medications need admission review');
+      const decisions = new Map(input.homeMedicationReview.map((item) => [item.homeMedicationId, item]));
+      if (decisions.size !== input.homeMedicationReview.length || decisions.size !== pendingRows.length || pendingRows.some((home) => !decisions.has(home.id))) throw new ValidationError('Review every current unreviewed home medication exactly once');
+      const reviewedAt = new Date();
+      for (const home of pendingRows) {
         const decision = decisions.get(home.id)!;
         if (decision.decision === 'continue') await assertNoRecordedAllergy(manager, admission.patientId, [home.medicineName]);
-        await reviewRepo.save(reviewRepo.create({ admissionId, homeMedicationId: home.id, medicineName: home.medicineName, dosage: home.dosage, frequency: home.frequency, route: home.route, source: home.source, sourceDetail: home.sourceDetail, decision: decision.decision, reason: decision.decision === 'continue' ? null : decision.reason, reviewedAt }));
+        await reviewRepo.save(reviewRepo.create({ admissionId, homeMedicationId: home.id, medicineName: home.medicineName, dosage: home.dosage, frequency: home.frequency, route: home.route, source: home.source, sourceDetail: home.sourceDetail, decision: decision.decision, reason: decision.decision === 'continue' ? null : decision.reason, reviewedAt, reviewedById: userId }));
       }
-      admission.admissionMedicationsReviewedAt = reviewedAt;
-      admission.admissionMedicationsReviewedById = userId;
-      await admissionRepo.save(admission);
-      await manager.getRepository(PatientAuditLog).save({ patientId: admission.patientId, action: 'admission_medications_reviewed', changedById: userId, changeSummary: `Reported home medications reviewed for admission ${admission.admissionNumber}`, beforeData: null, afterData: JSON.stringify({ admissionId, decisions: homeRows.map((home) => ({ homeMedicationId: home.id, decision: decisions.get(home.id)!.decision })) }) });
-      return { reviewedAt, reviewedById: userId, items: await reviewRepo.find({ where: { admissionId }, order: { id: 'ASC' } }) };
+      const firstReview = !admission.admissionMedicationsReviewedAt;
+      if (firstReview) {
+        admission.admissionMedicationsReviewedAt = reviewedAt;
+        admission.admissionMedicationsReviewedById = userId;
+        await admissionRepo.save(admission);
+      }
+      await manager.getRepository(PatientAuditLog).save({ patientId: admission.patientId, action: firstReview ? 'admission_medications_reviewed' : 'admission_medications_review_added', changedById: userId, changeSummary: `${firstReview ? 'Reported home medications reviewed' : 'New reported home medications reviewed'} for admission ${admission.admissionNumber}`, beforeData: null, afterData: JSON.stringify({ admissionId, decisions: pendingRows.map((home) => ({ homeMedicationId: home.id, decision: decisions.get(home.id)!.decision })) }) });
+      return { reviewedAt: admission.admissionMedicationsReviewedAt, reviewedById: admission.admissionMedicationsReviewedById, items: await reviewRepo.find({ where: { admissionId }, order: { id: 'ASC' } }) };
     });
   },
   async carePlans(admissionId: number) {
@@ -173,6 +180,7 @@ export const inpatientService = {
       if (!admission) throw new NotFoundError('Admission not found');
       if (admission.status === 'discharged') throw new ConflictError('Admission is already discharged');
       const previousStatus = admission.status;
+      await manager.getRepository(Patient).createQueryBuilder('patient').setLock('pessimistic_write').where('patient.id = :patientId', { patientId: admission.patientId }).getOneOrFail();
       const prescriptionRepo = manager.getRepository(Prescription);
       const activePrescriptions = await prescriptionRepo.createQueryBuilder('prescription').setLock('pessimistic_write').where('prescription.patient_id = :patientId', { patientId: admission.patientId }).andWhere('prescription.status = :status', { status: 'active' }).orderBy('prescription.id', 'ASC').getMany();
       const decisions = new Map(summary.medicationReview.map((item) => [item.prescriptionId, item]));

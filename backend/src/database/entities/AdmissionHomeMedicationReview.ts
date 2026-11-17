@@ -19,4 +19,5 @@ export class AdmissionHomeMedicationReview {
   @Column({ type: 'varchar', length: 20 }) decision!: 'continue' | 'hold' | 'stop';
   @Column({ type: 'varchar', length: 1000, nullable: true }) reason!: string | null;
   @Column({ name: 'reviewed_at', type: 'timestamp', precision: 6 }) reviewedAt!: Date;
+  @Column({ name: 'reviewed_by_id', type: 'int', unsigned: true, nullable: true }) reviewedById!: number | null;
 }

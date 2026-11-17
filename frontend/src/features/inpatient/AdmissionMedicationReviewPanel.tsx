@@ -34,18 +34,22 @@ export function AdmissionMedicationReviewPanel({ admission, onClose }: { admissi
   }, [onClose, saving]);
 
   const update = (id: number, patch: Partial<Choice>) => setChoices((current) => ({ ...current, [id]: { ...(current[id] || { decision: '', reason: '' }), ...patch } }));
-  const complete = medications.every((row) => Boolean(choices[row.id]?.decision) && (choices[row.id]?.decision === 'continue' || Boolean(choices[row.id]?.reason.trim())));
+  const reviewedIds = new Set(review?.items.map((item) => item.homeMedicationId) ?? []);
+  const newMedications = medications.filter((row) => !reviewedIds.has(row.id));
+  const hasInitialReview = Boolean(review?.reviewedAt);
+  const complete = newMedications.every((row) => Boolean(choices[row.id]?.decision) && (choices[row.id]?.decision === 'continue' || (choices[row.id]?.reason.trim().length ?? 0) >= 5));
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!complete || review?.reviewedAt || saving) return;
+    if (!complete || (hasInitialReview && !newMedications.length) || saving) return;
     setSaving(true); setError('');
     try {
       const saved = await inpatientApi.saveAdmissionMedicationReview(admission.id, {
         homeMedicationsReviewed: true,
-        homeMedicationReview: medications.map((row) => ({ homeMedicationId: row.id, decision: choices[row.id].decision as AdmissionHomeMedicationDecision, ...(choices[row.id].reason.trim() ? { reason: choices[row.id].reason.trim() } : {}) })),
+        homeMedicationReview: newMedications.map((row) => ({ homeMedicationId: row.id, decision: choices[row.id].decision as AdmissionHomeMedicationDecision, ...(choices[row.id].reason.trim() ? { reason: choices[row.id].reason.trim() } : {}) })),
       });
       setReview(saved);
+      setChoices({});
     } catch (err) { setError(getErrorMessage(err, 'Unable to save admission medication review')); }
     finally { setSaving(false); }
   };
@@ -60,17 +64,21 @@ export function AdmissionMedicationReviewPanel({ admission, onClose }: { admissi
       <div className="inpatient-admission-review">
         <Alert tone="warning">This is an unverified reported medication history. Review each medicine with the patient or source. Decisions do not create prescriptions or medication orders.</Alert>
         {error ? <Alert tone="error">{error}</Alert> : null}
-        {loading ? <p>Loading medication history…</p> : review?.reviewedAt ? <>
-          <p>Reviewed {new Date(review.reviewedAt).toLocaleString()} · Staff ID {review.reviewedById}</p>
-          {review.items.length ? review.items.map((item) => <article className="inpatient-discharge-review__item" key={item.id}><strong>{item.medicineName}</strong>{details(item)}<span>Decision: {item.decision}</span>{item.reason ? <span>Reason: {item.reason}</span> : null}</article>) : <p>No current home medications were recorded at review.</p>}
-        </> : <form onSubmit={(event) => void submit(event)}>
-          {medications.length ? medications.map((row) => <article className="inpatient-discharge-review__item" key={row.id}>
+        {loading ? <p>Loading medication history…</p> : <>
+          {hasInitialReview && review ? <section aria-label="Saved admission medication decisions">
+            <p>Initial review: {review.reviewedAt ? new Date(review.reviewedAt).toLocaleString() : 'Date unavailable'}</p>
+            {review.items.length ? review.items.map((item) => <article className="inpatient-discharge-review__item" key={item.id}><strong>{item.medicineName}</strong>{details(item)}<span>Decision: {item.decision}</span>{item.reason ? <span>Reason: {item.reason}</span> : null}<small>Reviewed {new Date(item.reviewedAt).toLocaleString()} · {item.reviewedById ? `Staff ID ${item.reviewedById}` : 'Reviewer unavailable'}</small></article>) : <p>No home medications were recorded in the initial review.</p>}
+          </section> : null}
+          {(!hasInitialReview || newMedications.length > 0) ? <form onSubmit={(event) => void submit(event)}>
+          {hasInitialReview ? <h3>New current home medications to review</h3> : null}
+          {newMedications.length ? newMedications.map((row) => <article className="inpatient-discharge-review__item" key={row.id}>
             <strong>{row.medicineName}</strong>{details(row)}
             <label>Admission decision for {row.medicineName}<select required value={choices[row.id]?.decision || ''} onChange={(event) => update(row.id, { decision: event.target.value as AdmissionHomeMedicationDecision })}><option value="">Select decision</option><option value="continue">Continue</option><option value="hold">Hold</option><option value="stop">Stop</option></select></label>
-            <label>Reason {choices[row.id]?.decision && choices[row.id].decision !== 'continue' ? '(required)' : '(optional)'}<textarea rows={2} required={Boolean(choices[row.id]?.decision && choices[row.id].decision !== 'continue')} value={choices[row.id]?.reason || ''} onChange={(event) => update(row.id, { reason: event.target.value })} /></label>
+            <label>Reason {choices[row.id]?.decision && choices[row.id].decision !== 'continue' ? '(required)' : '(optional)'}<textarea rows={2} required={Boolean(choices[row.id]?.decision && choices[row.id].decision !== 'continue')} minLength={5} maxLength={1000} value={choices[row.id]?.reason || ''} onChange={(event) => update(row.id, { reason: event.target.value })} /></label>
           </article>) : <p>No current reported home medications. Save the review to confirm the empty history.</p>}
-          <div className="inpatient-modal__footer"><Button type="button" variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button><Button type="submit" loading={saving} disabled={!complete}>Save review</Button></div>
-        </form>}
+          <div className="inpatient-modal__footer"><Button type="button" variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button><Button type="submit" loading={saving} disabled={!complete}>{hasInitialReview ? 'Save follow-up review' : 'Save review'}</Button></div>
+        </form> : <p>All current home medications have been reviewed.</p>}
+        </>}
       </div>
     </section>
   </div>;

@@ -74,7 +74,7 @@ export type AdmissionHomeMedicationDecision = 'continue' | 'hold' | 'stop';
 export interface AdmissionMedicationReview {
   reviewedAt: string | null;
   reviewedById: number | null;
-  items: { id: number; homeMedicationId: number; medicineName: string; dosage: string | null; frequency: string | null; route: string | null; source: string; sourceDetail: string | null; decision: AdmissionHomeMedicationDecision; reason: string | null; reviewedAt: string }[];
+  items: { id: number; homeMedicationId: number; medicineName: string; dosage: string | null; frequency: string | null; route: string | null; source: string; sourceDetail: string | null; decision: AdmissionHomeMedicationDecision; reason: string | null; reviewedAt: string; reviewedById: number | null }[];
 }
 export interface AdmissionMedicationReviewPayload {
   homeMedicationsReviewed: true;
