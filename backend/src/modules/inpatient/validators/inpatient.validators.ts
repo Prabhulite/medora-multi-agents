@@ -18,6 +18,12 @@ const homeMedicationDecisionSchema = z.discriminatedUnion('decision', [
   z.object({ homeMedicationId: z.number().int().positive(), decision: z.literal('stop'), reason: z.string().trim().min(5).max(1000) }),
 ]);
 export const dischargeSummarySchema = z.object({ dischargeSummary: z.string().trim().min(2).max(10000), dischargeDiagnosis: z.string().trim().max(5000).nullable().optional(), dischargeMedications: z.string().trim().max(5000).nullable().optional(), followUpInstructions: z.string().trim().max(5000).nullable().optional(), medicationsReviewed: z.literal(true), medicationReview: z.array(medicationDecisionSchema).max(500), homeMedicationsReviewed: z.literal(true), homeMedicationReview: z.array(homeMedicationDecisionSchema).max(500) });
+const admissionHomeMedicationDecisionSchema = z.discriminatedUnion('decision', [
+  z.object({ homeMedicationId: z.number().int().positive(), decision: z.literal('continue') }),
+  z.object({ homeMedicationId: z.number().int().positive(), decision: z.literal('hold'), reason: z.string().trim().min(5).max(1000) }),
+  z.object({ homeMedicationId: z.number().int().positive(), decision: z.literal('stop'), reason: z.string().trim().min(5).max(1000) }),
+]);
+export const admissionMedicationReviewSchema = z.object({ homeMedicationsReviewed: z.literal(true), homeMedicationReview: z.array(admissionHomeMedicationDecisionSchema).max(500) });
 export const nursingObservationSchema = z.object({ temperatureC: z.number().min(25).max(45).nullable().optional(), pulseBpm: z.number().int().min(20).max(250).nullable().optional(), systolicBp: z.number().int().min(40).max(300).nullable().optional(), diastolicBp: z.number().int().min(20).max(200).nullable().optional(), spo2Percent: z.number().int().min(0).max(100).nullable().optional(), notes: z.string().trim().max(4000).nullable().optional() }).refine((value) => Object.values(value).some((item) => item !== null && item !== undefined && item !== ''), 'Record at least one observation');
 export const createAdmissionSchema = z.object({
   patientId: z.number().int().positive(), bedId: z.number().int().positive(),

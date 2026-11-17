@@ -57,6 +57,7 @@ export { PatientVisit } from './PatientVisit.js';
 export { Permission } from './Permission.js';
 export { RegistrationSource } from './RegistrationSource.js';
 export { BedTransfer } from './BedTransfer.js';
+export { AdmissionHomeMedicationReview } from './AdmissionHomeMedicationReview.js';
 export { MedicationAdministration } from './MedicationAdministration.js';
 export { Refund } from './Refund.js';
 export { EmergencyCase } from './EmergencyCase.js';

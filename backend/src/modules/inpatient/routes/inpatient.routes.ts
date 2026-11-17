@@ -4,7 +4,7 @@ import { authorize } from '../../../middleware/authorize.js';
 import { validate } from '../../../middleware/validate.js';
 import { asyncHandler } from '../../../shared/utils/asyncHandler.js';
 import { inpatientController } from '../controllers/inpatient.controller.js';
-import { admissionIdParamSchema, admissionListQuerySchema, carePlanIdParamSchema, closeCarePlanSchema, createAdmissionSchema, createCarePlanSchema, dischargeSummarySchema, medicationAdministrationSchema, nursingObservationSchema, transferBedSchema } from '../validators/inpatient.validators.js';
+import { admissionIdParamSchema, admissionListQuerySchema, admissionMedicationReviewSchema, carePlanIdParamSchema, closeCarePlanSchema, createAdmissionSchema, createCarePlanSchema, dischargeSummarySchema, medicationAdministrationSchema, nursingObservationSchema, transferBedSchema } from '../validators/inpatient.validators.js';
 
 const router = Router(); router.use(authenticate);
 router.get('/wards', authorize('inpatient.view'), asyncHandler(inpatientController.wards));
@@ -16,6 +16,8 @@ router.post('/admissions/:id/care-plans', authorize('inpatient.update'), validat
 router.patch('/admissions/:id/care-plans/:planId/close', authorize('inpatient.update'), validate(carePlanIdParamSchema, 'params'), validate(closeCarePlanSchema), asyncHandler(inpatientController.closeCarePlan));
 router.get('/admissions/:id/medication-orders', authorize('inpatient.view'), validate(admissionIdParamSchema, 'params'), asyncHandler(inpatientController.medicationOrders));
 router.get('/admissions/:id/discharge-medication-review', authorize('inpatient.view'), validate(admissionIdParamSchema, 'params'), asyncHandler(inpatientController.dischargeMedicationReview));
+router.get('/admissions/:id/admission-medication-review', authorize('inpatient.view', 'clinical.view'), validate(admissionIdParamSchema, 'params'), asyncHandler(inpatientController.admissionMedicationReview));
+router.post('/admissions/:id/admission-medication-review', authorize('inpatient.view', 'inpatient.update', 'clinical.view'), validate(admissionIdParamSchema, 'params'), validate(admissionMedicationReviewSchema), asyncHandler(inpatientController.recordAdmissionMedicationReview));
 router.get('/admissions/:id/medication-administrations', authorize('inpatient.view'), validate(admissionIdParamSchema, 'params'), asyncHandler(inpatientController.medicationAdministrations));
 router.post('/admissions/:id/medication-administrations', authorize('inpatient.update'), validate(admissionIdParamSchema, 'params'), validate(medicationAdministrationSchema), asyncHandler(inpatientController.addMedicationAdministration));
 router.get('/admissions/:id/transfers', authorize('inpatient.view'), validate(admissionIdParamSchema, 'params'), asyncHandler(inpatientController.transfers));

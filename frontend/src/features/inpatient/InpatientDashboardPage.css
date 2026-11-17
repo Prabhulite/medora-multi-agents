@@ -37,6 +37,11 @@
 .inpatient-discharge-review > p { color: var(--color-text-secondary); font-size: 13px; }
 .inpatient-discharge-review__item { display: grid; gap: 8px; padding: 13px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); }
 .inpatient-discharge-review__item small { color: var(--color-text-secondary); }
+.inpatient-admission-review { display: grid; gap: 14px; padding: 20px 24px; }
+.inpatient-admission-review form { display: grid; gap: 12px; }
+.inpatient-admission-review .inpatient-discharge-review__item label { display: grid; gap: 5px; font-size: 13px; font-weight: 700; }
+.inpatient-admission-review select, .inpatient-admission-review textarea { width: 100%; padding: 9px 11px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text); font: inherit; }
+.inpatient-admission-review textarea { resize: vertical; }
 .inpatient-discharge-review__attestation { display: flex; align-items: flex-start; gap: 9px; font-size: 13px; }
 .inpatient-discharge-review__error { padding: 16px 24px 0; }
 .inpatient-discharge-sheet__medication { padding: 9px 0; border-bottom: 1px solid var(--color-border); }

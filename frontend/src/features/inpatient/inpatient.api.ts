@@ -70,6 +70,16 @@ export interface MedicationOrder { id: number; medicineName: string; dosage: str
 export interface MedicationAdministration { id: number; prescriptionId: number; prescription: MedicationOrder; outcome: 'given' | 'withheld' | 'refused'; doseGiven: string | null; route: string | null; notes: string | null; recordedAt: string; administeredBy?: { fullName: string } | null }
 export interface DischargeMedicationReview { medicationsReviewedAt: string | null; medicationsReviewedById: number | null; items: { id: number; prescriptionId: number; medicineName: string; dosage: string | null; frequency: string | null; route: string; decision: 'continue' | 'stop'; instructions: string | null; reason: string | null; reviewedAt: string; reviewedBy: { id: number; fullName: string } | null }[]; homeItems: { id: number; homeMedicationId: number; medicineName: string; dosage: string | null; frequency: string | null; route: string | null; source: string; sourceDetail: string | null; decision: 'continue' | 'stop'; instructions: string | null; reason: string | null; reviewedAt: string; reviewedBy: { id: number; fullName: string } | null }[] }
 export interface MedicationAdministrationPayload { prescriptionId: number; outcome: MedicationAdministration['outcome']; doseGiven?: string; route?: string; notes?: string }
+export type AdmissionHomeMedicationDecision = 'continue' | 'hold' | 'stop';
+export interface AdmissionMedicationReview {
+  reviewedAt: string | null;
+  reviewedById: number | null;
+  items: { id: number; homeMedicationId: number; medicineName: string; dosage: string | null; frequency: string | null; route: string | null; source: string; sourceDetail: string | null; decision: AdmissionHomeMedicationDecision; reason: string | null; reviewedAt: string }[];
+}
+export interface AdmissionMedicationReviewPayload {
+  homeMedicationsReviewed: true;
+  homeMedicationReview: { homeMedicationId: number; decision: AdmissionHomeMedicationDecision; reason?: string }[];
+}
 
 export interface CreateAdmissionPayload {
   patientId: number;
@@ -129,6 +139,8 @@ export const inpatientApi = {
   transfer: async (id: number, toBedId: number, reason: string) => (await api.post<ApiEnvelope<BedTransfer>>(`/inpatient/admissions/${id}/transfers`, { toBedId, reason })).data.data,
   medicationOrders: async (id: number) => (await api.get<ApiEnvelope<MedicationOrder[]>>(`/inpatient/admissions/${id}/medication-orders`)).data.data,
   dischargeMedicationReview: async (id: number) => (await api.get<ApiEnvelope<DischargeMedicationReview>>(`/inpatient/admissions/${id}/discharge-medication-review`)).data.data,
+  admissionMedicationReview: async (id: number) => (await api.get<ApiEnvelope<AdmissionMedicationReview | null>>(`/inpatient/admissions/${id}/admission-medication-review`)).data.data,
+  saveAdmissionMedicationReview: async (id: number, payload: AdmissionMedicationReviewPayload) => (await api.post<ApiEnvelope<AdmissionMedicationReview>>(`/inpatient/admissions/${id}/admission-medication-review`, payload)).data.data,
   medicationAdministrations: async (id: number) => (await api.get<ApiEnvelope<MedicationAdministration[]>>(`/inpatient/admissions/${id}/medication-administrations`)).data.data,
   addMedicationAdministration: async (id: number, payload: MedicationAdministrationPayload) => (await api.post<ApiEnvelope<MedicationAdministration>>(`/inpatient/admissions/${id}/medication-administrations`, payload)).data.data,
 };

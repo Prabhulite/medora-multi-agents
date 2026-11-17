@@ -1,11 +1,11 @@
 import { AppDataSource } from '../../../config/data-source.js';
-import { Admission, Bed, BedTransfer, Department, DischargeHomeMedicationReview, DischargeMedicationReview, Doctor, HomeMedication, MedicationAdministration, NursingCarePlan, NursingObservation, Patient, PatientAuditLog, Prescription, Ward, Medication, User } from '../../../database/entities/index.js';
+import { Admission, AdmissionHomeMedicationReview, Bed, BedTransfer, Department, DischargeHomeMedicationReview, DischargeMedicationReview, Doctor, HomeMedication, MedicationAdministration, NursingCarePlan, NursingObservation, Patient, PatientAuditLog, Prescription, Ward, Medication, User } from '../../../database/entities/index.js';
 import { assertNoRecordedAllergy } from '../../clinical/services/allergy-check.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { nextSequenceNumber } from '../../patients/services/number-sequence.service.js';
 import type { CreateAdmissionInput } from '../validators/inpatient.validators.js';
 import type { z } from 'zod';
-import { closeCarePlanSchema, createCarePlanSchema, dischargeSummarySchema, medicationAdministrationSchema, nursingObservationSchema, transferBedSchema } from '../validators/inpatient.validators.js';
+import { admissionMedicationReviewSchema, closeCarePlanSchema, createCarePlanSchema, dischargeSummarySchema, medicationAdministrationSchema, nursingObservationSchema, transferBedSchema } from '../validators/inpatient.validators.js';
 
 function carePlanResponse(plan: NursingCarePlan | null) {
   if (!plan) throw new NotFoundError('Care plan not found');
@@ -19,6 +19,36 @@ const transferResponse = (row: BedTransfer | null) => row ? { ...row, transferre
 const observationResponse = (row: NursingObservation) => ({ ...row, recordedBy: staffReference(row.recordedBy) });
 
 export const inpatientService = {
+  async admissionMedicationReview(admissionId: number) {
+    const admission = await AppDataSource.getRepository(Admission).findOne({ where: { id: admissionId } });
+    if (!admission) throw new NotFoundError('Admission not found');
+    const rows = await AppDataSource.getRepository(AdmissionHomeMedicationReview).find({ where: { admissionId }, order: { id: 'ASC' } });
+    return { reviewedAt: admission.admissionMedicationsReviewedAt, reviewedById: admission.admissionMedicationsReviewedById, items: rows };
+  },
+  async recordAdmissionMedicationReview(admissionId: number, input: z.infer<typeof admissionMedicationReviewSchema>, userId: number | null) {
+    return AppDataSource.transaction(async (manager) => {
+      const admissionRepo = manager.getRepository(Admission);
+      const admission = await admissionRepo.createQueryBuilder('admission').setLock('pessimistic_write').where('admission.id = :id', { id: admissionId }).getOne();
+      if (!admission) throw new NotFoundError('Admission not found');
+      if (admission.status === 'discharged') throw new ConflictError('Cannot review admission medications after discharge');
+      if (admission.admissionMedicationsReviewedAt) throw new ConflictError('Admission medications were already reviewed');
+      const homeRows = await manager.getRepository(HomeMedication).createQueryBuilder('home').setLock('pessimistic_write').where('home.patient_id = :patientId', { patientId: admission.patientId }).andWhere('home.is_current = 1').orderBy('home.id', 'ASC').getMany();
+      const decisions = new Map(input.homeMedicationReview.map((item) => [item.homeMedicationId, item]));
+      if (decisions.size !== input.homeMedicationReview.length || decisions.size !== homeRows.length || homeRows.some((home) => !decisions.has(home.id))) throw new ValidationError('Review every current reported home medication exactly once');
+      const reviewedAt = new Date();
+      const reviewRepo = manager.getRepository(AdmissionHomeMedicationReview);
+      for (const home of homeRows) {
+        const decision = decisions.get(home.id)!;
+        if (decision.decision === 'continue') await assertNoRecordedAllergy(manager, admission.patientId, [home.medicineName]);
+        await reviewRepo.save(reviewRepo.create({ admissionId, homeMedicationId: home.id, medicineName: home.medicineName, dosage: home.dosage, frequency: home.frequency, route: home.route, source: home.source, sourceDetail: home.sourceDetail, decision: decision.decision, reason: decision.decision === 'continue' ? null : decision.reason, reviewedAt }));
+      }
+      admission.admissionMedicationsReviewedAt = reviewedAt;
+      admission.admissionMedicationsReviewedById = userId;
+      await admissionRepo.save(admission);
+      await manager.getRepository(PatientAuditLog).save({ patientId: admission.patientId, action: 'admission_medications_reviewed', changedById: userId, changeSummary: `Reported home medications reviewed for admission ${admission.admissionNumber}`, beforeData: null, afterData: JSON.stringify({ admissionId, decisions: homeRows.map((home) => ({ homeMedicationId: home.id, decision: decisions.get(home.id)!.decision })) }) });
+      return { reviewedAt, reviewedById: userId, items: await reviewRepo.find({ where: { admissionId }, order: { id: 'ASC' } }) };
+    });
+  },
   async carePlans(admissionId: number) {
     if (!(await AppDataSource.getRepository(Admission).exist({ where: { id: admissionId } }))) throw new NotFoundError('Admission not found');
     return (await AppDataSource.getRepository(NursingCarePlan).find({ where: { admissionId }, relations: { createdBy: true, closedBy: true }, order: { createdAt: 'DESC' } })).map(carePlanResponse);

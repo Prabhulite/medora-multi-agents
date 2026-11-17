@@ -8,6 +8,8 @@ export const inpatientController = {
   async closeCarePlan(req: Request, res: Response) { return sendSuccess(res, await inpatientService.closeCarePlan(Number(req.params.id), Number(req.params.planId), req.body, req.user?.id ?? null), 'Care plan closed'); },
   async medicationOrders(req: Request, res: Response) { return sendSuccess(res, await inpatientService.medicationOrders(Number(req.params.id)), 'Medication orders fetched'); },
   async dischargeMedicationReview(req: Request, res: Response) { return sendSuccess(res, await inpatientService.dischargeMedicationReview(Number(req.params.id)), 'Discharge medication review fetched'); },
+  async admissionMedicationReview(req: Request, res: Response) { return sendSuccess(res, await inpatientService.admissionMedicationReview(Number(req.params.id)), 'Admission medication review fetched'); },
+  async recordAdmissionMedicationReview(req: Request, res: Response) { return sendCreated(res, await inpatientService.recordAdmissionMedicationReview(Number(req.params.id), req.body, req.user?.id ?? null), 'Admission medication review recorded'); },
   async medicationAdministrations(req: Request, res: Response) { return sendSuccess(res, await inpatientService.medicationAdministrations(Number(req.params.id)), 'Medication administrations fetched'); },
   async addMedicationAdministration(req: Request, res: Response) { return sendCreated(res, await inpatientService.addMedicationAdministration(Number(req.params.id), req.body, req.user?.id ?? null), 'Medication administration recorded'); },
   async transfers(req: Request, res: Response) { return sendSuccess(res, await inpatientService.transfers(Number(req.params.id)), 'Transfers fetched'); },

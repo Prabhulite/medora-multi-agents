@@ -396,6 +396,15 @@ try {
   assert.equal((await ok('POST', `/api/clinical/patients/2/home-medications/${ceasedHistory.id}/cease`, { reason: 'Not taken now' })).isCurrent, false);
   assert.equal((await request('POST', `/api/clinical/patients/2/home-medications/${ceasedHistory.id}/cease`, { reason: 'Again' })).status, 409);
   assert.equal((await ok('GET', '/api/patients/1/audit-logs')).filter((row: { action: string }) => row.action === 'home_medication_recorded').length, 2);
+  assert.equal((await ok('GET', `/api/inpatient/admissions/${admission.id}/admission-medication-review`)).reviewedAt, null);
+  assert.equal((await request('POST', `/api/inpatient/admissions/${admission.id}/admission-medication-review`, { homeMedicationsReviewed: true, homeMedicationReview: [{ homeMedicationId: continuedHome.id, decision: 'continue' }] })).status, 422);
+  const admissionHomeReview = await ok('POST', `/api/inpatient/admissions/${admission.id}/admission-medication-review`, { homeMedicationsReviewed: true, homeMedicationReview: [{ homeMedicationId: continuedHome.id, decision: 'continue' }, { homeMedicationId: stoppedHome.id, decision: 'hold', reason: 'Confirm with caregiver' }] }, 201);
+  assert.ok(admissionHomeReview.reviewedAt);
+  assert.equal(admissionHomeReview.items.length, 2);
+  assert.equal(admissionHomeReview.items.find((row: { homeMedicationId: number }) => row.homeMedicationId === stoppedHome.id).sourceDetail, 'Family list');
+  assert.equal((await request('POST', `/api/inpatient/admissions/${admission.id}/admission-medication-review`, { homeMedicationsReviewed: true, homeMedicationReview: [] })).status, 409);
+  assert.equal((await ok('GET', `/api/inpatient/admissions/${admission.id}/admission-medication-review`)).items.length, 2);
+  assert.equal((await ok('GET', '/api/patients/1/audit-logs')).some((row: { action: string }) => row.action === 'admission_medications_reviewed'), true);
   assert.equal((await ok('PATCH', `/api/emergency/cases/${emergency.id}/status`, { status: 'admitted', dispositionNote: 'Inpatient admission confirmed' })).status, 'admitted');
   assert.equal((await request('PATCH', `/api/inpatient/admissions/${admission.id}/discharge`, { dischargeSummary: 'Integration discharge' })).status, 422);
   assert.equal((await request('PATCH', `/api/inpatient/admissions/${admission.id}/discharge`, { dischargeSummary: 'Integration discharge', medicationsReviewed: true, medicationReview: [{ prescriptionId: prescription.id, decision: 'stop', reason: 'Course complete' }] })).status, 422);
@@ -435,6 +444,7 @@ try {
   assert.equal((await dataSource.query('SELECT status FROM prescriptions WHERE id = ?', [continuingPrescription.id]))[0].status, 'active');
   assert.equal((await ok('GET', '/api/patients/1/audit-logs')).some((row: { action: string }) => row.action === 'inpatient_discharged'), true);
   const noMedicationAdmission = await ok('POST', '/api/inpatient/admissions', { patientId: 2, bedId: 1 }, 201);
+  assert.equal((await ok('POST', `/api/inpatient/admissions/${noMedicationAdmission.id}/admission-medication-review`, { homeMedicationsReviewed: true, homeMedicationReview: [] }, 201)).items.length, 0);
   assert.equal((await ok('GET', `/api/inpatient/admissions/${noMedicationAdmission.id}/medication-orders`)).length, 0);
   await ok('PATCH', `/api/inpatient/admissions/${noMedicationAdmission.id}/discharge`, { dischargeSummary: 'No active prescriptions', medicationsReviewed: true, medicationReview: [], homeMedicationsReviewed: true, homeMedicationReview: [] });
   const emptyMedicationReview = await ok('GET', `/api/inpatient/admissions/${noMedicationAdmission.id}/discharge-medication-review`);
