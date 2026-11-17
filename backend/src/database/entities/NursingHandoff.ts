@@ -20,5 +20,8 @@ export class NursingHandoff {
   @Column({ name: 'acknowledged_by_id', type: 'int', unsigned: true, nullable: true }) acknowledgedById!: number | null;
   @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true }) @JoinColumn({ name: 'acknowledged_by_id' }) acknowledgedBy!: User | null;
   @Column({ name: 'acknowledged_at', type: 'timestamp', nullable: true }) acknowledgedAt!: Date | null;
+  @Column({ name: 'closed_on_discharge_at', type: 'timestamp', nullable: true }) closedOnDischargeAt!: Date | null;
+  @Column({ name: 'closed_on_discharge_by_id', type: 'int', unsigned: true, nullable: true }) closedOnDischargeById!: number | null;
+  @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true }) @JoinColumn({ name: 'closed_on_discharge_by_id' }) closedOnDischargeBy!: User | null;
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' }) createdAt!: Date;
 }

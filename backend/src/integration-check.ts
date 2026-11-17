@@ -550,6 +550,7 @@ try {
   assert.deepEqual(handoffAudit.map((row: { action: string }) => row.action), ['nursing_handoff_created', 'nursing_handoff_reassigned', 'nursing_handoff_reassigned', 'nursing_handoff_acknowledged']);
   assert.equal(handoffAudit[0].afterData.includes('Fall risk'), false);
   assert.equal(handoffAudit[1].afterData.includes('Receiver unavailable'), false);
+  const dischargeHandoff = await ok('POST', `/api/inpatient/admissions/${admission.id}/handoffs`, { recipientId: receiver.id, conditionSummary: 'Awaiting discharge', pendingTasks: 'Confirm departure instructions' }, 201);
   await dataSource.query('UPDATE patients SET is_active = 0 WHERE id = 2');
   assert.equal((await request('POST', '/api/pharmacy/prescriptions', { patientId: 2, medicineName: 'Inactive patient prescription' })).status, 404);
   await dataSource.query('UPDATE patients SET is_active = 1, merged_into_patient_id = 1 WHERE id = 2');
@@ -668,6 +669,7 @@ try {
   assert.equal((await request('PATCH', `/api/inpatient/admissions/${admission.id}/discharge`, { dischargeSummary: 'Integration discharge', medicationsReviewed: true, medicationReview: [{ prescriptionId: prescription.id, decision: 'stop', reason: 'Course complete' }] })).status, 422);
   assert.equal((await request('PATCH', `/api/inpatient/admissions/${admission.id}/discharge`, { dischargeSummary: 'Integration discharge', medicationsReviewed: true, medicationReview: [{ prescriptionId: prescription.id, decision: 'stop', reason: 'Course complete' }, { prescriptionId: prescription.id, decision: 'stop', reason: 'Duplicate' }] })).status, 422);
   assert.equal((await dataSource.query('SELECT status FROM admissions WHERE id = ?', [admission.id]))[0].status, 'admitted');
+  assert.equal((await ok('GET', `/api/inpatient/admissions/${admission.id}/handoffs`)).find((row: { id: number }) => row.id === dischargeHandoff.id).closedOnDischargeAt, null);
   const dischargeReview = [{ prescriptionId: prescription.id, decision: 'stop', reason: 'Course complete' }, { prescriptionId: continuingPrescription.id, decision: 'continue', instructions: 'Take 10 mg orally each day until review' }];
   const homeDischargeReview = [{ homeMedicationId: continuedHome.id, decision: 'stop', reason: 'No longer indicated' }, { homeMedicationId: stoppedHome.id, decision: 'continue', instructions: 'Resume supplement after clinician review', changeReason: 'Caregiver confirmed ongoing use' }];
   token = (await ok('POST', '/api/auth/login', { username: 'integration_clinician', password: 'Temporary!Pass123' })).token;
@@ -691,6 +693,13 @@ try {
   assert.equal((await request('PATCH', `/api/inpatient/admissions/${admission.id}/discharge`, { dischargeSummary: 'Unexplained admission change', medicationsReviewed: true, medicationReview: dischargeReview, homeMedicationsReviewed: true, homeMedicationReview: [homeDischargeReview[0], { homeMedicationId: stoppedHome.id, decision: 'continue', instructions: 'Resume supplement after clinician review' }] })).status, 422);
   assert.equal(Number((await dataSource.query('SELECT COUNT(*) AS total FROM discharge_home_medication_reviews WHERE admission_id = ?', [admission.id]))[0].total), 0);
   await ok('PATCH', `/api/inpatient/admissions/${admission.id}/discharge`, { dischargeSummary: 'Integration discharge', medicationsReviewed: true, medicationReview: dischargeReview, homeMedicationsReviewed: true, homeMedicationReview: homeDischargeReview });
+  const closedHandoff = (await ok('GET', `/api/inpatient/admissions/${admission.id}/handoffs`)).find((row: { id: number }) => row.id === dischargeHandoff.id);
+  assert.ok(closedHandoff.closedOnDischargeAt);
+  assert.equal(closedHandoff.acknowledgedAt, null);
+  assert.equal(closedHandoff.closedOnDischargeBy.fullName, 'Integration Admin');
+  assert.equal((await ok('GET', '/api/inpatient/handoffs/pending')).total, 0);
+  const [closureAudit] = await dataSource.query("SELECT after_data AS afterData FROM patient_audit_logs WHERE patient_id = 1 AND action = 'nursing_handoff_closed' ORDER BY id DESC LIMIT 1");
+  assert.equal(JSON.parse(closureAudit.afterData).handoffId, dischargeHandoff.id);
   const savedDischargeReview = await ok('GET', `/api/inpatient/admissions/${admission.id}/discharge-medication-review`);
   assert.ok(savedDischargeReview.medicationsReviewedAt);
   assert.equal(savedDischargeReview.items.length, 2);
