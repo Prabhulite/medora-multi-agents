@@ -175,8 +175,8 @@ export const laboratoryApi = {
     const response = await api.post<ApiEnvelope<LaboratoryAddendum>>(`/laboratory/orders/${orderId}/addenda`, payload);
     return response.data.data;
   },
-  async verifyResult(orderId: number): Promise<LaboratoryOrder> {
-    const response = await api.post<ApiEnvelope<any>>(`/laboratory/orders/${orderId}/verify`, { patientAndSpecimenChecked: true, qualityControlChecked: true });
+  async verifyResult(orderId: number, confirmation: { patientAndSpecimenChecked: boolean; qualityControlChecked: boolean }): Promise<LaboratoryOrder> {
+    const response = await api.post<ApiEnvelope<any>>(`/laboratory/orders/${orderId}/verify`, confirmation);
     return mapOrder(response.data.data);
   },
   async releaseResult(orderId: number): Promise<LaboratoryOrder> {

@@ -184,10 +184,10 @@ export function LaboratoryDiagnosticsPage() {
     } catch (err) { setError(getErrorMessage(err, 'Unable to collect sample')); }
     finally { setSaving(false); }
   };
-  const verifyResult = async () => {
+  const verifyResult = async (confirmation: { patientAndSpecimenChecked: boolean; qualityControlChecked: boolean }) => {
     if (!selectedOrder) return;
     setSaving(true); setError(''); setNotice('');
-    try { const updated = await laboratoryApi.verifyResult(selectedOrder.id); setOrders((current) => current.map((row) => row.id === updated.id ? updated : row)); setModal(null); setSelectedOrder(null); setNotice('Result verified. It is ready for release.'); refresh(); }
+    try { const updated = await laboratoryApi.verifyResult(selectedOrder.id, confirmation); setOrders((current) => current.map((row) => row.id === updated.id ? updated : row)); setModal(null); setSelectedOrder(null); setNotice('Result verified. It is ready for release.'); refresh(); }
     catch (err) { setError(getErrorMessage(err, 'Unable to verify result')); }
     finally { setSaving(false); }
   };
@@ -229,7 +229,7 @@ export function LaboratoryDiagnosticsPage() {
     {modal === 'catalog' && <CatalogForm tests={catalogTests} saving={saving} error={error} onClose={() => setModal(null)} onSubmit={(payload) => void saveTest(payload)} onRetire={(test) => setRetireTarget(test)} onReactivate={(test) => void reactivateTest(test)} />}
     {modal === 'collect' && selectedOrder ? <CollectForm order={selectedOrder} saving={saving} onClose={() => { setModal(null); setSelectedOrder(null); }} onSubmit={(label) => void collectSample(label)} /> : null}
     {modal === 'result' && selectedOrder ? <ResultForm order={selectedOrder} saving={saving} error={error} onClose={() => { setModal(null); setSelectedOrder(null); }} onSubmit={(payload) => void saveResult(payload)} /> : null}
-    {modal === 'verify' && selectedOrder ? <VerifyForm order={selectedOrder} saving={saving} error={error} onClose={() => { setModal(null); setSelectedOrder(null); }} onSubmit={() => void verifyResult()} /> : null}
+    {modal === 'verify' && selectedOrder ? <VerifyForm order={selectedOrder} saving={saving} error={error} onClose={() => { setModal(null); setSelectedOrder(null); }} onSubmit={(confirmation) => void verifyResult(confirmation)} /> : null}
     {modal === 'view' && selectedOrder ? <ResultView order={selectedOrder} canAmend={canAmend} onClose={() => { setModal(null); setSelectedOrder(null); }} /> : null}
     {modal === 'communications' && selectedOrder ? <CommunicationView order={selectedOrder} canRecord={canRelease} onClose={() => { setModal(null); setSelectedOrder(null); void loadQueue(); }} onRecorded={() => void loadQueue()} /> : null}
     <ConfirmDialog open={Boolean(releaseTarget)} title="Release laboratory result" message="Release this verified result to the care team? The released result cannot be edited in place." confirmLabel="Release result" confirming={saving} onConfirm={() => void releaseResult()} onCancel={() => setReleaseTarget(null)} />
@@ -280,10 +280,10 @@ function ResultForm({ order, saving, error, onClose, onSubmit }: { order: Labora
   return <ModalShell title={`Result · ${order.testName}`} eyebrow={order.orderNumber} onClose={onClose}><form className="laboratory-form" onSubmit={(event) => { event.preventDefault(); onSubmit({ result: form.result, resultUnit: form.resultUnit || null, referenceRange: form.referenceRange || null, remarks: form.remarks || null, status: form.status }); }}><div className="laboratory-result-context"><strong>{order.patientName || `Patient #${order.patientId}`}</strong><span>{order.patientMrdNumber || `Patient ID ${order.patientId}`} · {order.priority || 'routine'} priority</span></div><label className="laboratory-textarea"><span>Result value</span><textarea rows={4} required value={form.result} onChange={(event) => update('result', event.target.value)} placeholder="Enter the observed result or interpretation" /></label><div className="laboratory-form__grid"><Input label="Unit" value={form.resultUnit} onChange={(event) => update('resultUnit', event.target.value)} placeholder="e.g. mg/dL" /><Input label="Reference range" value={form.referenceRange} onChange={(event) => update('referenceRange', event.target.value)} placeholder="e.g. 70–100 mg/dL" /></div><label className="laboratory-textarea"><span>Remarks</span><textarea rows={3} value={form.remarks} onChange={(event) => update('remarks', event.target.value)} placeholder="Add interpretation or quality notes" /></label>{error && <Alert tone="error">{error}</Alert>}<FormFooter saving={saving} onClose={onClose} submitLabel="Save draft" /></form></ModalShell>;
 }
 
-function VerifyForm({ order, saving, error, onClose, onSubmit }: { order: LaboratoryOrder; saving: boolean; error: string; onClose: () => void; onSubmit: () => void }) {
+function VerifyForm({ order, saving, error, onClose, onSubmit }: { order: LaboratoryOrder; saving: boolean; error: string; onClose: () => void; onSubmit: (confirmation: { patientAndSpecimenChecked: boolean; qualityControlChecked: boolean }) => void }) {
   const [patientAndSpecimenChecked, setPatientAndSpecimenChecked] = useState(false);
   const [qualityControlChecked, setQualityControlChecked] = useState(false);
-  return <ModalShell title={`Verify result · ${order.testName}`} eyebrow={order.orderNumber} onClose={onClose}><form className="laboratory-form" onSubmit={(event) => { event.preventDefault(); onSubmit(); }}>
+  return <ModalShell title={`Verify result · ${order.testName}`} eyebrow={order.orderNumber} onClose={onClose}><form className="laboratory-form" onSubmit={(event) => { event.preventDefault(); if (patientAndSpecimenChecked && qualityControlChecked) onSubmit({ patientAndSpecimenChecked, qualityControlChecked }); }}>
     <div className="laboratory-result-context"><strong>{order.patientName || `Patient #${order.patientId}`}</strong><span>{order.patientMrdNumber || `Patient ID ${order.patientId}`} · Specimen {order.specimenLabel || 'not labeled'}</span></div>
     {order.clinicalNotes && <section><h3>Order notes</h3><p>{order.clinicalNotes}</p></section>}
     <section><h3>Draft result</h3><p>{order.result} {order.resultUnit || ''}</p><p>{order.referenceRange ? `Reference range: ${order.referenceRange}` : 'Reference range not recorded.'}</p>{order.remarks && <p>{order.remarks}</p>}</section>
