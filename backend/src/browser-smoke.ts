@@ -208,7 +208,41 @@ try {
   const inpatientState = await evaluate('({ path: location.pathname, login: document.body.innerText.includes("Sign in"), inpatient: document.body.innerText.includes("Inpatient Management"), active: document.body.innerText.includes("Active admissions"), page: Boolean(document.querySelector(".inpatient-page")), kpis: Boolean(document.querySelector(".inpatient-kpis")), loadError: document.body.innerText.includes("Unable to load inpatient dashboard") })');
   assert.ok(inpatientLoaded, `Inpatient dashboard did not render: ${JSON.stringify(inpatientState)}`);
   assert.equal(await evaluate('document.body.innerText.includes("Unable to load inpatient dashboard")'), false, 'Inpatient dashboard showed a load error');
-  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, communication queues, pharmacy patient forms${hasBatch ? ', stock movements and count form' : ''}, inpatient dashboard${patientLookup.body.data?.length ? ', radiology patient selection' : ''}${finalOrderNumber ? ', and finalized radiology report print output' : ''} rendered in headless Chrome.`);
+  await evaluate('history.pushState({}, "", "/patients"); window.dispatchEvent(new PopStateEvent("popstate")); true');
+  let patientPageReady = false;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    try { patientPageReady = await evaluate('Boolean(document.querySelector(".patient-mrd-lookup")) && !document.body.innerText.includes("Loading...")'); } catch { /* navigation resets the execution context */ }
+    if (patientPageReady) break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.ok(patientPageReady, 'Patient registration page did not load');
+  const hasPatientRow = await evaluate('Boolean(document.querySelector(".ui-table tbody tr .ui-action-menu__trigger"))');
+  if (hasPatientRow) {
+    await evaluate('document.querySelector(".ui-table tbody tr .ui-action-menu__trigger").click(); true');
+    const mergeItem = await evaluate('Boolean(Array.from(document.querySelectorAll("[role=menuitem]")).find(button => button.innerText.includes("Merge into another patient")))');
+    assert.ok(mergeItem, 'Patient merge action was unavailable to super admin');
+    await evaluate('Array.from(document.querySelectorAll("[role=menuitem]")).find(button => button.innerText.includes("Merge into another patient")).click(); true');
+    assert.equal(await evaluate('Boolean(document.querySelector("[role=dialog] #patient-merge-search")) && Boolean(document.querySelector("[role=dialog] button.ui-btn--danger:disabled"))'), true, 'Merge dialog did not require target selection and source confirmation');
+    const mergeSourceMrd = await evaluate('document.querySelector("[role=dialog] .patient-merge p")?.innerText.split("(").pop().split(")")[0]');
+    const mergeTargets = await evaluate(`fetch('/api/patients', { credentials: 'include' }).then(async response => (await response.json()).data?.filter(patient => patient.mrdNumber !== ${JSON.stringify(mergeSourceMrd)}) || [])`) as Array<{ mrdNumber: string }>;
+    if (mergeTargets.length) {
+      await evaluate(`(() => { const input = document.querySelector('#patient-merge-search'); const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; setter.call(input, ${JSON.stringify(mergeTargets[0].mrdNumber)}); input.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      await evaluate('document.querySelector(".patient-merge form").requestSubmit(); true');
+      let targetReady = false;
+      for (let attempt = 0; attempt < 100; attempt++) {
+        targetReady = await evaluate('Boolean(document.querySelector(".patient-merge__candidates button"))');
+        if (targetReady) break;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      const mergeSearchState = await evaluate('({ value: document.querySelector("#patient-merge-search")?.value, error: document.querySelector(".patient-merge .ui-alert")?.innerText, text: document.querySelector(".patient-merge")?.innerText.slice(0, 400) })');
+      assert.ok(targetReady, `Merge destination search did not return an active patient: ${JSON.stringify(mergeSearchState)}`);
+      await evaluate('document.querySelector(".patient-merge__candidates button").click(); true');
+      assert.equal(await evaluate('Boolean(document.querySelector("#patient-merge-confirm")) && Boolean(document.querySelector("[role=dialog] button.ui-btn--danger:disabled"))'), true, 'Merge destination selection did not require source MRD confirmation');
+    }
+    await evaluate('document.querySelector("[role=dialog] .ui-modal__close").click(); true');
+  }
+  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, communication queues, pharmacy patient forms${hasBatch ? ', stock movements and count form' : ''}, inpatient dashboard, patient registration${hasPatientRow ? ' and merge confirmation' : ''}${patientLookup.body.data?.length ? ', radiology patient selection' : ''}${finalOrderNumber ? ', and finalized radiology report print output' : ''} rendered in headless Chrome.`);
   await send('Browser.close').catch(() => undefined);
   socket.close();
 } finally {
