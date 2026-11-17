@@ -23,6 +23,7 @@
     "db:restore:prod": "node dist/database/restore.js",
     "db:backup-check": "npm run build && tsx src/database/backup-restore-check.ts",
     "smoke": "tsx src/smoke.ts",
+    "browser:smoke": "tsx src/browser-smoke.ts",
     "test:integration": "tsx src/integration-check.ts"
   },
   "dependencies": {
