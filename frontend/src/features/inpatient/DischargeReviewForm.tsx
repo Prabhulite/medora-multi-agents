@@ -3,7 +3,7 @@ import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { Select } from '../../components/ui/Select';
 import { getErrorMessage } from '../../lib/api';
-import { inpatientApi, type Admission, type DischargePayload, type MedicationOrder } from './inpatient.api';
+import { inpatientApi, type Admission, type AdmissionMedicationReview, type DischargePayload, type MedicationOrder } from './inpatient.api';
 import { homeMedicationApi, type HomeMedication } from '../clinical/homeMedication.api';
 
 type Decision = { decision: '' | 'continue' | 'stop'; instructions: string; reason: string };
@@ -12,6 +12,7 @@ export function DischargeReviewForm({ admission, saving, submitError, onClose, o
   const [form, setForm] = useState({ dischargeSummary: '', dischargeDiagnosis: admission.diagnosis || '', dischargeMedications: '', followUpInstructions: '' });
   const [orders, setOrders] = useState<MedicationOrder[]>([]);
   const [homeRows, setHomeRows] = useState<HomeMedication[]>([]);
+  const [admissionReview, setAdmissionReview] = useState<AdmissionMedicationReview | null>(null);
   const [decisions, setDecisions] = useState<Record<number, Decision>>({});
   const [homeDecisions, setHomeDecisions] = useState<Record<number, Decision>>({});
   const [loading, setLoading] = useState(true);
@@ -21,17 +22,20 @@ export function DischargeReviewForm({ admission, saving, submitError, onClose, o
 
   useEffect(() => {
     let active = true;
-    Promise.all([inpatientApi.medicationOrders(admission.id), homeMedicationApi.list(admission.patientId)]).then(([items, homeItems]) => {
+    Promise.all([inpatientApi.medicationOrders(admission.id), homeMedicationApi.list(admission.patientId), inpatientApi.admissionMedicationReview(admission.id)]).then(([items, homeItems, savedAdmissionReview]) => {
       if (!active) return;
       setOrders(items);
       setDecisions(Object.fromEntries(items.map((item) => [item.id, { decision: '', instructions: '', reason: '' }])));
       const currentHome = homeItems.filter((item) => item.isCurrent);
       setHomeRows(currentHome);
+      setAdmissionReview(savedAdmissionReview);
       setHomeDecisions(Object.fromEntries(currentHome.map((item) => [item.id, { decision: '', instructions: '', reason: '' }])));
     }).catch((err) => { if (active) setError(getErrorMessage(err, 'Unable to load medication lists')); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [admission.id]);
+  }, [admission.id, admission.patientId]);
+
+  const admissionDecisions = new Map(admissionReview?.items.map((item) => [item.homeMedicationId, item]) ?? []);
 
   const updateForm = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
   const updateDecision = (id: number, change: Partial<Decision>) => setDecisions((current) => ({ ...current, [id]: { ...current[id], ...change } }));
@@ -85,11 +89,15 @@ export function DischargeReviewForm({ admission, saving, submitError, onClose, o
           <section className="inpatient-discharge-review">
             <h3>Review reported home medicines</h3>
             <p>These entries came from the patient, caregiver, or prior records. Compare them with the prescriptions above; they are not verified prescriptions.</p>
+            {!loading && !error && (!admissionReview?.reviewedAt ? <Alert tone="warning">No admission medication review was recorded for this stay. Confirm the reported history and all discharge decisions with the patient or another reliable source.</Alert> : <p>Admission history reviewed {new Date(admissionReview.reviewedAt).toLocaleString('en-IN')}. Compare each admission decision with the discharge plan.</p>)}
             {loading ? <p>Loading home medicines…</p> : homeRows.length ? homeRows.map((home) => {
               const choice = homeDecisions[home.id];
+              const prior = admissionDecisions.get(home.id);
               return <div className="inpatient-discharge-review__item" key={home.id}>
-                <strong>{home.medicineName}</strong><small>{[home.dosage, home.frequency, home.route, `Source: ${home.source}`].filter(Boolean).join(' · ')}</small>
+                <strong>{home.medicineName}</strong><small>{[home.dosage, home.frequency, home.route, `Source: ${home.source}${home.sourceDetail ? ` (${home.sourceDetail})` : ''}`].filter(Boolean).join(' · ')}</small>
+                {admissionReview?.reviewedAt ? <small>{prior ? `Admission decision: ${prior.decision}${prior.reason ? ` — ${prior.reason}` : ''}` : 'Added to the reported history after admission review; confirm the source and current use.'}</small> : null}
                 <Select label="Home medicine decision" value={choice?.decision || ''} onChange={(event) => setHomeDecisions((current) => ({ ...current, [home.id]: { ...current[home.id], decision: event.target.value as Decision['decision'] } }))} options={[{ value: '', label: 'Choose a decision' }, { value: 'continue', label: 'Continue' }, { value: 'stop', label: 'Stop' }]} />
+                {choice?.decision === 'continue' && prior && prior.decision !== 'continue' ? <Alert tone="warning">This medicine was {prior.decision} at admission. Confirm the changed plan before discharge.</Alert> : null}
                 {choice?.decision === 'continue' && <label className="inpatient-textarea"><span>Instructions on discharge *</span><textarea required minLength={2} maxLength={1000} rows={2} value={choice.instructions} onChange={(event) => setHomeDecisions((current) => ({ ...current, [home.id]: { ...current[home.id], instructions: event.target.value } }))} /></label>}
                 {choice?.decision === 'stop' && <label className="inpatient-textarea"><span>Reason for stopping *</span><textarea required minLength={5} maxLength={1000} rows={2} value={choice.reason} onChange={(event) => setHomeDecisions((current) => ({ ...current, [home.id]: { ...current[home.id], reason: event.target.value } }))} /></label>}
               </div>;
