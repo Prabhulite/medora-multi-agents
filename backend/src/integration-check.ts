@@ -469,7 +469,16 @@ try {
   assert.deepEqual(Object.keys(transfer.transferredBy).sort(), ['fullName', 'id']);
   await ok('POST', `/api/inpatient/admissions/${admission.id}/observations`, { pulseBpm: 80 }, 201);
   assert.deepEqual(Object.keys((await ok('GET', `/api/inpatient/admissions/${admission.id}/observations`))[0].recordedBy).sort(), ['fullName', 'id']);
-  const prescription = await ok('POST', '/api/pharmacy/prescriptions', { patientId: 1, medicationId: 1, medicineName: 'Integration Medicine', dosage: '5 mg', quantityPrescribed: 6 }, 201);
+  await dataSource.query('UPDATE patients SET is_active = 0 WHERE id = 2');
+  assert.equal((await request('POST', '/api/pharmacy/prescriptions', { patientId: 2, medicineName: 'Inactive patient prescription' })).status, 404);
+  await dataSource.query('UPDATE patients SET is_active = 1, merged_into_patient_id = 1 WHERE id = 2');
+  assert.equal((await request('POST', '/api/pharmacy/prescriptions', { patientId: 2, medicineName: 'Merged patient prescription' })).status, 404);
+  await dataSource.query('UPDATE patients SET merged_into_patient_id = NULL WHERE id = 2');
+  const prescription = await ok('POST', '/api/pharmacy/prescriptions', { patientId: 1, medicationId: 1, medicineName: 'Integration Medicine', dosage: '5 mg', quantityPrescribed: 6, instructions: 'Sensitive prescription instructions' }, 201);
+  const [prescriptionAudit] = await dataSource.query("SELECT changed_by_id AS changedById, change_summary AS changeSummary, after_data AS afterData FROM patient_audit_logs WHERE patient_id = 1 AND action = 'prescription_created' ORDER BY id DESC LIMIT 1");
+  assert.ok(prescriptionAudit.changedById);
+  assert.equal(JSON.parse(prescriptionAudit.afterData).prescriptionId, prescription.id);
+  assert.equal(`${prescriptionAudit.changeSummary}${prescriptionAudit.afterData}`.includes('Sensitive prescription instructions'), false);
   const allergy = await ok('POST', '/api/clinical/patients/1/allergies', { allergen: 'Integration Medicine', reaction: 'Rash', severity: 'moderate' }, 201);
   assert.equal((await ok('GET', '/api/clinical/patients/1/allergies')).length, 1);
   assert.equal((await request('POST', '/api/clinical/patients/1/allergies', { allergen: ' integration medicine ', severity: 'severe' })).status, 409);

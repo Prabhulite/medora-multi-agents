@@ -76,6 +76,7 @@ Current patient chart tabs: Profile and MRD show identity details and audit hist
 - Pharmacy inventory now shows Receive stock only to users with `pharmacy.inventory.create` and Dispense stock only to users with `pharmacy.inventory.update`. Inventory viewers can still search dispense history. The API permission checks remain the authority for these actions.
 - Prescription fulfillment locks the prescription and inventory batch while checking previously dispensed quantity and available stock. The isolated integration suite now sends simultaneous issues against a one-unit prescription and verifies exactly one succeeds.
 - Patient-linked pharmacy dispensing now writes an attributed patient audit event in the same transaction as the stock movement. Its metadata records transaction, batch, medication, prescription, and quantity identifiers without copying free-text issue notes or references. The patient timeline shows the dispense event; general stock issues without a patient remain in the inventory ledger only.
+- Prescription creation now checks that the patient remains active and unmerged, validates the encounter, medication, and recorded allergy list, then saves the prescription and an attributed patient audit entry in one transaction. Audit metadata identifies the prescription, linked records, and quantity without copying medication instructions. The existing patient timeline continues to derive its prescription event from the prescription record.
 - Reorder levels and stock/expiry alerts
 
 ### Phase 6: Laboratory and radiology
