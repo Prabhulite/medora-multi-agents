@@ -18,9 +18,23 @@ const staffReference = (user: User | null | undefined) => user ? { id: user.id, 
 const medicationAdministrationResponse = (row: MedicationAdministration | null) => row ? { ...row, administeredBy: staffReference(row.administeredBy) } : null;
 const transferResponse = (row: BedTransfer | null) => row ? { ...row, transferredBy: staffReference(row.transferredBy) } : null;
 const observationResponse = (row: NursingObservation) => ({ ...row, recordedBy: staffReference(row.recordedBy) });
-const handoffResponse = (row: NursingHandoff) => { const { outgoingBy, acknowledgedBy, ...fields } = row; return { ...fields, outgoingBy: staffReference(outgoingBy), acknowledgedBy: staffReference(acknowledgedBy) }; };
+const handoffResponse = (row: NursingHandoff) => { const { outgoingBy, recipient, acknowledgedBy, ...fields } = row; return { ...fields, outgoingBy: staffReference(outgoingBy), recipient: staffReference(recipient), acknowledgedBy: staffReference(acknowledgedBy) }; };
 
 export const inpatientService = {
+  async handoffReceivers(search: string, currentUserId: number) {
+    const pattern = `%${search.replace(/[\\%_]/g, '\\$&')}%`;
+    const users = await AppDataSource.getRepository(User).createQueryBuilder('staff')
+      .leftJoin('staff.roles', 'role', 'role.is_active = 1')
+      .leftJoin('role.permissions', 'permission')
+      .leftJoin('staff.roles', 'viewRole', 'viewRole.is_active = 1')
+      .leftJoin('viewRole.permissions', 'viewPermission', 'viewPermission.code = :viewCode', { viewCode: 'inpatient.view' })
+      .where('staff.is_active = 1 AND staff.id <> :currentUserId', { currentUserId })
+      .andWhere('(staff.is_super_admin = 1 OR (permission.code = :code AND viewPermission.code = :viewCode))', { code: 'inpatient.update', viewCode: 'inpatient.view' })
+      .andWhere('(staff.full_name LIKE :pattern OR staff.employee_id LIKE :pattern OR staff.username LIKE :pattern)', { pattern })
+      .select(['staff.id', 'staff.fullName', 'staff.employeeId', 'staff.designation'])
+      .distinct(true).orderBy('staff.fullName', 'ASC').take(20).getMany();
+    return users.map(({ id, fullName, employeeId, designation }) => ({ id, fullName, employeeId, designation }));
+  },
   async pendingNursingHandoffs(page: number, pageSize: number) {
     const query = AppDataSource.getRepository(NursingHandoff).createQueryBuilder('handoff')
       .innerJoin('handoff.admission', 'admission')
@@ -28,12 +42,15 @@ export const inpatientService = {
       .innerJoin('admission.bed', 'bed')
       .innerJoin('bed.ward', 'ward')
       .innerJoin('handoff.outgoingBy', 'outgoing')
+      .leftJoin('handoff.recipient', 'recipient')
       .where('handoff.acknowledged_at IS NULL')
       .andWhere('admission.status IN (:...statuses)', { statuses: ['admitted', 'transferred'] });
     const total = await query.clone().getCount();
     const items = await query.select('handoff.id', 'id').addSelect('handoff.admissionId', 'admissionId')
       .addSelect('handoff.createdAt', 'createdAt').addSelect('outgoing.id', 'outgoingById')
       .addSelect('outgoing.fullName', 'outgoingByName')
+      .addSelect('handoff.recipientId', 'recipientId')
+      .addSelect('recipient.fullName', 'recipientName')
       .addSelect('admission.admissionNumber', 'admissionNumber')
       .addSelect('patient.mrdNumber', 'patientMrdNumber')
       .addSelect("CONCAT_WS(' ', patient.firstName, patient.middleName, patient.lastName)", 'patientName')
@@ -44,7 +61,7 @@ export const inpatientService = {
   },
   async nursingHandoffs(admissionId: number) {
     if (!(await AppDataSource.getRepository(Admission).exist({ where: { id: admissionId } }))) throw new NotFoundError('Admission not found');
-    const rows = await AppDataSource.getRepository(NursingHandoff).find({ where: { admissionId }, relations: { outgoingBy: true, acknowledgedBy: true }, order: { id: 'DESC' }, take: 100 });
+    const rows = await AppDataSource.getRepository(NursingHandoff).find({ where: { admissionId }, relations: { outgoingBy: true, recipient: true, acknowledgedBy: true }, order: { id: 'DESC' }, take: 100 });
     return rows.map(handoffResponse);
   },
   async createNursingHandoff(admissionId: number, input: z.infer<typeof createNursingHandoffSchema>, userId: number | null) {
@@ -53,11 +70,20 @@ export const inpatientService = {
       const admission = await manager.getRepository(Admission).createQueryBuilder('admission').setLock('pessimistic_write').where('admission.id = :id', { id: admissionId }).getOne();
       if (!admission) throw new NotFoundError('Admission not found');
       if (admission.status === 'discharged') throw new ConflictError('Cannot hand off a discharged admission');
+      if (input.recipientId === userId) throw new ValidationError('Receiving staff must be different from outgoing staff');
+      const recipient = await manager.getRepository(User).createQueryBuilder('staff')
+        .leftJoin('staff.roles', 'role', 'role.is_active = 1')
+        .leftJoin('role.permissions', 'permission')
+        .leftJoin('staff.roles', 'viewRole', 'viewRole.is_active = 1')
+        .leftJoin('viewRole.permissions', 'viewPermission', 'viewPermission.code = :viewCode', { viewCode: 'inpatient.view' })
+        .where('staff.id = :recipientId AND staff.is_active = 1', { recipientId: input.recipientId })
+        .andWhere('(staff.is_super_admin = 1 OR (permission.code = :code AND viewPermission.code = :viewCode))', { code: 'inpatient.update', viewCode: 'inpatient.view' }).getOne();
+      if (!recipient) throw new ValidationError('Receiving staff must have active inpatient view and update permissions');
       const pending = await manager.getRepository(NursingHandoff).exist({ where: { admissionId, acknowledgedAt: IsNull() } });
       if (pending) throw new ConflictError('A handoff is still awaiting acknowledgement');
-      const record = await manager.getRepository(NursingHandoff).save({ admissionId, conditionSummary: input.conditionSummary, pendingTasks: input.pendingTasks, safetyConcerns: input.safetyConcerns ?? null, outgoingById: userId });
-      await manager.getRepository(PatientAuditLog).save({ patientId: admission.patientId, action: 'nursing_handoff_created', changedById: userId, changeSummary: `Nursing handoff created for admission ${admission.admissionNumber}`, beforeData: null, afterData: JSON.stringify({ admissionId, handoffId: record.id }) });
-      return handoffResponse((await manager.getRepository(NursingHandoff).findOne({ where: { id: record.id }, relations: { outgoingBy: true, acknowledgedBy: true } }))!);
+      const record = await manager.getRepository(NursingHandoff).save({ admissionId, conditionSummary: input.conditionSummary, pendingTasks: input.pendingTasks, safetyConcerns: input.safetyConcerns ?? null, outgoingById: userId, recipientId: recipient.id });
+      await manager.getRepository(PatientAuditLog).save({ patientId: admission.patientId, action: 'nursing_handoff_created', changedById: userId, changeSummary: `Nursing handoff created for admission ${admission.admissionNumber}`, beforeData: null, afterData: JSON.stringify({ admissionId, handoffId: record.id, recipientId: recipient.id }) });
+      return handoffResponse((await manager.getRepository(NursingHandoff).findOne({ where: { id: record.id }, relations: { outgoingBy: true, recipient: true, acknowledgedBy: true } }))!);
     });
   },
   async acknowledgeNursingHandoff(admissionId: number, handoffId: number, userId: number | null) {
@@ -70,10 +96,11 @@ export const inpatientService = {
       if (!handoff) throw new NotFoundError('Handoff not found');
       if (handoff.acknowledgedAt) throw new ConflictError('Handoff is already acknowledged');
       if (handoff.outgoingById === userId) throw new ConflictError('Outgoing staff cannot acknowledge their own handoff');
+      if (handoff.recipientId && handoff.recipientId !== userId) throw new ConflictError('Handoff is assigned to another staff member');
       handoff.acknowledgedAt = new Date(); handoff.acknowledgedById = userId;
       await manager.getRepository(NursingHandoff).save(handoff);
       await manager.getRepository(PatientAuditLog).save({ patientId: admission.patientId, action: 'nursing_handoff_acknowledged', changedById: userId, changeSummary: `Nursing handoff acknowledged for admission ${admission.admissionNumber}`, beforeData: JSON.stringify({ admissionId, handoffId, acknowledged: false }), afterData: JSON.stringify({ admissionId, handoffId, acknowledged: true }) });
-      return handoffResponse((await manager.getRepository(NursingHandoff).findOne({ where: { id: handoffId }, relations: { outgoingBy: true, acknowledgedBy: true } }))!);
+      return handoffResponse((await manager.getRepository(NursingHandoff).findOne({ where: { id: handoffId }, relations: { outgoingBy: true, recipient: true, acknowledgedBy: true } }))!);
     });
   },
   async dueCarePlans(page: number, pageSize: number) {
