@@ -246,12 +246,12 @@ export const radiologyService = {
   },
   async createOrder(input: CreateRadiologyOrderInput, userId: number | null) {
     return AppDataSource.transaction(async (manager) => {
-      const [patient, modality, doctor] = await Promise.all([
-        manager.getRepository(Patient).findOne({ where: { id: input.patientId, isActive: true } }),
+      const patient = await manager.getRepository(Patient).createQueryBuilder('patient').setLock('pessimistic_write').where('patient.id = :id', { id: input.patientId }).getOne();
+      if (!patient || !patient.isActive || patient.mergedIntoPatientId) throw new NotFoundError('Active patient not found');
+      const [modality, doctor] = await Promise.all([
         manager.getRepository(RadiologyModality).findOne({ where: { id: input.modalityId, isActive: true } }),
         input.doctorId ? manager.getRepository(Doctor).findOne({ where: { id: input.doctorId, isActive: true } }) : Promise.resolve(null),
       ]);
-      if (!patient || patient.mergedIntoPatientId) throw new NotFoundError('Active patient not found');
       if (!modality) throw new NotFoundError('Radiology modality not found');
       if (input.doctorId && !doctor) throw new NotFoundError('Active doctor not found');
       const repo = manager.getRepository(RadiologyOrder);

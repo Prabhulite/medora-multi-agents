@@ -912,6 +912,8 @@ try {
   await ok('POST', '/api/pharmacy/inventory/dispense', { batchId: stock.id, patientId: 2, quantity: 1, reference: 'IT-MERGE-DISPENSE' });
   await dataSource.query("UPDATE patients SET gender = 'transgender' WHERE id = 2");
   await ok('POST', '/api/patients/merge', { sourcePatientId: 2, targetPatientId: 1 });
+  assert.equal((await request('POST', '/api/laboratory/orders', { patientId: 2, testId: newLabTest.id })).status, 404);
+  assert.equal((await request('POST', '/api/radiology/orders', { patientId: 2, modalityId: 1, studyName: 'Late merged study' })).status, 404);
   assert.equal((await request('POST', '/api/clinical/encounters', { patientId: 2, assessment: 'Late merged encounter' })).status, 404);
   assert.equal((await request('POST', '/api/clinical/patients/2/allergies', { allergen: 'Late merged allergy' })).status, 404);
   assert.equal((await request('POST', '/api/clinical/patients/2/medical-history', { conditionName: 'Late merged condition' })).status, 404);

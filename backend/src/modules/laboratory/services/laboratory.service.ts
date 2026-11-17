@@ -191,12 +191,12 @@ export const laboratoryService = {
   },
   async createOrder(input: CreateLaboratoryOrderInput, userId: number | null) {
     return AppDataSource.transaction(async (manager) => {
-      const [patient, test, doctor] = await Promise.all([
-        manager.getRepository(Patient).findOne({ where: { id: input.patientId, isActive: true } }),
+      const patient = await manager.getRepository(Patient).createQueryBuilder('patient').setLock('pessimistic_write').where('patient.id = :id', { id: input.patientId }).getOne();
+      if (!patient || !patient.isActive || patient.mergedIntoPatientId) throw new NotFoundError('Active patient not found');
+      const [test, doctor] = await Promise.all([
         manager.getRepository(LaboratoryTest).findOne({ where: { id: input.testId, isActive: true } }),
         input.doctorId ? manager.getRepository(Doctor).findOne({ where: { id: input.doctorId, isActive: true } }) : Promise.resolve(null),
       ]);
-      if (!patient || patient.mergedIntoPatientId) throw new NotFoundError('Active patient not found');
       if (!test) throw new NotFoundError('Active laboratory test not found');
       if (input.doctorId && !doctor) throw new NotFoundError('Active doctor not found');
       const order = await manager.getRepository(LaboratoryOrder).save(manager.getRepository(LaboratoryOrder).create({ orderNumber: await nextSequenceNumber(manager, 'LAB', 'LAB', 6), patientId: input.patientId, testId: input.testId, doctorId: input.doctorId ?? null, priority: input.priority, clinicalNotes: input.clinicalNotes ?? null, status: 'ordered', orderedAt: new Date(), createdById: userId, collectedAt: null, completedAt: null, resultValue: null, resultUnit: null, referenceRange: null, resultNotes: null, resultedById: null }));
