@@ -12,7 +12,7 @@ import { useAuth } from '../auth/AuthContext';
 import { patientsApi } from '../patients/patients.api';
 import { doctorsApi } from '../doctors/doctors.api';
 import type { Doctor, Patient } from '../../types';
-import { inpatientApi, type Admission, type Bed, type BedTransfer, type CreateAdmissionPayload, type DischargeMedicationReview, type DischargePayload, type DueCarePlanPage, type NursingObservation, type NursingObservationPayload, type Ward } from './inpatient.api';
+import { inpatientApi, type Admission, type Bed, type BedTransfer, type CreateAdmissionPayload, type DischargeMedicationReview, type DischargePayload, type DueCarePlanPage, type NursingObservation, type NursingObservationPayload, type PendingNursingHandoffPage, type Ward } from './inpatient.api';
 import './InpatientDashboardPage.css';
 import { MedicationAdministrationPanel } from './MedicationAdministrationPanel';
 import { CarePlanPanel } from './CarePlanPanel';
@@ -59,6 +59,9 @@ export function InpatientDashboardPage() {
   const [duePage, setDuePage] = useState(1);
   const [dueCarePlans, setDueCarePlans] = useState<DueCarePlanPage>({ items: [], total: 0, page: 1, pageSize: 10 });
   const [dueError, setDueError] = useState('');
+  const [handoffPage, setHandoffPage] = useState(1);
+  const [pendingHandoffs, setPendingHandoffs] = useState<PendingNursingHandoffPage>({ items: [], total: 0, page: 1, pageSize: 10 });
+  const [handoffError, setHandoffError] = useState('');
   const [transfers, setTransfers] = useState<BedTransfer[]>([]);
   const [observations, setObservations] = useState<NursingObservation[]>([]);
 
@@ -81,6 +84,15 @@ export function InpatientDashboardPage() {
     catch (err) { setDueError(getErrorMessage(err, 'Unable to load due care plans')); }
   };
   useEffect(() => { void loadDueCarePlans(); }, [duePage]);
+  const loadPendingHandoffs = async () => {
+    try {
+      const result = await inpatientApi.pendingNursingHandoffs(handoffPage);
+      if (handoffPage > 1 && !result.items.length && result.total <= (handoffPage - 1) * result.pageSize) setHandoffPage((page) => page - 1);
+      else setPendingHandoffs(result);
+      setHandoffError('');
+    } catch (err) { setHandoffError(getErrorMessage(err, 'Unable to load pending handoffs')); }
+  };
+  useEffect(() => { void loadPendingHandoffs(); }, [handoffPage]);
 
   const availableBeds = beds.filter((bed) => bed.status === 'available');
   const occupiedBeds = beds.filter((bed) => bed.status === 'occupied');
@@ -145,6 +157,12 @@ export function InpatientDashboardPage() {
       {dueCarePlans.items.length ? <div className="inpatient-due-plans__list">{dueCarePlans.items.map((plan) => <article key={plan.id}><div><strong>{plan.patientName} · {plan.patientMrdNumber}</strong><span>{plan.admissionNumber} · {plan.wardName} / bed {plan.bedNumber}</span><p>{plan.problem}</p><small>Review due {new Date(plan.reviewAt).toLocaleString()}</small></div><Button size="sm" variant="secondary" onClick={() => { const admission = admissions.find((item) => item.id === Number(plan.admissionId)); if (admission) setCarePlanTarget(admission); else { setTab('admissions'); setError('Refresh admissions to open this care plan.'); } }}>Review plan</Button></article>)}</div> : !dueError ? <p className="inpatient-empty">No care plans are due for review.</p> : null}
       {dueCarePlans.total > dueCarePlans.pageSize ? <div className="inpatient-due-plans__pager"><Button size="sm" variant="secondary" disabled={duePage <= 1} onClick={() => setDuePage((page) => page - 1)}>Previous</Button><span>Page {duePage} of {Math.ceil(dueCarePlans.total / dueCarePlans.pageSize)}</span><Button size="sm" variant="secondary" disabled={duePage * dueCarePlans.pageSize >= dueCarePlans.total} onClick={() => setDuePage((page) => page + 1)}>Next</Button></div> : null}
     </section> : null}
+    {tab === 'overview' ? <section className="inpatient-section inpatient-due-plans" aria-label="Pending nursing handoffs">
+      <div className="inpatient-section-heading"><div><h2>Pending nursing handoffs</h2><p>{pendingHandoffs.total} handoff{pendingHandoffs.total === 1 ? '' : 's'} awaiting acknowledgement.</p></div><Button variant="secondary" size="sm" onClick={() => void loadPendingHandoffs()}>Refresh</Button></div>
+      {handoffError && <Alert tone="error">{handoffError}</Alert>}
+      {pendingHandoffs.items.length ? <div className="inpatient-due-plans__list">{pendingHandoffs.items.map((handoff) => <article key={handoff.id}><div><strong>{handoff.patientName} · {handoff.patientMrdNumber}</strong><span>{handoff.admissionNumber} · {handoff.wardName} / bed {handoff.bedNumber}</span><small>Handed off {new Date(handoff.createdAt).toLocaleString()} by {handoff.outgoingByName}</small></div><Button size="sm" variant="secondary" onClick={() => { const admission = admissions.find((item) => item.id === Number(handoff.admissionId)); if (admission) setHandoffTarget(admission); else { setTab('admissions'); setError('Refresh admissions to open this handoff.'); } }}>Open handoff</Button></article>)}</div> : !handoffError ? <p className="inpatient-empty">No handoffs are awaiting acknowledgement.</p> : null}
+      {pendingHandoffs.total > pendingHandoffs.pageSize ? <div className="inpatient-due-plans__pager"><Button size="sm" variant="secondary" disabled={handoffPage <= 1} onClick={() => setHandoffPage((page) => page - 1)}>Previous</Button><span>Page {handoffPage} of {Math.ceil(pendingHandoffs.total / pendingHandoffs.pageSize)}</span><Button size="sm" variant="secondary" disabled={handoffPage * pendingHandoffs.pageSize >= pendingHandoffs.total} onClick={() => setHandoffPage((page) => page + 1)}>Next</Button></div> : null}
+    </section> : null}
     {tab === 'overview' ? <section className="inpatient-section"><div className="inpatient-section-heading"><div><h2>Ward overview</h2><p>Occupancy at a glance across configured inpatient units.</p></div><Button variant="secondary" size="sm" onClick={() => void load()}>Refresh</Button></div><div className="ward-grid">{wards.map((ward) => { const available = ward.totalBeds - ward.occupiedBeds; const percent = ward.totalBeds ? Math.round((ward.occupiedBeds / ward.totalBeds) * 100) : 0; return <article className="ward-card" key={ward.id}><div className="ward-card__top"><div><span className="ward-card__code">{ward.code}</span><h3>{ward.name}</h3><p>{ward.floor || 'Floor not specified'} · {ward.specialty || 'General care'}</p></div><Badge tone={ward.status === 'active' ? 'success' : 'neutral'}>{ward.status}</Badge></div><div className="ward-card__meter" aria-label={`${percent}% occupied`}><span style={{ width: `${percent}%` }} /></div><div className="ward-card__stats"><div><strong>{ward.occupiedBeds}</strong><span>Occupied</span></div><div><strong>{available}</strong><span>Available</span></div><div><strong>{ward.totalBeds}</strong><span>Total beds</span></div></div><button type="button" className="ward-card__link" onClick={() => setTab('beds')}>View bed board <span aria-hidden="true">→</span></button></article>; })}</div>{!wards.length && !loading ? <div className="inpatient-empty">No wards are configured yet.</div> : null}</section> : null}
     {tab === 'beds' ? <section className="inpatient-section"><div className="inpatient-section-heading"><div><h2>Bed board</h2><p>See current bed status and patient placement.</p></div><Button variant="secondary" size="sm" onClick={() => void load()}>Refresh</Button></div><Table columns={bedColumns} rows={beds} rowKey={(row) => row.id} loading={loading} searchText={(row) => `${row.bedNumber} ${row.wardName} ${row.patientName || ''}`} searchPlaceholder="Search beds or patients" emptyMessage="No beds found." /></section> : null}
     {tab === 'admissions' ? <section className="inpatient-section"><div className="inpatient-section-heading"><div><h2>Admissions</h2><p>Review current and planned inpatient stays.</p></div><Button size="sm" onClick={() => setShowForm(true)}>New admission</Button></div><Table columns={admissionColumns} rows={admissions} rowKey={(row) => row.id} loading={loading} searchText={(row) => `${row.admissionNumber} ${row.patientName} ${row.patientMrdNumber} ${row.wardName}`} searchPlaceholder="Search admissions" emptyMessage="No admissions found." /></section> : null}
@@ -155,7 +173,7 @@ export function InpatientDashboardPage() {
     {transferTarget ? <TransferPanel admission={transferTarget} availableBeds={availableBeds} transfers={transfers} onClose={() => setTransferTarget(null)} onSave={async (toBedId, reason) => { await inpatientApi.transfer(transferTarget.id, toBedId, reason); setTransfers(await inpatientApi.listTransfers(transferTarget.id)); await load(); }} /> : null}
     {medicationTarget ? <MedicationAdministrationPanel admission={medicationTarget} onClose={() => setMedicationTarget(null)} /> : null}
     {admissionReviewTarget ? <AdmissionMedicationReviewPanel admission={admissionReviewTarget} onClose={() => setAdmissionReviewTarget(null)} /> : null}
-    {handoffTarget ? <NursingHandoffPanel admission={handoffTarget} onClose={() => setHandoffTarget(null)} /> : null}
+    {handoffTarget ? <NursingHandoffPanel admission={handoffTarget} onClose={() => { setHandoffTarget(null); void loadPendingHandoffs(); }} /> : null}
     {carePlanTarget ? <CarePlanPanel admission={carePlanTarget} onClose={() => { setCarePlanTarget(null); void loadDueCarePlans(); }} /> : null}
   </div>;
 }

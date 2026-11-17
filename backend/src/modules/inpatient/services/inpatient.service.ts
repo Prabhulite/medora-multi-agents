@@ -21,6 +21,27 @@ const observationResponse = (row: NursingObservation) => ({ ...row, recordedBy: 
 const handoffResponse = (row: NursingHandoff) => { const { outgoingBy, acknowledgedBy, ...fields } = row; return { ...fields, outgoingBy: staffReference(outgoingBy), acknowledgedBy: staffReference(acknowledgedBy) }; };
 
 export const inpatientService = {
+  async pendingNursingHandoffs(page: number, pageSize: number) {
+    const query = AppDataSource.getRepository(NursingHandoff).createQueryBuilder('handoff')
+      .innerJoin('handoff.admission', 'admission')
+      .innerJoin('admission.patient', 'patient')
+      .innerJoin('admission.bed', 'bed')
+      .innerJoin('bed.ward', 'ward')
+      .innerJoin('handoff.outgoingBy', 'outgoing')
+      .where('handoff.acknowledged_at IS NULL')
+      .andWhere('admission.status IN (:...statuses)', { statuses: ['admitted', 'transferred'] });
+    const total = await query.clone().getCount();
+    const items = await query.select('handoff.id', 'id').addSelect('handoff.admissionId', 'admissionId')
+      .addSelect('handoff.createdAt', 'createdAt').addSelect('outgoing.id', 'outgoingById')
+      .addSelect('outgoing.fullName', 'outgoingByName')
+      .addSelect('admission.admissionNumber', 'admissionNumber')
+      .addSelect('patient.mrdNumber', 'patientMrdNumber')
+      .addSelect("CONCAT_WS(' ', patient.firstName, patient.middleName, patient.lastName)", 'patientName')
+      .addSelect('ward.name', 'wardName').addSelect('bed.number', 'bedNumber')
+      .orderBy('handoff.createdAt', 'ASC').addOrderBy('handoff.id', 'ASC')
+      .limit(pageSize).offset((page - 1) * pageSize).getRawMany();
+    return { items, total, page, pageSize };
+  },
   async nursingHandoffs(admissionId: number) {
     if (!(await AppDataSource.getRepository(Admission).exist({ where: { id: admissionId } }))) throw new NotFoundError('Admission not found');
     const rows = await AppDataSource.getRepository(NursingHandoff).find({ where: { admissionId }, relations: { outgoingBy: true, acknowledgedBy: true }, order: { id: 'DESC' }, take: 100 });

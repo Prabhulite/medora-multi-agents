@@ -4,6 +4,7 @@ import { User } from './User.js';
 
 @Entity({ name: 'nursing_handoffs' })
 @Index('IDX_nursing_handoffs_admission', ['admissionId', 'id'])
+@Index('IDX_nursing_handoffs_pending', ['acknowledgedAt', 'id'])
 export class NursingHandoff {
   @PrimaryGeneratedColumn({ unsigned: true }) id!: number;
   @Column({ name: 'admission_id', type: 'int', unsigned: true }) admissionId!: number;

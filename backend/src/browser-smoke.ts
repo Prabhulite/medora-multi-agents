@@ -208,6 +208,7 @@ try {
   const inpatientState = await evaluate('({ path: location.pathname, login: document.body.innerText.includes("Sign in"), inpatient: document.body.innerText.includes("Inpatient Management"), active: document.body.innerText.includes("Active admissions"), page: Boolean(document.querySelector(".inpatient-page")), kpis: Boolean(document.querySelector(".inpatient-kpis")), loadError: document.body.innerText.includes("Unable to load inpatient dashboard") })');
   assert.ok(inpatientLoaded, `Inpatient dashboard did not render: ${JSON.stringify(inpatientState)}`);
   assert.equal(await evaluate('document.body.innerText.includes("Unable to load inpatient dashboard")'), false, 'Inpatient dashboard showed a load error');
+  assert.equal(await evaluate('Boolean(document.querySelector(".inpatient-section[aria-label^=Pending]"))'), true, 'Pending handoff queue did not render');
   await evaluate('history.pushState({}, "", "/patients"); window.dispatchEvent(new PopStateEvent("popstate")); true');
   let patientPageReady = false;
   for (let attempt = 0; attempt < 100; attempt++) {
