@@ -243,7 +243,24 @@ try {
     }
     await evaluate('document.querySelector("[role=dialog] .ui-modal__close").click(); true');
   }
-  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, communication queues, pharmacy patient forms${hasBatch ? ', stock movements and count form' : ''}, inpatient dashboard, patient registration${hasPatientRow ? ' and merge confirmation' : ''}${patientLookup.body.data?.length ? ', radiology patient selection' : ''}${finalOrderNumber ? ', and finalized radiology report print output' : ''} rendered in headless Chrome.`);
+  await evaluate('history.pushState({}, "", "/billing"); window.dispatchEvent(new PopStateEvent("popstate")); true');
+  let billingReady = false;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    billingReady = await evaluate('document.body.innerText.includes("Billing & Payments") && Boolean([...document.querySelectorAll("button")].find(button => button.textContent?.includes("Cashier report")))');
+    if (billingReady) break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.ok(billingReady, 'Billing page and cashier report action did not render');
+  await evaluate('[...document.querySelectorAll("button")].find(button => button.textContent?.includes("Cashier report")).click(); true');
+  let cashierReady = false;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    cashierReady = await evaluate('Boolean(document.querySelector("#cashier-report-title")) && document.body.innerText.includes("Cash handled by staff")');
+    if (cashierReady) break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  const cashierState = await evaluate('({ dialog: document.querySelector("[role=dialog]")?.innerText.slice(0, 600), path: location.pathname })');
+  assert.ok(cashierReady, `Cashier operator breakdown did not render: ${JSON.stringify(cashierState)}`);
+  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, communication queues, pharmacy patient forms${hasBatch ? ', stock movements and count form' : ''}, inpatient dashboard, patient registration${hasPatientRow ? ' and merge confirmation' : ''}${patientLookup.body.data?.length ? ', radiology patient selection' : ''}${finalOrderNumber ? ', finalized radiology report print output' : ''}, and cashier report rendered in headless Chrome.`);
   await send('Browser.close').catch(() => undefined);
   socket.close();
 } finally {

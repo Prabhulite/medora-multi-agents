@@ -798,6 +798,11 @@ try {
   const cashierReport = await ok('GET', `/api/billing/reports/cashier?from=${reportFrom}&to=${reportTo}`);
   assert.deepEqual(cashierReport.totals, { received: '140.00', refunded: '40.00', net: '100.00', paymentCount: 2, refundCount: 1 });
   assert.deepEqual(cashierReport.rows.find((row: { method: string }) => row.method === 'cash'), { method: 'cash', paymentCount: 1, refundCount: 1, received: '100.00', refunded: '40.00', net: '60.00' });
+  assert.equal(cashierReport.cashiers.length, 1);
+  assert.equal(cashierReport.cashiers[0].cashierName, 'Integration Admin');
+  assert.equal(cashierReport.cashiers[0].received, '100.00');
+  assert.equal(cashierReport.cashiers[0].refunded, '40.00');
+  assert.equal(cashierReport.cashiers[0].net, '60.00');
   assert.equal((await request('GET', '/api/billing/reports/cashier?from=2026-02-01&to=2026-01-01')).status, 422);
   const invoiceList = await ok('GET', '/api/billing/invoices?patientId=1');
   assert.equal(invoiceList[0].paidAmount, '100.00');

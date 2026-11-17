@@ -73,8 +73,9 @@ Current patient chart tabs: Profile and MRD show identity details and audit hist
 - Insurance, corporate accounts, approvals, claims-ready records
 - Patient ledger, discounts, taxes, payment reconciliation
 - Financial reports and cashier controls
-- Billing now has a date-range cashier report (up to 90 days) with payment-method receipt counts, refund counts, gross receipts, refunds, and net collections. Dates follow the MySQL session local time and totals come from stored transaction amounts; the report does not represent historical outstanding balances. Shift closeout, cashier attribution, exports, and reconciliation remain future work.
+- Billing now has a date-range cashier report (up to 90 days) with payment-method receipt counts, refund counts, gross receipts, refunds, and net collections. Dates follow the MySQL session local time and totals come from stored transaction amounts; the report does not represent historical outstanding balances. Shift closeout, exports, and reconciliation remain future work.
 - Staff with billing view access can open and print a payment receipt from an invoice. It shows the patient MRD, invoice, payment method and reference, and any refunds against that payment, with current net retained. Payment ID is the lookup identifier; it is not a tax invoice number or a regulated receipt sequence. Printed copies reflect the refund state at viewing time rather than an immutable archive.
+- The cashier report now breaks cash receipts and cash refunds down by the staff account that recorded each transaction. Older transactions without an actor appear as Unassigned. A refund is attributed to the staff member who recorded the refund, which can differ from the original payment recorder. This is an operational accountability view; no shift closeout or cash drawer count is recorded yet.
 
 ### Phase 5: Pharmacy and inventory
 
