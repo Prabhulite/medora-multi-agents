@@ -900,7 +900,17 @@ try {
   assert.equal((await ok('GET', '/api/patients/1/audit-logs')).some((row: { action: string }) => row.action === 'fhir_exported'), true);
   assert.equal((await request('GET', '/api/fhir/r4/Patient/999999')).status, 404);
   assert.equal((await request('GET', '/api/fhir/r4/Patient/invalid')).status, 422);
-  await dataSource.query("UPDATE patients SET gender = 'transgender', is_active = 0, merged_into_patient_id = 1 WHERE id = 2");
+  const sourcePrescription = await ok('POST', '/api/pharmacy/prescriptions', { patientId: 2, medicineName: 'Merged Chart Medicine' }, 201);
+  await ok('POST', '/api/pharmacy/inventory/dispense', { batchId: stock.id, patientId: 2, quantity: 1, reference: 'IT-MERGE-DISPENSE' });
+  await dataSource.query("UPDATE patients SET gender = 'transgender' WHERE id = 2");
+  await ok('POST', '/api/patients/merge', { sourcePatientId: 2, targetPatientId: 1 });
+  assert.equal((await ok('GET', '/api/pharmacy/patients/1/prescriptions')).some((row: { id: number }) => row.id === sourcePrescription.id), true);
+  assert.equal((await ok('GET', '/api/pharmacy/inventory/dispenses?patientId=1')).some((row: { reference: string | null }) => row.reference === 'IT-MERGE-DISPENSE'), true);
+  assert.equal((await dataSource.query('SELECT patient_id AS patientId FROM prescriptions WHERE id = ?', [sourcePrescription.id]))[0].patientId, 1);
+  assert.equal((await dataSource.query('SELECT patient_id AS patientId FROM laboratory_orders WHERE id = ?', [existingTestOrder.id]))[0].patientId, 1);
+  assert.equal((await dataSource.query('SELECT patient_id AS patientId FROM home_medications WHERE id = ?', [ceasedHistory.id]))[0].patientId, 1);
+  const [mergeAudit] = await dataSource.query("SELECT before_data AS beforeData FROM patient_audit_logs WHERE patient_id = 1 AND action = 'merge' ORDER BY id DESC LIMIT 1");
+  assert.equal(JSON.parse(mergeAudit.beforeData).sourcePatientId, 2);
   const mergedFhirResponse = await fetch(`${base}/api/fhir/r4/Patient/2`, { headers: { authorization: `Bearer ${token}` } });
   assert.equal(mergedFhirResponse.status, 200);
   const mergedFhir = await mergedFhirResponse.json() as Record<string, any>;

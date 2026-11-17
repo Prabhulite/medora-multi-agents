@@ -851,8 +851,14 @@ export const patientRepository = {
   ): Promise<PatientDetailView | null> {
     return AppDataSource.transaction(async (manager) => {
       const patientRepo = manager.getRepository(Patient);
-      const source = await patientRepo.findOne({ where: { id: sourcePatientId } });
-      const target = await patientRepo.findOne({ where: { id: targetPatientId } });
+      const lockedPatients = await patientRepo
+        .createQueryBuilder('patient')
+        .where('patient.id IN (:...ids)', { ids: [sourcePatientId, targetPatientId] })
+        .orderBy('patient.id', 'ASC')
+        .setLock('pessimistic_write')
+        .getMany();
+      const source = lockedPatients.find((patient) => patient.id === sourcePatientId);
+      const target = lockedPatients.find((patient) => patient.id === targetPatientId);
       if (!source || !target) return null;
       if (!source.isActive || source.mergedIntoPatientId) return null;
       if (!target.isActive || target.mergedIntoPatientId) return null;
@@ -862,13 +868,29 @@ export const patientRepository = {
       source.updatedById = changedById;
       await patientRepo.save(source);
 
-      await manager
-        .getRepository(PatientVisit)
-        .createQueryBuilder()
-        .update(PatientVisit)
-        .set({ patientId: targetPatientId })
-        .where('patient_id = :sourcePatientId', { sourcePatientId })
-        .execute();
+      // Keep the source's unique demographic records and audit trail intact. Clinical
+      // records must share the surviving patient ID so chart and module queries agree.
+      const clinicalTables = [
+        'patient_visits', 'patient_documents', 'patient_allergies',
+        'patient_medical_history', 'patient_consents', 'patient_communications',
+        'appointments', 'clinical_encounters', 'home_medications',
+        'prescriptions', 'admissions', 'emergency_cases', 'laboratory_orders',
+        'radiology_orders', 'surgery_cases', 'invoices', 'stock_transactions',
+        'ambulance_trips',
+      ] as const;
+      const movedRecords: Record<string, number> = {};
+      for (const table of clinicalTables) {
+        const result: { affectedRows?: number } = await manager.query(
+          `UPDATE \`${table}\` SET patient_id = ? WHERE patient_id = ?`,
+          [targetPatientId, sourcePatientId],
+        );
+        if (result.affectedRows) movedRecords[table] = result.affectedRows;
+      }
+      const bloodUnits: { affectedRows?: number } = await manager.query(
+        'UPDATE `blood_units` SET issued_patient_id = ? WHERE issued_patient_id = ?',
+        [targetPatientId, sourcePatientId],
+      );
+      if (bloodUnits.affectedRows) movedRecords.blood_units = bloodUnits.affectedRows;
 
       await manager.save(
         manager.create(PatientAuditLog, {
@@ -876,7 +898,7 @@ export const patientRepository = {
           action: 'merge',
           changedById,
           changeSummary: `Merged patient ${source.mrdNumber} into ${target.mrdNumber}`,
-          beforeData: JSON.stringify({ sourcePatientId, targetPatientId }),
+          beforeData: JSON.stringify({ sourcePatientId, targetPatientId, movedRecords }),
           afterData: JSON.stringify({
             keptMrd: target.mrdNumber,
             mergedMrd: source.mrdNumber,
