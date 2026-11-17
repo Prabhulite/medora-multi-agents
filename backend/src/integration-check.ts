@@ -497,8 +497,13 @@ try {
   await ok('POST', '/api/pharmacy/inventory/dispense', { batchId: stock.id, patientId: 1, prescriptionId: prescription.id, quantity: 4 });
   assert.equal((await request('POST', '/api/pharmacy/inventory/dispense', { batchId: stock.id, patientId: 1, prescriptionId: prescription.id, quantity: 3 })).status, 422);
   await ok('POST', '/api/pharmacy/inventory/dispense', { batchId: stock.id, patientId: 1, prescriptionId: prescription.id, quantity: 2 });
+  const concurrentPrescription = await ok('POST', '/api/pharmacy/prescriptions', { patientId: 1, medicationId: 1, medicineName: 'Integration Medicine', dosage: '5 mg', quantityPrescribed: 1 }, 201);
+  const concurrentDispenses = await Promise.all([1, 2].map(() => request('POST', '/api/pharmacy/inventory/dispense', { batchId: stock.id, patientId: 1, prescriptionId: concurrentPrescription.id, quantity: 1 })));
+  assert.deepEqual(concurrentDispenses.map((response) => response.status).sort(), [200, 422]);
   const dispenses = await ok('GET', '/api/pharmacy/inventory/dispenses?patientId=1');
   assert.equal(dispenses.filter((row: { prescriptionId: number | null }) => row.prescriptionId === prescription.id).length, 2);
+  assert.equal(dispenses.filter((row: { prescriptionId: number | null }) => row.prescriptionId === concurrentPrescription.id).length, 1);
+  await dataSource.query("UPDATE prescriptions SET status = 'completed' WHERE id = ?", [concurrentPrescription.id]);
   assert.deepEqual(Object.keys(dispenses[0].createdBy).sort(), ['fullName', 'id']);
   const administered = await ok('POST', `/api/inpatient/admissions/${admission.id}/medication-administrations`, { prescriptionId: prescription.id, outcome: 'given', doseGiven: '5 mg' }, 201);
   assert.equal(administered.prescriptionId, prescription.id);
