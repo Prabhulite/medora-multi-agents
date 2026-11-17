@@ -167,6 +167,16 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   assert.ok(pharmacyReady, 'Pharmacy inventory did not render');
+  await evaluate('Array.from(document.querySelectorAll("button")).find(button => button.innerText === "Receive stock").click(); true');
+  assert.equal(await evaluate('document.querySelector(".pharmacy-modal")?.innerText.includes("Catalog medication") && Boolean(document.querySelector(".pharmacy-modal button[type=submit]:disabled"))'), true, 'Pharmacy receipt form did not require catalog medication selection');
+  let medicationCatalogReady = false;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    medicationCatalogReady = await evaluate('document.querySelector(".pharmacy-modal #catalog-medication")?.options.length > 1');
+    if (medicationCatalogReady) break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.ok(medicationCatalogReady, 'Active medication catalog did not load in stock receipt form');
+  await evaluate('document.querySelector(".pharmacy-modal__header button").click(); true');
   await evaluate('Array.from(document.querySelectorAll("button")).find(button => button.innerText === "Dispense stock").click(); true');
   assert.equal(await evaluate('document.querySelector(".pharmacy-modal")?.innerText.includes("Patient (optional)")'), true, 'Pharmacy dispense form did not show patient search');
   await evaluate('document.querySelector(".pharmacy-modal__header button").click(); true');
