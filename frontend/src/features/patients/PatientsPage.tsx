@@ -55,11 +55,19 @@ export function PatientsPage() {
   const [mrdLookup, setMrdLookup] = useState('');
   const [mrdMatches, setMrdMatches] = useState<Patient[] | null>(null);
   const [mrdLookupLoading, setMrdLookupLoading] = useState(false);
+  const [mergeSource, setMergeSource] = useState<Patient | null>(null);
+  const [mergeQuery, setMergeQuery] = useState('');
+  const [mergeCandidates, setMergeCandidates] = useState<Patient[]>([]);
+  const [mergeTarget, setMergeTarget] = useState<Patient | null>(null);
+  const [mergeConfirmation, setMergeConfirmation] = useState('');
+  const [mergeError, setMergeError] = useState('');
+  const [mergeBusy, setMergeBusy] = useState(false);
 
   const canCreate = hasPermission(user, 'patients.create');
   const canView = hasPermission(user, 'patients.view');
   const canUpdate = hasPermission(user, 'patients.update');
   const canDelete = hasPermission(user, 'patients.delete');
+  const canMerge = hasPermission(user, 'patients.merge');
 
   const load = async () => {
     setLoading(true);
@@ -125,6 +133,55 @@ export function PatientsPage() {
     } finally {
       setMrdLookupLoading(false);
     }
+  };
+
+  const closeMerge = () => {
+    if (mergeBusy) return;
+    setMergeSource(null);
+    setMergeQuery('');
+    setMergeCandidates([]);
+    setMergeTarget(null);
+    setMergeConfirmation('');
+    setMergeError('');
+  };
+
+  const searchMergeTarget = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!mergeQuery.trim() || !mergeSource) return;
+    setMergeBusy(true);
+    setMergeError('');
+    setMergeTarget(null);
+    try {
+      const matches = await patientsApi.search({ q: mergeQuery.trim() });
+      setMergeCandidates(matches.filter((patient) => patient.id !== mergeSource.id && patient.isActive && !patient.mergedIntoPatientId));
+    } catch (err) {
+      setMergeError(getErrorMessage(err, 'Unable to search patients'));
+    } finally {
+      setMergeBusy(false);
+    }
+  };
+
+  const submitMerge = async () => {
+    if (!mergeSource || !mergeTarget || mergeConfirmation !== mergeSource.mrdNumber) return;
+    setMergeBusy(true);
+    setMergeError('');
+    try {
+      const survivor = await patientsApi.merge(mergeSource.id, mergeTarget.id);
+      closeMergeAfterSuccess();
+      await load();
+      navigate(`/patients/${survivor.id}`);
+    } catch (err) {
+      setMergeError(getErrorMessage(err, 'Unable to merge patient records'));
+    } finally {
+      setMergeBusy(false);
+    }
+  };
+
+  const closeMergeAfterSuccess = () => {
+    setMergeSource(null);
+    setMergeTarget(null);
+    setMergeCandidates([]);
+    setMergeConfirmation('');
   };
 
   const columns = useMemo(
@@ -266,12 +323,15 @@ export function PatientsPage() {
                   },
                 ]
               : []),
+            ...(canMerge && row.isActive && !row.mergedIntoPatientId
+              ? [{ key: 'merge', label: 'Merge into another patient', icon: <ViewIcon />, onClick: () => { setMergeSource(row); setMergeError(''); } }]
+              : []),
           ];
           return items.length ? <ActionMenu items={items} /> : null;
         },
       },
     ],
-    [canDelete, canUpdate, canView, navigate],
+    [canDelete, canUpdate, canView, canMerge, navigate],
   );
 
   return (
@@ -311,6 +371,30 @@ export function PatientsPage() {
           `${row.fullName} ${row.mrdNumber} ${row.mobileNumber || ''} ${row.latestVisitNumber || ''} ${row.latestOpNumber || ''} ${row.bloodGroup || ''} ${row.createdByName || ''} ${row.gender} ${row.dateOfBirth || ''} ${row.addressLine || ''} ${row.city || ''} ${row.district || ''} ${row.state || ''}`
         }
       />
+
+      <Modal open={Boolean(mergeSource)} title="Merge patient records" onClose={closeMerge} footer={<>
+        <Button variant="secondary" size="sm" onClick={closeMerge} disabled={mergeBusy}>Cancel</Button>
+        <Button variant="danger" size="sm" onClick={() => void submitMerge()} disabled={mergeBusy || !mergeTarget || mergeConfirmation !== mergeSource?.mrdNumber}>Merge records</Button>
+      </>}>
+        {mergeSource ? <div className="patient-merge">
+          <p><strong>Source record:</strong> {mergeSource.fullName} ({mergeSource.mrdNumber})</p>
+          <p>The source MRD becomes inactive. Visits, clinical, pharmacy, billing, and operational records move to the surviving chart. Contact and identification details remain on the source record for review.</p>
+          <form onSubmit={(event) => void searchMergeTarget(event)}>
+            <label htmlFor="patient-merge-search">Find the patient record to keep</label>
+            <div className="patient-mrd-lookup__controls">
+              <input id="patient-merge-search" value={mergeQuery} onChange={(event) => { setMergeQuery(event.target.value); setMergeTarget(null); setMergeCandidates([]); }} placeholder="MRD or patient name" />
+              <Button type="submit" size="sm" disabled={mergeBusy || !mergeQuery.trim()}>Search</Button>
+            </div>
+          </form>
+          {mergeCandidates.length ? <div className="patient-merge__candidates" role="group" aria-label="Destination patients">
+            {mergeCandidates.map((candidate) => <button key={candidate.id} type="button" aria-pressed={mergeTarget?.id === candidate.id} onClick={() => setMergeTarget(candidate)}>{candidate.fullName} · {candidate.mrdNumber}</button>)}
+          </div> : null}
+          {mergeTarget ? <p><strong>Surviving chart:</strong> {mergeTarget.fullName} ({mergeTarget.mrdNumber})</p> : null}
+          {mergeTarget ? <label htmlFor="patient-merge-confirm">Type {mergeSource.mrdNumber} to confirm the source record</label> : null}
+          {mergeTarget ? <input id="patient-merge-confirm" value={mergeConfirmation} onChange={(event) => setMergeConfirmation(event.target.value)} autoComplete="off" /> : null}
+          {mergeError ? <Alert tone="error">{mergeError}</Alert> : null}
+        </div> : null}
+      </Modal>
 
       <Modal
         open={Boolean(receipt)}

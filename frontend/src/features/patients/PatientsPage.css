@@ -46,6 +46,18 @@
   cursor: pointer;
 }
 
+.patient-merge, .patient-merge form {
+  display: grid;
+  gap: 10px;
+}
+
+.patient-merge p { margin: 0; line-height: 1.5; }
+.patient-merge label { font-weight: 700; font-size: 13px; }
+.patient-merge input { min-width: 0; padding: 8px 11px; border: 1px solid #bfcec4; border-radius: 8px; font: inherit; }
+.patient-merge__candidates { display: grid; gap: 6px; max-height: 190px; overflow: auto; }
+.patient-merge__candidates button { padding: 9px 11px; border: 1px solid #bfcec4; border-radius: 8px; background: #fff; color: #254b35; font: inherit; text-align: left; cursor: pointer; }
+.patient-merge__candidates button[aria-pressed="true"] { border-color: #027a43; background: #edf8f0; font-weight: 700; }
+
 .patient-cell {
   display: flex;
   align-items: center;
