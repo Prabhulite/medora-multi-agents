@@ -7,6 +7,8 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Select } from '../../components/ui/Select';
 import { Table, type TableColumn } from '../../components/ui/Table';
 import { getErrorMessage } from '../../lib/api';
+import { hasPermission } from '../../lib/permissions';
+import { useAuth } from '../auth/AuthContext';
 import { prescriptionsApi } from '../clinical/prescriptions.api';
 import type { Prescription } from '../../types';
 import { pharmacyApi, type DispenseRecord, type DispenseStockPayload, type InventoryBatch, type PharmacyPatientCandidate, type ReceiveStockPayload } from './pharmacy.api';
@@ -30,6 +32,9 @@ function stockTone(row: InventoryBatch): 'success' | 'warning' | 'danger' {
 }
 
 export function PharmacyInventoryPage() {
+  const { user } = useAuth();
+  const canReceive = hasPermission(user, 'pharmacy.inventory.create');
+  const canDispense = hasPermission(user, 'pharmacy.inventory.update');
   const [inventory, setInventory] = useState<InventoryBatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -86,7 +91,7 @@ export function PharmacyInventoryPage() {
   };
 
   return <div className="pharmacy-page">
-    <PageHeader title="Pharmacy inventory" subtitle="Monitor medicine availability, expiry risk, and stock movements." actions={<div className="pharmacy-actions"><Button variant="secondary" size="sm" onClick={() => setModal('history')}>Dispense history</Button><Button variant="secondary" size="sm" onClick={() => setModal('dispense')}>Dispense stock</Button><Button size="sm" onClick={() => setModal('receive')}>Receive stock</Button></div>} />
+    <PageHeader title="Pharmacy inventory" subtitle="Monitor medicine availability, expiry risk, and stock movements." actions={<div className="pharmacy-actions"><Button variant="secondary" size="sm" onClick={() => setModal('history')}>Dispense history</Button>{canDispense && <Button variant="secondary" size="sm" onClick={() => setModal('dispense')}>Dispense stock</Button>}{canReceive && <Button size="sm" onClick={() => setModal('receive')}>Receive stock</Button>}</div>} />
     {error ? <Alert tone="error">{error}</Alert> : null}
     {notice ? <Alert tone="success">{notice}</Alert> : null}
     <div className="pharmacy-kpis" aria-label="Pharmacy inventory summary">
@@ -99,8 +104,8 @@ export function PharmacyInventoryPage() {
       <div className="pharmacy-section__heading"><div><span className="pharmacy-eyebrow">STOCK CONTROL</span><h2>Inventory batches</h2><p>Use FEFO handling: issue medicines with the nearest expiry first.</p></div></div>
       <Table columns={columns} rows={inventory} rowKey={(row) => row.id} loading={loading} onRefresh={() => void load()} searchText={(row) => `${row.medicationName} ${row.medicationCode} ${row.batchNumber} ${row.storageLocation || ''}`} searchPlaceholder="Search medicine, batch, or location" emptyMessage="No inventory batches found. Receive stock to start tracking medicines." />
     </section>
-    {modal === 'receive' ? <ReceiveStockForm saving={saving} onClose={() => setModal(null)} onSubmit={(payload) => void saveReceipt(payload)} /> : null}
-    {modal === 'dispense' ? <DispenseStockForm inventory={inventory} saving={saving} onClose={() => setModal(null)} onSubmit={(payload) => void saveDispense(payload)} /> : null}
+    {modal === 'receive' && canReceive ? <ReceiveStockForm saving={saving} onClose={() => setModal(null)} onSubmit={(payload) => void saveReceipt(payload)} /> : null}
+    {modal === 'dispense' && canDispense ? <DispenseStockForm inventory={inventory} saving={saving} onClose={() => setModal(null)} onSubmit={(payload) => void saveDispense(payload)} /> : null}
     {modal === 'history' ? <DispenseHistory onClose={() => setModal(null)} /> : null}
   </div>;
 }
