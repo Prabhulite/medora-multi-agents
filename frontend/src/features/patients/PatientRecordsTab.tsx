@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
+import { Loader } from '../../components/ui/Loader';
 import { getErrorMessage } from '../../lib/api';
 import { hasPermission } from '../../lib/permissions';
 import type { Patient } from '../../types';
@@ -56,7 +57,7 @@ export function PatientRecordsTab({ patient, mode }: { patient: Patient; mode: P
 
   return <section className="pd-card pd-card--wide">
     <div className="pd-card__head"><h3>{mode === 'Rx' ? 'Prescriptions' : mode === 'Tests' ? 'Diagnostic tests' : mode === 'Visit' ? 'Visits' : mode === 'Bills' ? 'Patient bills' : 'Appointments'}</h3><Badge tone="info">{rows.length} records</Badge></div>
-    {!permitted ? <Alert tone="error">You do not have permission to view these records.</Alert> : error ? <Alert tone="error">{error}</Alert> : loading ? <p className="pd-empty">Loading records…</p> : rows.length ? <div className="pd-card__body pd-visits">
+    {!permitted ? <Alert tone="error">You do not have permission to view these records.</Alert> : error ? <Alert tone="error">{error}</Alert> : loading ? <Loader size="sm" variant="block" label="Loading records…" /> : rows.length ? <div className="pd-card__body pd-visits">
       {rows.map((row) => <div className="pd-visit-row" key={row.key}><div><div className="ui-table__cell-title">{row.title}</div><div className="ui-table__cell-sub">{[row.detail, row.status].filter(Boolean).join(' · ')}</div></div><strong>{asDate(row.at)}</strong></div>)}
     </div> : <p className="pd-empty">No {mode.toLowerCase()} records found for this patient.</p>}
   </section>;

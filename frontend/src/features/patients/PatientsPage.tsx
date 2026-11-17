@@ -4,6 +4,7 @@ import { ActionMenu } from '../../components/ui/ActionMenu';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { Loader } from '../../components/ui/Loader';
 import { Modal } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { PatientAvatar } from '../../components/ui/PatientAvatar';
@@ -330,7 +331,7 @@ export function PatientsPage() {
           </Button>
         }
       >
-        {auditLoading ? <p className="patient-empty">Loading history…</p> : null}
+        {auditLoading ? <Loader size="sm" variant="block" label="Loading history…" /> : null}
         {auditError ? <Alert tone="error">{auditError}</Alert> : null}
         {!auditLoading && !auditError ? (
           auditLogs.length ? (

@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { PageLoader } from '../../components/ui/Loader';
 import { Select } from '../../components/ui/Select';
 import { getErrorMessage } from '../../lib/api';
 import type {
@@ -371,7 +372,7 @@ export function AppointmentFormPage() {
   };
 
   if (loading) {
-    return <div className="patient-form-loading">Loading appointment…</div>;
+    return <PageLoader label="Loading appointment…" />;
   }
 
   return (

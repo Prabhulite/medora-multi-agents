@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { Loader } from '../../components/ui/Loader';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { getErrorMessage } from '../../lib/api';
 import { auditApi, AuditLog, AuditLogFilters, AuditLogPage } from './audit.api';
@@ -21,7 +22,7 @@ function statusClass(status: number | string | null) {
 }
 
 function SkeletonRows() {
-  return <div className="audit-skeleton" aria-busy="true" aria-label="Loading audit logs">{Array.from({ length: 6 }, (_, index) => <span key={index} />)}</div>;
+  return <Loader size="md" variant="block" label="Loading audit logs…" />;
 }
 
 function LogTable({ logs }: { logs: AuditLog[] }) {

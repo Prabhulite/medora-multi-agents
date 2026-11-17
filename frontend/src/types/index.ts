@@ -41,6 +41,66 @@ export interface UpdateDepartmentPayload {
   isActive?: boolean;
 }
 
+export type ServiceCareType = 'OP' | 'IP' | 'Both';
+
+export interface ServiceCategory {
+  id: number;
+  code: string;
+  name: string;
+  description: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  serviceCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ServiceMaster {
+  id: number;
+  serviceCode: string;
+  serviceName: string;
+  categoryId: number;
+  categoryCode: string | null;
+  categoryName: string | null;
+  departmentId: number;
+  departmentCode: string | null;
+  departmentName: string | null;
+  serviceType: ServiceCareType;
+  defaultPrice: number;
+  taxPercent: number | null;
+  description: string | null;
+  isActive: boolean;
+  billingApplicable: ServiceCareType;
+  allowDiscount: boolean;
+  defaultDiscountPercent: number | null;
+  allowQuantity: boolean;
+  defaultQuantity: number;
+  effectiveFrom: string;
+  branchName: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateServicePayload {
+  serviceName: string;
+  categoryId: number;
+  departmentId: number;
+  serviceType: ServiceCareType;
+  defaultPrice: number;
+  taxPercent?: number | null;
+  description?: string | null;
+  isActive?: boolean;
+  billingApplicable?: ServiceCareType;
+  allowDiscount?: boolean;
+  defaultDiscountPercent?: number | null;
+  allowQuantity?: boolean;
+  defaultQuantity?: number;
+  effectiveFrom: string;
+  branchName?: string | null;
+}
+
+export type UpdateServicePayload = Partial<CreateServicePayload>;
+
 export type HospitalType = 'multi_speciality' | 'ivf' | 'general' | 'clinic';
 
 export interface MasterDocument {

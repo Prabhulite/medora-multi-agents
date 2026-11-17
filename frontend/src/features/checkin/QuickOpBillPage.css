@@ -1,0 +1,309 @@
+.qob-page {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #f8fafc;
+  font-family: var(--font);
+}
+
+.qob-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fff;
+  border-radius: 14px 14px 0 0;
+}
+
+.qob-header h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.qob-header p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.qob-close {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.qob-close:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.qob-body {
+  display: grid;
+  gap: 14px;
+  padding: 16px 20px 20px;
+}
+
+.qob-patient-bar {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.qob-patient-chip {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.qob-patient-chip span {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.qob-patient-chip strong {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  word-break: break-word;
+}
+
+.qob-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  padding: 14px 16px;
+}
+
+.qob-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.qob-search {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.qob-search__icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.qob-search input {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 14px 0 38px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  font: inherit;
+  color: #0f172a;
+  outline: none;
+}
+
+.qob-search input:focus {
+  border-color: #94a3b8;
+  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.2);
+}
+
+.qob-suggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  max-height: 240px;
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+}
+
+.qob-suggestion {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 0;
+  border-bottom: 1px solid #f1f5f9;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.qob-suggestion:last-child {
+  border-bottom: 0;
+}
+
+.qob-suggestion:hover {
+  background: #f8fafc;
+}
+
+.qob-suggestion strong {
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.qob-suggestion span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.qob-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #eef2f7;
+  border-radius: 10px;
+}
+
+.qob-table {
+  width: 100%;
+  min-width: 860px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.qob-table th,
+.qob-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #eef2f7;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.qob-table th {
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.qob-table input {
+  width: 100%;
+  min-width: 64px;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font: inherit;
+}
+
+.qob-table__empty {
+  text-align: center;
+  color: #94a3b8;
+  padding: 28px 12px !important;
+}
+
+.qob-remove {
+  border: 0;
+  background: transparent;
+  color: #ef4444;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.qob-bottom {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.8fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.qob-pay-mode {
+  display: flex;
+  gap: 16px;
+  margin: 4px 0 12px;
+}
+
+.qob-pay-mode label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.qob-summary {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.qob-summary__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.qob-summary__row strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.qob-summary__row--accent strong {
+  color: #db2777;
+  font-size: 16px;
+}
+
+.qob-summary__discount {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.qob-summary__discount input {
+  width: 72px;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font: inherit;
+}
+
+.qob-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+@media (max-width: 960px) {
+  .qob-patient-bar,
+  .qob-meta-grid,
+  .qob-bottom {
+    grid-template-columns: 1fr;
+  }
+}

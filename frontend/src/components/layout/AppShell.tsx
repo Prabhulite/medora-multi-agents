@@ -8,6 +8,7 @@ import { notificationsApi } from '../../features/notifications/notifications.api
 import { hasPermission } from '../../lib/permissions';
 import type { MenuItem } from '../../types';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { PageLoader } from '../ui/Loader';
 import { PatientSearchField } from '../ui/PatientSearchField';
 import './AppShell.css';
 
@@ -281,15 +282,61 @@ export function AppShell() {
             <img src={medoraLogo} alt="Medora" className="app-shell__header-logo" />
           </div>
           <div className="app-shell__header-right">
-            {canSearchPatients && <PatientSearchField required={false} label="Patient" onSelect={(patient) => navigate(`/patients/${patient.id}`)} />}
-            <NavLink to="/notifications" className="app-shell__notification-link">Notifications {unreadNotifications > 0 && <span>{unreadNotifications}</span>}</NavLink>
+            {canSearchPatients ? (
+              <PatientSearchField
+                required={false}
+                label="Patient"
+                onSelect={(patient) => navigate(`/patients/${patient.id}`)}
+              />
+            ) : null}
+            <NavLink
+              to="/notifications"
+              className="app-shell__notification-btn"
+              aria-label={
+                unreadNotifications > 0
+                  ? `Notifications, ${unreadNotifications} unread`
+                  : 'Notifications'
+              }
+              title="Notifications"
+            >
+              <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true">
+                <path
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6.2 9.8a5.8 5.8 0 0 1 11.6 0c0 4.1 1.4 5.3 1.4 5.3H4.8s1.4-1.2 1.4-5.3Z"
+                />
+                <path
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M10 18.4a2 2 0 0 0 4 0"
+                />
+              </svg>
+              {unreadNotifications > 0 ? (
+                <span className="app-shell__notification-badge">
+                  {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                </span>
+              ) : null}
+            </NavLink>
           </div>
         </header>
 
         <main className="app-shell__content">
-          <Suspense fallback={<div className="app-shell__loading" role="status">Loading page...</div>}>
+          <Suspense
+            fallback={
+              <div className="app-shell__loading">
+                <PageLoader label="Loading page…" />
+              </div>
+            }
+          >
             <Outlet />
           </Suspense>
+
         </main>
       </div>
 

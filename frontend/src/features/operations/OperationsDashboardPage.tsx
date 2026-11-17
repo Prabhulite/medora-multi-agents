@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { PageLoader } from '../../components/ui/Loader';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { operationsApi, OperationsDashboard, OperationsQueueItem } from './operations.api';
 import { FollowUpQueue } from '../patients/FollowUpQueue';
@@ -65,7 +66,7 @@ export function OperationsDashboardPage() {
     <PageHeader title="Operations dashboard" subtitle="A live view of patient flow, capacity, revenue, and diagnostic work." />
     <div className="operations-toolbar"><span className="operations-updated">{dashboard.generatedAt ? `Updated ${formatTime(dashboard.generatedAt)}` : 'Live operational overview'}</span><div className="operations-toolbar__actions"><button type="button" className="operations-refresh" onClick={() => void operationsApi.downloadCsv()} aria-label="Export operations dashboard as CSV">Export CSV</button><button type="button" className="operations-refresh" onClick={() => void loadDashboard(true)} disabled={loading || refreshing} aria-label="Refresh operations dashboard">{refreshing ? 'Refreshing…' : 'Refresh'}</button></div></div>
     {error && <div className="operations-error" role="alert"><span>{error}</span><button type="button" onClick={() => void loadDashboard()}>Try again</button></div>}
-    {loading ? <div className="operations-skeleton" aria-busy="true" aria-label="Loading operations dashboard">{Array.from({ length: 8 }, (_, index) => <span key={index} />)}</div> : <>
+    {loading ? <PageLoader label="Loading operations dashboard…" /> : <>
       <section className="operations-kpis" aria-label="Key performance indicators">{cards.map(([label, value, tone]) => <article className={`operations-kpi operations-kpi--${tone}`} key={label}><span>{label}</span><strong>{value}</strong></article>)}</section>
       <section className="operations-content" aria-label="Operational queues">
         <div className="operations-panels">

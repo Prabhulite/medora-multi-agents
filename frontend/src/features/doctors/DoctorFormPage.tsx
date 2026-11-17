@@ -4,6 +4,7 @@ import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { DocumentUploadField } from '../../components/ui/DocumentUploadField';
 import { Input } from '../../components/ui/Input';
+import { PageLoader } from '../../components/ui/Loader';
 import { Select } from '../../components/ui/Select';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
 import { getErrorMessage } from '../../lib/api';
@@ -326,7 +327,7 @@ export function DoctorFormPage() {
     }
   };
 
-  if (loading) return <div className="doc-form-loading">Loading doctor…</div>;
+  if (loading) return <PageLoader label="Loading doctor…" />;
 
   if (error) {
     return (

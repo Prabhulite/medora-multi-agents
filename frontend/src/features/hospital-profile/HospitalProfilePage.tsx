@@ -3,6 +3,7 @@ import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { DocumentUploadField } from '../../components/ui/DocumentUploadField';
 import { Input } from '../../components/ui/Input';
+import { PageLoader } from '../../components/ui/Loader';
 import { Select } from '../../components/ui/Select';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
 import { getErrorMessage } from '../../lib/api';
@@ -205,7 +206,7 @@ export function HospitalProfilePage() {
   };
 
   if (loading) {
-    return <div className="hp-loading">Loading hospital profile…</div>;
+    return <PageLoader label="Loading hospital profile…" />;
   }
 
   if (loadError) {

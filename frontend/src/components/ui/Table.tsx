@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Loader } from './Loader';
 import './Table.css';
 
 export interface TableColumn<T> {
@@ -22,6 +23,37 @@ interface TableProps<T> {
 }
 
 const PAGE_SIZES = [10, 25, 50, 100];
+
+function EmptyInboxIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="40" height="40" aria-hidden="true">
+      <path
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M4.5 8.5h15v9.2a1.8 1.8 0 0 1-1.8 1.8H6.3a1.8 1.8 0 0 1-1.8-1.8V8.5z"
+      />
+      <path
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M4.5 8.5 7.2 4.8h9.6l2.7 3.7"
+      />
+      <path
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M9.2 12.2h5.6M4.5 12.2h3.2l1.4 2.2h5.8l1.4-2.2h3.2"
+      />
+    </svg>
+  );
+}
 
 export function Table<T>({
   columns,
@@ -121,67 +153,92 @@ export function Table<T>({
         </div>
       </div>
 
-      {loading ? (
-        <div className="ui-table__empty">Loading...</div>
-      ) : filteredRows.length === 0 ? (
-        <div className="ui-table__empty">{emptyMessage}</div>
-      ) : (
-        <>
-          <div className="ui-table__wrap">
-            <table className="ui-table">
-              <thead>
-                <tr>
-                  {showIndex ? <th style={{ width: 64 }}>#</th> : null}
-                  {columns.map((column) => (
-                    <th key={column.key} style={column.width ? { width: column.width } : undefined}>
-                      {column.header}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {pageRows.map((row, rowIndex) => {
-                  const absoluteIndex = (effectivePage - 1) * effectivePageSize + rowIndex;
-                  return (
-                    <tr key={rowKey(row)}>
-                      {showIndex ? (
-                        <td>
-                          <div className="ui-table__index">{absoluteIndex + 1}</div>
-                        </td>
-                      ) : null}
-                      {columns.map((column) => (
-                        <td key={column.key}>{column.render(row, absoluteIndex)}</td>
-                      ))}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+      <div className="ui-table__wrap">
+        <table className="ui-table">
+          <thead>
+            <tr>
+              {showIndex ? <th style={{ width: 64 }}>#</th> : null}
+              {columns.map((column) => (
+                <th key={column.key} style={column.width ? { width: column.width } : undefined}>
+                  {column.header}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr className="ui-table__state-row">
+                <td colSpan={(showIndex ? 1 : 0) + columns.length}>
+                  <div className="ui-table__empty ui-table__empty--loading">
+                    <Loader size="md" variant="block" label="Loading records…" />
+                  </div>
+                </td>
+              </tr>
+            ) : filteredRows.length === 0 ? (
+              <tr className="ui-table__state-row">
+                <td colSpan={(showIndex ? 1 : 0) + columns.length}>
+                  <div className="ui-table__empty" role="status">
+                    <span className="ui-table__empty-icon">
+                      <EmptyInboxIcon />
+                    </span>
+                    <p>{emptyMessage}</p>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              pageRows.map((row, rowIndex) => {
+                const absoluteIndex = (effectivePage - 1) * effectivePageSize + rowIndex;
+                return (
+                  <tr key={rowKey(row)}>
+                    {showIndex ? (
+                      <td>
+                        <div className="ui-table__index">{absoluteIndex + 1}</div>
+                      </td>
+                    ) : null}
+                    {columns.map((column) => (
+                      <td key={column.key}>{column.render(row, absoluteIndex)}</td>
+                    ))}
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
 
-          <div className="ui-table-footer">
-            <span>
-              Showing <strong>{rangeStart}</strong> to <strong>{rangeEnd}</strong> of{' '}
-              <strong>{effectiveTotal}</strong> entries
-            </span>
-            <div className="ui-table-pager">
-              <button type="button" disabled={effectivePage <= 1} onClick={() => serverPagination ? serverPagination.onPageChange(effectivePage - 1) : setPage((p) => p - 1)}>
-                Prev
-              </button>
-              <button type="button" className="is-active">
-                {effectivePage}
-              </button>
-              <button
-                type="button"
-                disabled={effectivePage >= totalPages}
-                onClick={() => serverPagination ? serverPagination.onPageChange(effectivePage + 1) : setPage((p) => p + 1)}
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        </>
-      )}
+      <div className="ui-table-footer">
+        <span>
+          Showing <strong>{rangeStart}</strong> to <strong>{rangeEnd}</strong> of{' '}
+          <strong>{effectiveTotal}</strong> entries
+        </span>
+        <div className="ui-table-pager">
+          <button
+            type="button"
+            disabled={effectivePage <= 1 || loading || effectiveTotal === 0}
+            onClick={() =>
+              serverPagination
+                ? serverPagination.onPageChange(effectivePage - 1)
+                : setPage((p) => p - 1)
+            }
+          >
+            Prev
+          </button>
+          <button type="button" className="is-active">
+            {effectivePage}
+          </button>
+          <button
+            type="button"
+            disabled={effectivePage >= totalPages || loading || effectiveTotal === 0}
+            onClick={() =>
+              serverPagination
+                ? serverPagination.onPageChange(effectivePage + 1)
+                : setPage((p) => p + 1)
+            }
+          >
+            Next
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

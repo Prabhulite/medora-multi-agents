@@ -1,4 +1,5 @@
 import { Navigate, Outlet } from 'react-router-dom';
+import { PageLoader } from '../components/ui/Loader';
 import { useAuth } from '../features/auth/AuthContext';
 import { hasAnyPermission, hasPermission } from '../lib/permissions';
 
@@ -14,7 +15,7 @@ export function ProtectedRoute({ permission, permissions }: ProtectedRouteProps)
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
-        Loading Medora...
+        <PageLoader label="Loading Medora…" />
       </div>
     );
   }
