@@ -101,14 +101,14 @@ export function LaboratoryDiagnosticsPage() {
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 60_000); return () => window.clearInterval(timer); }, []);
   const refresh = () => { void load(); void loadQueue(); };
   const openQueueCommunication = (row: LaboratoryCommunicationQueueItem) => {
-    setSelectedOrder({ id: row.id, orderNumber: row.orderNumber, patientId: row.patientId, patientName: row.patientName, patientMrdNumber: row.patientMrdNumber, testId: 0, testName: row.testName, status: 'completed', priority: row.priority, completedAt: row.completedAt });
+    setSelectedOrder({ id: row.id, orderNumber: row.orderNumber, patientId: row.patientId, patientName: row.patientName, patientMrdNumber: row.patientMrdNumber, testId: 0, testName: row.testName, status: row.status, priority: row.priority, verifiedAt: row.verifiedAt, completedAt: row.completedAt });
     setModal('communications');
   };
   const queueColumns: TableColumn<LaboratoryCommunicationQueueItem>[] = [
     { key: 'priority', header: 'Priority', render: (row) => <Badge tone={row.priority === 'stat' ? 'danger' : 'warning'}>{row.priority.toUpperCase()}</Badge> },
     { key: 'order', header: 'Order / patient', render: (row) => <div><div className="ui-table__cell-title">{row.orderNumber}</div><div className="ui-table__cell-sub">{row.patientName || `Patient #${row.patientId}`} / {row.patientMrdNumber || `ID ${row.patientId}`}</div></div> },
     { key: 'test', header: 'Investigation', render: (row) => row.testName },
-    { key: 'elapsed', header: 'Since release', render: (row) => <div><strong>{elapsedLabel(row.completedAt, now)}</strong><div className="ui-table__cell-sub">{dateLabel(row.completedAt)}</div></div> },
+    { key: 'elapsed', header: 'Since verification', render: (row) => <div><strong>{elapsedLabel(row.verifiedAt || row.completedAt, now)}</strong><div className="ui-table__cell-sub">{row.status === 'verified' ? 'Verified, awaiting release' : 'Released'} · {dateLabel(row.verifiedAt || row.completedAt)}</div></div> },
     { key: 'attempts', header: 'Pending contact', render: (row) => <div>{row.attemptCount} {row.attemptCount === 1 ? 'attempt' : 'attempts'}<div className="ui-table__cell-sub">{row.lastAttemptAt ? `Last: ${dateLabel(row.lastAttemptAt)}` : 'No attempts recorded'}</div></div> },
     { key: 'actions', header: 'Action', render: (row) => <Button size="sm" variant="secondary" onClick={() => openQueueCommunication(row)}>Communications</Button> },
   ];
@@ -129,7 +129,7 @@ export function LaboratoryDiagnosticsPage() {
       {row.status === 'processing' && canVerify && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('verify'); }}>Verify</Button>}
       {row.status === 'verified' && canRelease && <Button size="sm" onClick={() => setReleaseTarget(row)}>Release</Button>}
       {(row.status === 'completed' || row.status === 'verified' && (canUpdate || canVerify || canRelease)) && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('view'); }}>View result</Button>}
-      {row.status === 'completed' && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('communications'); }}>Communications</Button>}
+      {(row.status === 'completed' || row.status === 'verified' && ['urgent', 'stat'].includes(row.priority || '')) && <Button size="sm" variant="secondary" onClick={() => { setSelectedOrder(row); setModal('communications'); }}>Communications</Button>}
     </div> },
   ], [canUpdate, canVerify, canRelease, canCancel]);
 
@@ -187,7 +187,7 @@ export function LaboratoryDiagnosticsPage() {
   const verifyResult = async () => {
     if (!selectedOrder) return;
     setSaving(true); setError(''); setNotice('');
-    try { const updated = await laboratoryApi.verifyResult(selectedOrder.id); setOrders((current) => current.map((row) => row.id === updated.id ? updated : row)); setModal(null); setSelectedOrder(null); setNotice('Result verified. It is ready for release.'); void load(); }
+    try { const updated = await laboratoryApi.verifyResult(selectedOrder.id); setOrders((current) => current.map((row) => row.id === updated.id ? updated : row)); setModal(null); setSelectedOrder(null); setNotice('Result verified. It is ready for release.'); refresh(); }
     catch (err) { setError(getErrorMessage(err, 'Unable to verify result')); }
     finally { setSaving(false); }
   };
@@ -217,9 +217,9 @@ export function LaboratoryDiagnosticsPage() {
       <article className="laboratory-kpi--green"><span>Completed</span><strong>{summary.completed}</strong><small>Results available to care teams</small></article>
     </div>
     <section className="laboratory-section laboratory-communication-queue" aria-label="Urgent and STAT communication follow-up">
-      <div className="laboratory-section__heading"><div><span className="laboratory-eyebrow">RELEASED RESULTS / CONTACT FOLLOW-UP</span><h2>Urgent / STAT communication follow-up <span className="laboratory-queue-count">{queueTotal}</span></h2><p>Released urgent and STAT orders awaiting confirmed delivery. Record contact attempts and follow up until delivered.</p></div><Button variant="secondary" size="sm" onClick={() => void loadQueue()}>Refresh queue</Button></div>
+      <div className="laboratory-section__heading"><div><span className="laboratory-eyebrow">VERIFIED RESULTS / CONTACT FOLLOW-UP</span><h2>Urgent / STAT communication follow-up <span className="laboratory-queue-count">{queueTotal}</span></h2><p>Verified urgent and STAT results awaiting confirmed delivery. Record contact attempts and follow up until delivered.</p></div><Button variant="secondary" size="sm" onClick={() => void loadQueue()}>Refresh queue</Button></div>
       {queueError && <div className="laboratory-queue-error"><Alert tone="error">{queueError}</Alert></div>}
-      <Table columns={queueColumns} rows={queue} rowKey={(row) => row.id} loading={queueLoading} searchPlaceholder="Search order, patient, or test (2+ characters)" emptyMessage="No urgent or STAT released orders awaiting communication." serverPagination={{ page: queuePage, pageSize: queuePageSize, total: queueTotal, search: queueSearch, onPageChange: setQueuePage, onPageSizeChange: (size) => { setQueuePageSize(size); setQueuePage(1); }, onSearchChange: (value) => { setQueueSearch(value); setQueuePage(1); } }} />
+      <Table columns={queueColumns} rows={queue} rowKey={(row) => row.id} loading={queueLoading} searchPlaceholder="Search order, patient, or test (2+ characters)" emptyMessage="No urgent or STAT verified results awaiting communication." serverPagination={{ page: queuePage, pageSize: queuePageSize, total: queueTotal, search: queueSearch, onPageChange: setQueuePage, onPageSizeChange: (size) => { setQueuePageSize(size); setQueuePage(1); }, onSearchChange: (value) => { setQueueSearch(value); setQueuePage(1); } }} />
     </section>
     <section className="laboratory-section">
       <div className="laboratory-section__heading"><div><span className="laboratory-eyebrow">DIAGNOSTICS WORKBENCH</span><h2>Laboratory orders</h2><p>Review requests and enter results when the lab completes an investigation.</p></div><div className="laboratory-actions"><Select label="Status" value={status} onChange={(event) => { setStatus(event.target.value as LaboratoryOrderStatus | ''); setPage(1); }} options={[{ value: '', label: 'All statuses' }, ...(['ordered', 'collected', 'processing', 'verified', 'completed', 'cancelled'] as const).map((value) => ({ value, label: value[0].toUpperCase() + value.slice(1) }))]} /><Button variant="secondary" size="sm" onClick={refresh}>Refresh</Button></div></div>
@@ -351,10 +351,11 @@ function CommunicationView({ order, canRecord, onClose, onRecorded }: { order: L
   };
   return <ModalShell title={`Result communications · ${order.testName}`} eyebrow={order.orderNumber} onClose={onClose}>
     <div className="laboratory-form">
+      {order.status === 'verified' ? <Alert tone="warning">This urgent result is verified but the report is awaiting release. Confirm the verified result and recipient before direct communication.</Alert> : null}
       <div className="laboratory-result-context"><strong>{order.patientName || `Patient #${order.patientId}`}</strong><span>{order.patientMrdNumber || `Patient ID ${order.patientId}`}</span></div>
       <Alert tone="warning">Record actual contact attempts and confirmed delivery. An in-app notification does not confirm receipt.</Alert>
       {error && <Alert tone="error">{error}</Alert>}
-      <section className="laboratory-report__communications"><h3>Contact history</h3>{loading ? <p>Loading…</p> : rows.length ? rows.map((row) => <article key={row.id}><strong>{row.outcome === 'delivered' ? 'Delivered' : 'Attempted'} · {dateLabel(row.occurredAt)}</strong><p>{row.method.replace('_', ' ')} · {row.recipientName}</p><p>{row.resultSummary}</p>{row.note && <p>{row.note}</p>}<small>Recorded by {row.recorderName || 'Former user'} · {dateLabel(row.createdAt)}</small></article>) : <p>No communication recorded.</p>}</section>
+      <section className="laboratory-report__communications"><h3>Contact history</h3>{loading ? <p>Loading…</p> : rows.length ? rows.map((row) => <article key={row.id}><strong>{row.outcome === 'delivered' ? 'Delivered' : 'Attempted'} · {dateLabel(row.occurredAt)}</strong><p>{row.method.replace('_', ' ')} · {row.recipientName}</p><p>{row.resultSummary ?? 'Result details are restricted until report release.'}</p>{row.note && <p>{row.note}</p>}<small>Recorded by {row.recorderName || 'Former user'} · {dateLabel(row.createdAt)}</small></article>) : <p>No communication recorded.</p>}</section>
     </div>
     {canRecord && <form className="laboratory-form laboratory-report__contact-form" onSubmit={(event) => void save(event)}>
       <h3>Record contact</h3>

@@ -22,7 +22,7 @@ export const laboratoryService = {
   async communicationQueue({ page, pageSize, search }: LaboratoryCommunicationQueueInput) {
     const pending = AppDataSource.getRepository(LaboratoryOrder).createQueryBuilder('lab')
       .innerJoin('lab.patient', 'patient').innerJoin('lab.test', 'test')
-      .where('lab.status = :completed', { completed: 'completed' })
+      .where('lab.status IN (:...readyStatuses)', { readyStatuses: ['verified', 'completed'] })
       .andWhere('lab.priority IN (:...priorities)', { priorities: ['urgent', 'stat'] })
       .andWhere("NOT EXISTS (SELECT 1 FROM laboratory_communications delivered WHERE delivered.order_id = lab.id AND delivered.outcome = 'delivered')");
     if (search) {
@@ -39,10 +39,10 @@ export const laboratoryService = {
       .select('lab.id', 'id').addSelect('lab.orderNumber', 'orderNumber')
       .addSelect('lab.patientId', 'patientId').addSelect('patient.mrdNumber', 'patientMrdNumber')
       .addSelect('patient.firstName', 'firstName').addSelect('patient.middleName', 'middleName').addSelect('patient.lastName', 'lastName')
-      .addSelect('test.testName', 'testName').addSelect('lab.priority', 'priority').addSelect('lab.completedAt', 'completedAt')
-      .orderBy('lab.completedAt', 'ASC').addOrderBy('lab.id', 'ASC')
+      .addSelect('test.testName', 'testName').addSelect('lab.priority', 'priority').addSelect('lab.status', 'status').addSelect('lab.verifiedAt', 'verifiedAt').addSelect('lab.completedAt', 'completedAt')
+      .orderBy('COALESCE(lab.verifiedAt, lab.completedAt, lab.orderedAt)', 'ASC').addOrderBy('lab.id', 'ASC')
       .limit(pageSize).offset((page - 1) * pageSize).getRawMany<{
-        id: number; orderNumber: string; patientId: number; patientMrdNumber: string; firstName: string; middleName: string | null; lastName: string; testName: string; priority: 'urgent' | 'stat'; completedAt: Date | null;
+        id: number; orderNumber: string; patientId: number; patientMrdNumber: string; firstName: string; middleName: string | null; lastName: string; testName: string; priority: 'urgent' | 'stat'; status: 'verified' | 'completed'; verifiedAt: Date | null; completedAt: Date | null;
       }>();
     const ids = rows.map((row) => row.id);
     const attempts = ids.length ? await AppDataSource.getRepository(LaboratoryCommunication).createQueryBuilder('contact')
@@ -50,12 +50,13 @@ export const laboratoryService = {
       .where('contact.orderId IN (:...ids)', { ids }).andWhere('contact.outcome = :attempted', { attempted: 'attempted' })
       .groupBy('contact.orderId').getRawMany<{ orderId: number; attemptCount: string; lastAttemptAt: Date | null }>() : [];
     const attemptMap = new Map(attempts.map((row) => [Number(row.orderId), row]));
-    return { items: rows.map((row) => ({ id: Number(row.id), orderNumber: row.orderNumber, patientId: Number(row.patientId), patientMrdNumber: row.patientMrdNumber, patientName: [row.firstName, row.middleName, row.lastName].filter(Boolean).join(' '), testName: row.testName, priority: row.priority, completedAt: row.completedAt, attemptCount: Number(attemptMap.get(Number(row.id))?.attemptCount ?? 0), lastAttemptAt: attemptMap.get(Number(row.id))?.lastAttemptAt ?? null })), total, page, pageSize };
+    return { items: rows.map((row) => ({ id: Number(row.id), orderNumber: row.orderNumber, patientId: Number(row.patientId), patientMrdNumber: row.patientMrdNumber, patientName: [row.firstName, row.middleName, row.lastName].filter(Boolean).join(' '), testName: row.testName, priority: row.priority, status: row.status, verifiedAt: row.verifiedAt, completedAt: row.completedAt, attemptCount: Number(attemptMap.get(Number(row.id))?.attemptCount ?? 0), lastAttemptAt: attemptMap.get(Number(row.id))?.lastAttemptAt ?? null })), total, page, pageSize };
   },
-  async listCommunications(orderId: number) {
-    if (!await AppDataSource.getRepository(LaboratoryOrder).exist({ where: { id: orderId } })) throw new NotFoundError('Laboratory order not found');
+  async listCommunications(orderId: number, canViewUnreleasedResult: boolean) {
+    const order = await AppDataSource.getRepository(LaboratoryOrder).findOne({ where: { id: orderId } });
+    if (!order) throw new NotFoundError('Laboratory order not found');
     const rows = await AppDataSource.getRepository(LaboratoryCommunication).find({ where: { orderId }, relations: { recordedBy: true }, order: { id: 'ASC' } });
-    return rows.map(({ id, outcome, method, recipientName, resultSummary, note, occurredAt, recordedById, createdAt, recordedBy }) => ({ id, outcome, method, recipientName, resultSummary, note, occurredAt, recordedById, createdAt, recorderName: recordedBy?.fullName ?? null }));
+    return rows.map(({ id, outcome, method, recipientName, resultSummary, note, occurredAt, recordedById, createdAt, recordedBy }) => ({ id, outcome, method, recipientName, resultSummary: order.status === 'completed' || canViewUnreleasedResult ? resultSummary : null, note: order.status === 'completed' || canViewUnreleasedResult ? note : null, occurredAt, recordedById, createdAt, recorderName: recordedBy?.fullName ?? null }));
   },
   async recordCommunication(orderId: number, input: CreateLaboratoryCommunicationInput, userId: number) {
     const occurredAt = new Date(input.occurredAt);
@@ -63,8 +64,9 @@ export const laboratoryService = {
     return AppDataSource.transaction(async (manager) => {
       const order = await manager.getRepository(LaboratoryOrder).findOne({ where: { id: orderId } });
       if (!order) throw new NotFoundError('Laboratory order not found');
-      if (order.status !== 'completed') throw new ConflictError('Only released laboratory results can have a communication record');
+      if (order.status !== 'completed' && !(order.status === 'verified' && ['urgent', 'stat'].includes(order.priority))) throw new ConflictError('Communication requires a released result or a verified urgent/STAT result');
       if (occurredAt < order.orderedAt) throw new ValidationError('Communication time cannot precede the order');
+      if (order.verifiedAt && occurredAt < order.verifiedAt) throw new ValidationError('Communication time cannot precede result verification');
       const repo = manager.getRepository(LaboratoryCommunication);
       const row = await repo.save(repo.create({ orderId, outcome: input.outcome, method: input.method, recipientName: input.recipientName, resultSummary: input.resultSummary, note: input.note ?? null, occurredAt, recordedById: userId }));
       await manager.getRepository(PatientAuditLog).save({ patientId: order.patientId, action: 'laboratory_result_communication', changedById: userId, changeSummary: `Laboratory result communication ${input.outcome}: ${order.orderNumber}`, beforeData: null, afterData: JSON.stringify({ orderId, communicationId: row.id, outcome: row.outcome, method: row.method }) });

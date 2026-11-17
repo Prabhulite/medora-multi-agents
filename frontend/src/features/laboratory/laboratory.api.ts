@@ -15,12 +15,12 @@ export interface CreateLaboratoryTestPayload { testCode: string; testName: strin
 export type LaboratoryOrderStatus = 'ordered' | 'collected' | 'processing' | 'verified' | 'completed' | 'cancelled';
 export interface LaboratoryWorklist { items: LaboratoryOrder[]; total: number; page: number; pageSize: number; summary: { total: number; pending: number; processing: number; completed: number }; }
 
-export interface LaboratoryCommunicationQueueItem { id: number; orderNumber: string; patientId: number; patientName: string | null; patientMrdNumber: string | null; testName: string; priority: 'urgent' | 'stat'; completedAt: string | null; attemptCount: number; lastAttemptAt: string | null; }
+export interface LaboratoryCommunicationQueueItem { id: number; orderNumber: string; patientId: number; patientName: string | null; patientMrdNumber: string | null; testName: string; priority: 'urgent' | 'stat'; status: 'verified' | 'completed'; verifiedAt: string | null; completedAt: string | null; attemptCount: number; lastAttemptAt: string | null; }
 export interface LaboratoryCommunicationQueue { items: LaboratoryCommunicationQueueItem[]; total: number; page: number; pageSize: number; }
 
 export interface LaboratoryAddendum { id: number; reason: string; addendum: string; createdAt: string; createdById: number | null; authorName: string | null; }
-export interface LaboratoryCommunication { id: number; outcome: 'attempted' | 'delivered'; method: 'phone' | 'in_person' | 'secure_message' | 'other'; recipientName: string; resultSummary: string; note: string | null; occurredAt: string; recordedById: number | null; recorderName: string | null; createdAt: string; }
-export type CreateLaboratoryCommunicationPayload = Pick<LaboratoryCommunication, 'outcome' | 'method' | 'recipientName' | 'resultSummary' | 'occurredAt'> & { note?: string | null };
+export interface LaboratoryCommunication { id: number; outcome: 'attempted' | 'delivered'; method: 'phone' | 'in_person' | 'secure_message' | 'other'; recipientName: string; resultSummary: string | null; note: string | null; occurredAt: string; recordedById: number | null; recorderName: string | null; createdAt: string; }
+export type CreateLaboratoryCommunicationPayload = Pick<LaboratoryCommunication, 'outcome' | 'method' | 'recipientName' | 'occurredAt'> & { resultSummary: string; note?: string | null };
 export interface LaboratoryPatientCandidate { id: number; mrdNumber: string; fullName: string; }
 export interface LaboratoryDoctorCandidate { id: number; name: string; doctorCode: string; medicalRegistrationNumber: string; }
 
