@@ -1,7 +1,8 @@
 import type { Request, Response } from 'express';
 import { radiologyService } from '../services/radiology.service.js';
-import type { RadiologyCommunicationQueueInput } from '../validators/radiology.validators.js';
+import type { RadiologyCommunicationQueueInput, RadiologyWorklistInput } from '../validators/radiology.validators.js';
 export const radiologyController = {
+  worklist: async (req: Request, res: Response) => res.json({ success: true, data: await radiologyService.worklist(req.query as unknown as RadiologyWorklistInput) }),
   communicationQueue: async (req: Request, res: Response) => res.json({ success: true, data: await radiologyService.communicationQueue(req.query as unknown as RadiologyCommunicationQueueInput) }),
   listModalities: async (_req: Request, res: Response) => res.json({ success: true, data: await radiologyService.listModalities() }),
   doctorCandidates: async (req: Request, res: Response) => res.json({ success: true, data: await radiologyService.doctorCandidates(String(req.query.search)) }),

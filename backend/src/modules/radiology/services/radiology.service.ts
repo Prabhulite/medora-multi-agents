@@ -3,7 +3,7 @@ import { Brackets } from 'typeorm';
 import { Doctor, Patient, RadiologyCommunication, RadiologyModality, RadiologyOrder, RadiologyReportAddendum, RadiologyResource, RadiologyScheduleEvent, User, UserNotification } from '../../../database/entities/index.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { nextSequenceNumber } from '../../patients/services/number-sequence.service.js';
-import type { CreateRadiologyAddendumInput, CreateRadiologyCommunicationInput, CreateRadiologyOrderInput, CreateRadiologyResourceInput, RadiologyCommunicationQueueInput, ScheduleRadiologyOrderInput, UpdateRadiologyReportInput } from '../validators/radiology.validators.js';
+import type { CreateRadiologyAddendumInput, CreateRadiologyCommunicationInput, CreateRadiologyOrderInput, CreateRadiologyResourceInput, RadiologyCommunicationQueueInput, RadiologyWorklistInput, ScheduleRadiologyOrderInput, UpdateRadiologyReportInput } from '../validators/radiology.validators.js';
 
 const orderRelations = { patient: true, modality: true, doctor: true, resource: true } as const;
 
@@ -158,7 +158,37 @@ export const radiologyService = {
     return AppDataSource.getRepository(RadiologyModality).find({ where: { isActive: true }, order: { category: 'ASC', modalityName: 'ASC' } });
   },
   listOrders(filters: { patientId?: number; status?: RadiologyOrder['status'] }) {
-    return AppDataSource.getRepository(RadiologyOrder).find({ where: { ...(filters.patientId ? { patientId: filters.patientId } : {}), ...(filters.status ? { status: filters.status } : {}) }, relations: orderRelations, order: { orderedAt: 'DESC' } });
+    return AppDataSource.getRepository(RadiologyOrder).find({ where: { ...(filters.patientId ? { patientId: filters.patientId } : {}), ...(filters.status ? { status: filters.status } : {}) }, relations: orderRelations, order: { orderedAt: 'DESC', id: 'DESC' }, take: filters.patientId ? undefined : 100 });
+  },
+  async worklist(input: RadiologyWorklistInput) {
+    const repo = AppDataSource.getRepository(RadiologyOrder);
+    const query = repo.createQueryBuilder('study')
+      .leftJoinAndSelect('study.patient', 'patient').leftJoinAndSelect('study.modality', 'modality')
+      .leftJoinAndSelect('study.doctor', 'doctor').leftJoinAndSelect('study.resource', 'resource');
+    if (input.status) query.andWhere('study.status = :status', { status: input.status });
+    if (input.search) {
+      const search = `%${input.search.replace(/[%_\\]/g, '\\$&')}%`;
+      query.andWhere(new Brackets((terms) => {
+        terms.where('study.orderNumber LIKE :search', { search })
+          .orWhere('patient.mrdNumber LIKE :search', { search })
+          .orWhere("CONCAT_WS(' ', patient.firstName, patient.middleName, patient.lastName) LIKE :search", { search })
+          .orWhere('study.studyName LIKE :search', { search })
+          .orWhere('modality.modalityName LIKE :search', { search });
+      }));
+    }
+    const [rows, total] = await query.orderBy('study.orderedAt', 'DESC').addOrderBy('study.id', 'DESC')
+      .skip((input.page - 1) * input.pageSize).take(input.pageSize).getManyAndCount();
+    const counts = await repo.createQueryBuilder('study').select('study.status', 'status').addSelect('COUNT(*)', 'count')
+      .groupBy('study.status').getRawMany<{ status: RadiologyOrder['status']; count: string }>();
+    const summary = { total: 0, pending: 0, inProgress: 0, reported: 0 };
+    for (const { status, count } of counts) {
+      const amount = Number(count);
+      summary.total += amount;
+      if (!['reported', 'cancelled'].includes(status)) summary.pending += amount;
+      if (status === 'performed') summary.inProgress += amount;
+      if (status === 'reported') summary.reported += amount;
+    }
+    return { items: rows, total, page: input.page, pageSize: input.pageSize, summary };
   },
   async doctorCandidates(search: string) {
     const escaped = search.replace(/[%_\\]/g, '\\$&');

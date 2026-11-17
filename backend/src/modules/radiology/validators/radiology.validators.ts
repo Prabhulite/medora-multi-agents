@@ -1,6 +1,7 @@
 import { z } from 'zod';
 const positiveInt = z.number().int().positive();
 export const radiologyOrderListSchema = z.object({ patientId: z.coerce.number().int().positive().optional(), status: z.enum(['ordered', 'scheduled', 'performed', 'reported', 'cancelled']).optional() });
+export const radiologyWorklistSchema = z.object({ page: z.coerce.number().int().min(1).max(100000).default(1), pageSize: z.coerce.number().int().min(10).max(100).default(25), search: z.string().trim().min(2).max(80).optional(), status: z.enum(['ordered', 'scheduled', 'performed', 'reported', 'cancelled']).optional() });
 export const radiologyCommunicationQueueSchema = z.object({ page: z.coerce.number().int().min(1).default(1), pageSize: z.coerce.number().int().min(1).max(100).default(25), search: z.string().trim().min(2).max(80).optional() });
 export const radiologyDoctorLookupSchema = z.object({ search: z.string().trim().min(2).max(80) });
 export const createRadiologyOrderSchema = z.object({ patientId: positiveInt, modalityId: positiveInt, studyName: z.string().trim().min(2).max(160), doctorId: positiveInt.nullable().optional(), priority: z.enum(['routine', 'urgent', 'stat']).default('routine'), clinicalNotes: z.string().trim().max(5000).nullable().optional() });
@@ -14,6 +15,7 @@ export const radiologyResourceIdParamSchema = z.object({ id: z.coerce.number().i
 export const updateRadiologyResourceStatusSchema = z.object({ isActive: z.boolean() });
 export type CreateRadiologyOrderInput = z.infer<typeof createRadiologyOrderSchema>;
 export type RadiologyCommunicationQueueInput = z.infer<typeof radiologyCommunicationQueueSchema>;
+export type RadiologyWorklistInput = z.infer<typeof radiologyWorklistSchema>;
 export type UpdateRadiologyReportInput = z.infer<typeof updateRadiologyReportSchema>;
 export type CreateRadiologyAddendumInput = z.infer<typeof createRadiologyAddendumSchema>;
 export type CreateRadiologyCommunicationInput = z.infer<typeof createRadiologyCommunicationSchema>;

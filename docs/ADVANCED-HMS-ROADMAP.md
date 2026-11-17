@@ -101,6 +101,8 @@ Current radiology reporting and scheduling: the study name entered in the UI is 
 
 The radiology workbench now has a paginated [finding communication queue](RADIOLOGY-COMMUNICATION-QUEUE.md) for performed urgent/STAT studies and corrected final reports awaiting confirmed delivery. Finalizing an urgent/STAT report or appending a correction starts a new follow-up period even when an earlier finding was delivered. Contact attempts before that milestone are not counted toward the new obligation. This still requires staff to use the hospital's escalation process.
 
+The radiology order worklist now pages and searches on the server, filters by status, and computes KPI counts across all orders. Pages are limited to 100 rows. The legacy unscoped order list is capped at 100 for compatibility, while the patient-scoped history endpoint remains available to the patient chart.
+
 ### Phase 7: Operations and integrations
 
 - Operations dashboard KPI totals now use full database counts and billing balance aggregation; preview queues remain bounded. Waiting appointments count checked-in patients. The CSV export includes KPI and alert totals and escapes spreadsheet formula prefixes in patient-entered text. The isolated integration suite covers values beyond the preview limits.

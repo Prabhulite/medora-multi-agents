@@ -93,6 +93,15 @@ try {
   const radiologyState = await evaluate('({ path: location.pathname, page: document.body.innerText.includes("Radiology diagnostics"), queue: document.body.innerText.includes("Finding communication follow-up"), empty: document.body.innerText.includes("No urgent, STAT, or corrected findings awaiting communication."), error: document.body.innerText.includes("Unable to load finding contact queue"), table: Boolean(document.querySelector(".radiology-communication-queue table")) })');
   assert.ok(radiologyQueueReady, `Radiology finding communication queue did not finish loading: ${JSON.stringify(radiologyState)}`);
   assert.equal(await evaluate('document.body.innerText.includes("Unable to load finding contact queue")'), false, 'Radiology finding communication queue showed a load error');
+  let radiologyWorklistReady = false;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    try { radiologyWorklistReady = await evaluate('Boolean(document.querySelector(".radiology-worklist table")) || document.body.innerText.includes("No matching radiology orders found.")'); } catch { /* navigation resets the execution context */ }
+    if (radiologyWorklistReady) break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.ok(radiologyWorklistReady, 'Radiology worklist did not finish loading');
+  assert.equal(await evaluate('Boolean(document.querySelector(".radiology-worklist .ui-table-search input")) && Boolean(document.querySelector(".radiology-worklist .ui-table-toolbar__entries select"))'), true, 'Radiology worklist search and paging controls did not render');
+  assert.equal(await evaluate('document.body.innerText.includes("Unable to load radiology worklist")'), false, 'Radiology worklist showed a load error');
   await evaluate('history.pushState({}, "", "/inpatient"); window.dispatchEvent(new PopStateEvent("popstate")); true');
   let inpatientLoaded = false;
   for (let attempt = 0; attempt < 100; attempt++) {
@@ -103,7 +112,7 @@ try {
   const inpatientState = await evaluate('({ path: location.pathname, login: document.body.innerText.includes("Sign in"), inpatient: document.body.innerText.includes("Inpatient Management"), active: document.body.innerText.includes("Active admissions"), page: Boolean(document.querySelector(".inpatient-page")), kpis: Boolean(document.querySelector(".inpatient-kpis")), loadError: document.body.innerText.includes("Unable to load inpatient dashboard") })');
   assert.ok(inpatientLoaded, `Inpatient dashboard did not render: ${JSON.stringify(inpatientState)}`);
   assert.equal(await evaluate('document.body.innerText.includes("Unable to load inpatient dashboard")'), false, 'Inpatient dashboard showed a load error');
-  console.log('Browser smoke passed: authenticated laboratory worklist, laboratory and radiology communication queues, and inpatient dashboard rendered in headless Chrome.');
+  console.log('Browser smoke passed: authenticated laboratory and radiology worklists, communication queues, and inpatient dashboard rendered in headless Chrome.');
   await send('Browser.close').catch(() => undefined);
   socket.close();
 } finally {

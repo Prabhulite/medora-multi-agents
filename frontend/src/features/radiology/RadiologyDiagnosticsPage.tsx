@@ -9,7 +9,7 @@ import { Table, type TableColumn } from '../../components/ui/Table';
 import { getErrorMessage } from '../../lib/api';
 import { hasPermission } from '../../lib/permissions';
 import { useAuth } from '../auth/AuthContext';
-import { radiologyApi, type CreateRadiologyOrderPayload, type RadiologyAddendum, type RadiologyCommunication, type RadiologyCommunicationQueueItem, type RadiologyModality, type RadiologyOrder, type RadiologyResource, type RadiologyScheduleEvent, type ReferringDoctor, type UpdateRadiologyReportPayload } from './radiology.api';
+import { radiologyApi, type CreateRadiologyOrderPayload, type RadiologyAddendum, type RadiologyCommunication, type RadiologyCommunicationQueueItem, type RadiologyModality, type RadiologyOrder, type RadiologyOrderStatus, type RadiologyResource, type RadiologyScheduleEvent, type ReferringDoctor, type UpdateRadiologyReportPayload } from './radiology.api';
 import './RadiologyDiagnosticsPage.css';
 
 type Modal = 'order' | 'report' | 'communications' | 'schedule' | 'resources' | null;
@@ -30,6 +30,14 @@ export function RadiologyDiagnosticsPage() {
   const canManageResources = hasPermission(user, 'radiology.resources.manage');
   const [modalities, setModalities] = useState<RadiologyModality[]>([]);
   const [orders, setOrders] = useState<RadiologyOrder[]>([]);
+  const [worklistTotal, setWorklistTotal] = useState(0);
+  const [summary, setSummary] = useState({ total: 0, pending: 0, inProgress: 0, reported: 0 });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [status, setStatus] = useState<RadiologyOrderStatus | ''>('');
+  const worklistRequestId = useRef(0);
   const [queue, setQueue] = useState<RadiologyCommunicationQueueItem[]>([]);
   const [queueTotal, setQueueTotal] = useState(0);
   const [queuePage, setQueuePage] = useState(1);
@@ -47,14 +55,18 @@ export function RadiologyDiagnosticsPage() {
   const [selectedOrder, setSelectedOrder] = useState<RadiologyOrder | null>(null);
 
   const load = async () => {
+    const currentRequest = ++worklistRequestId.current;
     setLoading(true); setError('');
     try {
-      const [modalityRows, orderRows] = await Promise.all([radiologyApi.listModalities(), radiologyApi.listOrders()]);
-      setModalities(modalityRows); setOrders(orderRows);
-    } catch (err) { setError(getErrorMessage(err, 'Unable to load radiology worklist')); }
-    finally { setLoading(false); }
+      const [modalityRows, worklist] = await Promise.all([radiologyApi.listModalities(), radiologyApi.worklist({ page, pageSize, search: debouncedSearch || undefined, status: status || undefined })]);
+      if (currentRequest !== worklistRequestId.current) return;
+      setModalities(modalityRows); setOrders(worklist.items); setWorklistTotal(worklist.total); setSummary(worklist.summary);
+      if (page > 1 && worklist.total <= (page - 1) * pageSize) setPage(Math.max(1, Math.ceil(worklist.total / pageSize)));
+    } catch (err) { if (currentRequest === worklistRequestId.current) setError(getErrorMessage(err, 'Unable to load radiology worklist')); }
+    finally { if (currentRequest === worklistRequestId.current) setLoading(false); }
   };
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { const timer = setTimeout(() => setDebouncedSearch(search.trim().length >= 2 ? search.trim() : ''), 300); return () => clearTimeout(timer); }, [search]);
+  useEffect(() => { void load(); }, [page, pageSize, debouncedSearch, status]);
   const loadQueue = async () => {
     const currentRequest = ++queueRequestId.current;
     setQueueLoading(true); setQueueError('');
@@ -81,13 +93,6 @@ export function RadiologyDiagnosticsPage() {
     { key: 'actions', header: 'Action', render: (row) => <Button size="sm" variant="secondary" onClick={() => openQueueCommunication(row)}>Communications</Button> },
   ];
 
-  const summary = useMemo(() => ({
-    total: orders.length,
-    pending: orders.filter((order) => !['reported', 'cancelled'].includes(order.status)).length,
-    inProgress: orders.filter((order) => order.status === 'performed').length,
-    reported: orders.filter((order) => order.status === 'reported').length,
-  }), [orders]);
-
   const columns = useMemo<TableColumn<RadiologyOrder>[]>(() => [
     { key: 'order', header: 'Order', render: (row) => <div><div className="ui-table__cell-title">{row.orderNumber}</div><div className="ui-table__cell-sub">{dateLabel(row.orderedAt)}</div></div> },
     { key: 'patient', header: 'Patient', render: (row) => <div><div className="ui-table__cell-title">{row.patientName || `Patient #${row.patientId}`}</div><div className="ui-table__cell-sub">{row.patientMrdNumber || `ID ${row.patientId}`}</div></div> },
@@ -100,14 +105,14 @@ export function RadiologyDiagnosticsPage() {
 
   const markPerformed = async (order: RadiologyOrder) => {
     setSaving(true); setError(''); setNotice('');
-    try { const updated = await radiologyApi.updateReport(order.id, { status: 'performed' }); setOrders((current) => current.map((row) => row.id === updated.id ? updated : row)); setNotice('Study marked performed.'); }
+    try { await radiologyApi.updateReport(order.id, { status: 'performed' }); void load(); void loadQueue(); setNotice('Study marked performed.'); }
     catch (err) { setError(getErrorMessage(err, 'Unable to mark study performed')); }
     finally { setSaving(false); }
   };
 
   const saveOrder = async (payload: CreateRadiologyOrderPayload) => {
     setSaving(true); setError(''); setNotice('');
-    try { const created = await radiologyApi.createOrder(payload); setOrders((current) => [created, ...current]); setModal(null); setNotice('Radiology order created successfully.'); }
+    try { await radiologyApi.createOrder(payload); setStatus(''); setSearch(''); setPage(1); if (page === 1 && !status && !debouncedSearch) void load(); setModal(null); setNotice('Radiology order created successfully.'); }
     catch (err) { setError(getErrorMessage(err, 'Unable to create radiology order')); }
     finally { setSaving(false); }
   };
@@ -115,7 +120,7 @@ export function RadiologyDiagnosticsPage() {
   const saveReport = async (payload: UpdateRadiologyReportPayload) => {
     if (!selectedOrder) return;
     setSaving(true); setError(''); setNotice('');
-    try { const updated = await radiologyApi.updateReport(selectedOrder.id, payload); setOrders((current) => current.map((order) => order.id === updated.id ? updated : order)); setModal(null); setSelectedOrder(null); setNotice('Radiology report saved successfully.'); }
+    try { await radiologyApi.updateReport(selectedOrder.id, payload); void load(); void loadQueue(); setModal(null); setSelectedOrder(null); setNotice('Radiology report saved successfully.'); }
     catch (err) { setError(getErrorMessage(err, 'Unable to save radiology report')); }
     finally { setSaving(false); }
   };
@@ -135,14 +140,14 @@ export function RadiologyDiagnosticsPage() {
       {queueError && <Alert tone="error">{queueError}</Alert>}
       <Table columns={queueColumns} rows={queue} rowKey={(row) => row.id} loading={queueLoading} searchPlaceholder="Search order, patient, or study (2+ characters)" emptyMessage="No urgent, STAT, or corrected findings awaiting communication." serverPagination={{ page: queuePage, pageSize: queuePageSize, total: queueTotal, search: queueSearch, onPageChange: setQueuePage, onPageSizeChange: (size) => { setQueuePageSize(size); setQueuePage(1); }, onSearchChange: (value) => { setQueueSearch(value); setQueuePage(1); } }} />
     </section>
-    <section className="radiology-section">
-      <div className="radiology-section__heading"><div><span className="radiology-eyebrow">IMAGING WORKLIST</span><h2>Radiology orders</h2><p>Track studies from request through final report.</p></div><Button variant="secondary" size="sm" onClick={() => void load()}>Refresh</Button></div>
-      <Table columns={columns} rows={orders} rowKey={(row) => row.id} loading={loading} searchText={(row) => `${row.orderNumber} ${row.patientName || ''} ${row.patientMrdNumber || ''} ${row.studyName} ${row.modalityName} ${row.status}`} searchPlaceholder="Search orders, patients, or studies" emptyMessage="No radiology orders found. Create an imaging order to start the worklist." />
+    <section className="radiology-section radiology-worklist">
+      <div className="radiology-section__heading"><div><span className="radiology-eyebrow">IMAGING WORKLIST</span><h2>Radiology orders</h2><p>Track studies from request through final report.</p></div><div className="radiology-actions"><Select label="Status" value={status} onChange={(event) => { setStatus(event.target.value as RadiologyOrderStatus | ''); setPage(1); }} options={[{ value: '', label: 'All statuses' }, ...(['ordered', 'scheduled', 'performed', 'reported', 'cancelled'] as const).map((value) => ({ value, label: value[0].toUpperCase() + value.slice(1) }))]} /><Button variant="secondary" size="sm" onClick={() => void load()}>Refresh</Button></div></div>
+      <Table columns={columns} rows={orders} rowKey={(row) => row.id} loading={loading} searchPlaceholder="Search order, patient, or study (2+ characters)" emptyMessage="No matching radiology orders found." serverPagination={{ page, pageSize, total: worklistTotal, search, onPageChange: setPage, onPageSizeChange: (size) => { setPageSize(size); setPage(1); }, onSearchChange: (value) => { setSearch(value); setPage(1); } }} />
     </section>
     {modal === 'order' ? <OrderForm modalities={modalities} saving={saving} onClose={() => setModal(null)} onSubmit={(payload) => void saveOrder(payload)} /> : null}
     {modal === 'report' && selectedOrder ? selectedOrder.status === 'reported' ? <FinalReportView order={selectedOrder} canUpdate={canUpdate} onClose={() => { setModal(null); setSelectedOrder(null); }} /> : <ReportForm order={selectedOrder} saving={saving} onClose={() => { setModal(null); setSelectedOrder(null); }} onSubmit={(payload) => void saveReport(payload)} /> : null}
     {modal === 'communications' && selectedOrder ? <CommunicationView order={selectedOrder} canUpdate={canUpdate} onRecorded={() => void loadQueue()} onClose={() => { setModal(null); setSelectedOrder(null); void loadQueue(); }} /> : null}
-    {modal === 'schedule' && selectedOrder ? <ScheduleView order={selectedOrder} onSaved={(updated) => { setOrders((current) => current.map((row) => row.id === updated.id ? updated : row)); setSelectedOrder(updated); setNotice('Study schedule saved.'); }} onClose={() => { setModal(null); setSelectedOrder(null); }} /> : null}
+    {modal === 'schedule' && selectedOrder ? <ScheduleView order={selectedOrder} onSaved={(updated) => { void load(); setSelectedOrder(updated); setNotice('Study schedule saved.'); }} onClose={() => { setModal(null); setSelectedOrder(null); }} /> : null}
     {modal === 'resources' ? <ResourceManager modalities={modalities} onClose={() => setModal(null)} /> : null}
   </div>;
 }
