@@ -159,6 +159,7 @@ export function AppointmentsPage() {
 
   const canCreate = hasPermission(user, 'appointments.create');
   const canUpdate = hasPermission(user, 'appointments.update');
+  const canViewVisits = hasPermission(user, 'visits.view');
 
   const stats = useMemo(() => {
     const count = (value: AppointmentStatus | AppointmentStatus[]) => {
@@ -367,12 +368,11 @@ export function AppointmentsPage() {
             });
           }
           if (row.status === 'checked_in') {
-            items.push({
-              key: 'complete',
-              label: 'Complete',
-              icon: <StatusIcon status="completed" />,
-              onClick: () => updateStatus(row, 'completed'),
-            });
+            if (row.visitId && canViewVisits) {
+              items.push({ key: 'queue', label: 'Open OP queue', icon: <StatusIcon status="checked_in" />, onClick: () => navigate('/checkin') });
+            } else if (!row.visitId) {
+              items.push({ key: 'complete', label: 'Complete', icon: <StatusIcon status="completed" />, onClick: () => updateStatus(row, 'completed') });
+            }
           }
 
           if (!items.length) return null;
@@ -380,7 +380,7 @@ export function AppointmentsPage() {
         },
       },
     ],
-    [busyId, canUpdate, navigate],
+    [busyId, canUpdate, canViewVisits, navigate],
   );
 
   return (

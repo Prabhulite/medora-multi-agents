@@ -419,6 +419,32 @@ export const visitService = {
       visit.status = 'completed';
       await repo.save(visit);
 
+      const linkedAppointments = await manager.getRepository(Appointment)
+        .createQueryBuilder('appointment')
+        .where('appointment.visitId = :visitId', { visitId: visit.id })
+        .getMany();
+      for (const appointment of linkedAppointments) {
+        if (appointment.status !== 'checked_in') continue;
+        appointment.status = 'completed';
+        appointment.updatedById = userId;
+        await manager.save(appointment);
+        await manager.save(manager.create(AppointmentStatusHistory, {
+          appointmentId: appointment.id,
+          fromStatus: 'checked_in',
+          toStatus: 'completed',
+          notes: `OP visit ${visit.opNumber || visit.visitNumber} checked out`,
+          changedById: userId,
+        }));
+      }
+      await manager.getRepository(PatientAuditLog).save(manager.create(PatientAuditLog, {
+        patientId: visit.patientId,
+        action: 'op_checkout',
+        changedById: userId,
+        changeSummary: `OP visit ${visit.visitNumber} checked out`,
+        beforeData: null,
+        afterData: JSON.stringify({ visitId: visit.id, appointmentIds: linkedAppointments.map((row) => row.id) }),
+      }));
+
       const saved = await repo.findOne({
         where: { id },
         relations: {

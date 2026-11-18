@@ -7,6 +7,7 @@ import {
   DoctorSchedule,
   DoctorTimeSlot,
   Patient,
+  PatientVisit,
   type AppointmentStatus,
 } from '../../../database/entities/index.js';
 import { AppError, ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
@@ -536,12 +537,30 @@ export const appointmentService = {
       return this.getById(id);
     }
 
-    if (toStatus === 'confirmed' || toStatus === 'completed') {
-      if (toStatus === 'confirmed' && !['booked', 'rescheduled'].includes(fromStatus)) {
+    if (toStatus === 'completed') {
+      await AppDataSource.transaction(async (manager) => {
+        const visit = appointment.visitId
+          ? await manager.getRepository(PatientVisit).createQueryBuilder('visit').setLock('pessimistic_write')
+            .where('visit.id = :id', { id: appointment.visitId }).getOne()
+          : null;
+        const current = await manager.getRepository(Appointment).createQueryBuilder('appointment').setLock('pessimistic_write')
+          .where('appointment.id = :id', { id }).getOneOrFail();
+        if (current.status === 'completed') return;
+        if (current.status !== 'checked_in') throw new ConflictError('Appointment is no longer checked in');
+        if (visit && !visit.checkedOutAt && !['completed', 'cancelled'].includes(visit.status)) {
+          throw new ConflictError('Check out the linked OP visit to complete this appointment');
+        }
+        current.status = 'completed';
+        current.updatedById = userId;
+        await manager.save(current);
+        await appendHistory(manager, current.id, 'checked_in', 'completed', userId, input.notes);
+      });
+      return this.getById(id);
+    }
+
+    if (toStatus === 'confirmed') {
+      if (!['booked', 'rescheduled'].includes(fromStatus)) {
         throw new ValidationError('Only booked appointments can be confirmed');
-      }
-      if (toStatus === 'completed' && fromStatus !== 'checked_in') {
-        throw new ValidationError('Only checked-in appointments can be completed');
       }
 
       await AppDataSource.transaction(async (manager) => {

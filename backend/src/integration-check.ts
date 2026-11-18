@@ -1310,7 +1310,32 @@ try {
   assert.equal(appointmentHistory.to_status, 'checked_in');
   assert.equal(appointmentHistory.notes, 'Patient arrived at reception');
   assert.equal((await request('POST', '/api/visits/checkin', { patientId: 7, doctorId: 1, appointmentId: appointmentRow.id, natureOfVisit: 'OP consultation', purposeOfVisit: 'Duplicate' })).status, 409);
+  assert.equal((await request('PATCH', `/api/appointments/${appointmentRow.id}/status`, { status: 'completed' })).status, 409);
   await ok('PATCH', `/api/visits/${appointmentQueue[0].id}/checkout`);
+  assert.equal((await ok('GET', `/api/appointments/${appointmentRow.id}`)).status, 'completed');
+  const [completedHistory] = await dataSource.query("SELECT from_status, to_status, changed_by_id FROM appointment_status_history WHERE appointment_id = ? ORDER BY id DESC LIMIT 1", [appointmentRow.id]);
+  assert.equal(completedHistory.from_status, 'checked_in');
+  assert.equal(completedHistory.to_status, 'completed');
+  assert.equal(completedHistory.changed_by_id, 1);
+  const [checkoutAudit] = await dataSource.query("SELECT action, changed_by_id FROM patient_audit_logs WHERE patient_id = 7 AND action = 'op_checkout' ORDER BY id DESC LIMIT 1");
+  assert.equal(checkoutAudit.action, 'op_checkout');
+  assert.equal(checkoutAudit.changed_by_id, 1);
+  assert.equal((await ok('PATCH', `/api/appointments/${appointmentRow.id}/status`, { status: 'completed' })).status, 'completed');
+  const [completionCount] = await dataSource.query("SELECT COUNT(*) AS count FROM appointment_status_history WHERE appointment_id = ? AND to_status = 'completed'", [appointmentRow.id]);
+  assert.equal(Number(completionCount.count), 1);
+  await dataSource.query("INSERT INTO patients (mrd_number,first_name,last_name,gender) VALUES ('IT-OP-008','Concurrent','Patient','other')");
+  await dataSource.query("INSERT INTO appointments (appointment_number,patient_id,doctor_id,department_id,appointment_date,appointment_time,appointment_type,status) VALUES ('IT-OP-APT-008',8,1,1,CURRENT_DATE(),'11:00:00','new_consultation','booked')");
+  const [raceAppointment] = await dataSource.query("SELECT id FROM appointments WHERE appointment_number = 'IT-OP-APT-008'");
+  const raceCheckin = await ok('PATCH', `/api/appointments/${raceAppointment.id}/status`, { status: 'checked_in' });
+  const raceResults = await Promise.all([
+    request('PATCH', `/api/appointments/${raceAppointment.id}/status`, { status: 'completed' }),
+    request('PATCH', `/api/visits/${raceCheckin.visitId}/checkout`),
+  ]);
+  assert.equal(raceResults[1].status, 200);
+  assert.ok([200, 409].includes(raceResults[0].status));
+  assert.equal((await ok('GET', `/api/appointments/${raceAppointment.id}`)).status, 'completed');
+  const [raceCompletionCount] = await dataSource.query("SELECT COUNT(*) AS count FROM appointment_status_history WHERE appointment_id = ? AND to_status = 'completed'", [raceAppointment.id]);
+  assert.equal(Number(raceCompletionCount.count), 1);
   const systemAudit = await ok('GET', '/api/audit-logs?limit=20&page=1');
   const actorEntry = systemAudit.rows.find((row: { user?: { id: number } | null }) => row.user);
   assert.ok(actorEntry, 'Expected an audit event attributed to a staff user');
