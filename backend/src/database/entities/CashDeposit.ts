@@ -1,5 +1,6 @@
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, Unique } from 'typeorm';
+import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToOne, PrimaryGeneratedColumn, Unique } from 'typeorm';
 import { CashierCloseout } from './CashierCloseout.js';
+import { CashDepositSettlement } from './CashDepositSettlement.js';
 import { User } from './User.js';
 
 @Entity({ name: 'cash_deposits' })
@@ -19,4 +20,5 @@ export class CashDeposit {
   @Column({ name: 'voided_by_id', type: 'int', unsigned: true, nullable: true }) voidedById!: number | null;
   @ManyToOne(() => User, { nullable: true, onDelete: 'RESTRICT' }) @JoinColumn({ name: 'voided_by_id' }) voidedBy!: User | null;
   @Column({ name: 'void_reason', type: 'varchar', length: 500, nullable: true }) voidReason!: string | null;
+  @OneToOne(() => CashDepositSettlement, (settlement) => settlement.deposit) settlement!: CashDepositSettlement | null;
 }

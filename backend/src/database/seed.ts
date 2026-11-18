@@ -162,6 +162,7 @@ const PERMISSIONS = [
   { code: 'billing.closeout', module: 'billing', action: 'closeout', description: 'Close cashier cash drawer' },
   { code: 'billing.deposit', module: 'billing', action: 'deposit', description: 'Record bank deposits against closed cash' },
   { code: 'billing.deposit.void', module: 'billing', action: 'deposit_void', description: 'Void an erroneous cash deposit with a reason' },
+  { code: 'billing.reconcile', module: 'billing', action: 'reconcile', description: 'Match cash deposits to bank statements' },
   { code: 'billing.create', module: 'billing', action: 'create', description: 'Create invoices' },
   { code: 'billing.update', module: 'billing', action: 'update', description: 'Record invoice payments' },
   { code: 'billing.charges.manage', module: 'billing_charges', action: 'manage', description: 'Create and update billing charge prices' },

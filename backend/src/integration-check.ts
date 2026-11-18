@@ -1017,6 +1017,7 @@ try {
   assert.equal((await request('POST', depositPath, { depositDate: closeoutDate, amount: 10, bankReference: 'IT-DENIED' })).status, 403);
   assert.equal((await request('GET', `/api/billing/deposits?date=${closeoutDate}`)).status, 403);
   assert.equal((await request('POST', '/api/billing/deposits/1/void', { reason: 'Unauthorized void attempt' })).status, 403);
+  assert.equal((await request('POST', '/api/billing/deposits/1/reconcile', { statementDate: closeoutDate, statementReference: 'IT-DENIED-STATEMENT' })).status, 403);
   token = adminToken;
   const competingDeposits = await Promise.all(['IT-DEP-1', 'IT-DEP-2'].map((bankReference) => request('POST', depositPath, { depositDate: closeoutDate, amount: 30, bankReference })));
   assert.deepEqual(competingDeposits.map((response) => response.status).sort(), [201, 422]);
@@ -1036,9 +1037,19 @@ try {
   assert.equal((await request('POST', voidPath, { reason: 'Repeat void must be rejected' })).status, 409);
   const replacementDeposit = await ok('POST', depositPath, { depositDate: closeoutDate, amount: 30, bankReference: 'IT-DEP-REPLACEMENT' }, 201);
   assert.equal(replacementDeposit.amount, '30.00');
+  assert.equal((await request('POST', `/api/billing/deposits/${firstDeposit.id}/reconcile`, { statementDate: closeoutDate, statementReference: 'IT-VOIDED-STATEMENT' })).status, 422);
+  assert.equal((await request('POST', `/api/billing/deposits/${replacementDeposit.id}/reconcile`, { statementDate: '2020-01-01', statementReference: 'IT-EARLY-STATEMENT' })).status, 422);
+  const competingSettlements = await Promise.all([replacementDeposit, finalDeposit].map((deposit) => request('POST', `/api/billing/deposits/${deposit.id}/reconcile`, { statementDate: closeoutDate, statementReference: 'IT-STATEMENT-1' })));
+  assert.deepEqual(competingSettlements.map((response) => response.status).sort(), [200, 409]);
+  const settlement = competingSettlements.find((response) => response.status === 200)!.data;
+  assert.equal(settlement.statementReference, 'IT-STATEMENT-1');
+  assert.equal(settlement.matchedByName, 'Integration Admin');
+  assert.equal((await request('POST', `/api/billing/deposits/${settlement.id}/reconcile`, { statementDate: closeoutDate, statementReference: 'IT-STATEMENT-2' })).status, 409);
+  assert.equal((await request('POST', `/api/billing/deposits/${settlement.id}/void`, { reason: 'Matched deposits must remain in the bank match history' })).status, 409);
   const listedDeposits = await ok('GET', `/api/billing/deposits?date=${closeoutDate}`);
   assert.equal(listedDeposits.length, 3);
   assert.equal(listedDeposits.find((row: { id: number }) => row.id === firstDeposit.id).voidReason, 'Bank reference entered against the wrong drawer');
+  assert.equal(listedDeposits.find((row: { id: number }) => row.id === settlement.id).statementReference, 'IT-STATEMENT-1');
   assert.equal((await ok('GET', `/api/billing/closeouts?date=${closeoutDate}`))[0].countedCash, '59.50');
   assert.equal((await request('POST', '/api/billing/closeouts', { countedCash: 60 })).status, 409);
   assert.equal((await request('POST', `/api/billing/invoices/${invoice.id}/payments`, { amount: 1, method: 'cash' })).status, 409);
