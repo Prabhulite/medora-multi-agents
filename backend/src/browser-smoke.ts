@@ -79,6 +79,16 @@ try {
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   assert.equal(await evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1'), true, 'Dashboard overflows the mobile viewport');
   await send('Emulation.clearDeviceMetricsOverride');
+  await evaluate('history.pushState({}, "", "/appointments"); window.dispatchEvent(new PopStateEvent("popstate")); true');
+  let appointmentCalendarReady = false;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    appointmentCalendarReady = await evaluate('Boolean(Array.from(document.querySelectorAll(".appointment-view-switch button")).find(button => button.textContent?.includes("Calendar")))');
+    if (appointmentCalendarReady) break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.ok(appointmentCalendarReady, 'Appointment calendar toggle did not render');
+  await evaluate('Array.from(document.querySelectorAll(".appointment-view-switch button")).find(button => button.textContent?.includes("Calendar"))?.click(); true');
+  assert.equal(await evaluate('Boolean(document.querySelector(".appointment-calendar__day"))'), true, 'Appointment calendar did not render');
   await evaluate('history.pushState({}, "", "/laboratory"); window.dispatchEvent(new PopStateEvent("popstate")); true');
   let loaded = false;
   for (let attempt = 0; attempt < 100; attempt++) {

@@ -10,6 +10,7 @@ This checklist tracks verified delivery work for Medora. A box is checked only a
 - [x] Printable medication list
 - [x] Printable clinical patient summary
 - [x] Simplified clinical sidebar and responsive navigation
+- [x] Calendar view for filtered appointments
 
 ## Corporate UI refresh
 

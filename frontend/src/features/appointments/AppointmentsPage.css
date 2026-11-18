@@ -460,3 +460,4 @@
     grid-template-columns: 1fr;
   }
 }
+.appointment-view-switch{display:flex;gap:8px;margin:0 0 14px}.appointment-calendar{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}.appointment-calendar__day{min-height:140px;padding:14px;border:1px solid var(--color-border);border-radius:12px;background:#fff}.appointment-calendar__day h2{font-size:14px;margin:0 0 12px}.appointment-calendar__day p,.appointment-calendar__hint{color:var(--color-text-secondary);font-size:13px}.appointment-calendar__item{width:100%;display:grid;gap:4px;text-align:left;padding:10px;margin:0 0 7px;border:1px solid #cfe5d5;border-radius:8px;background:#f4faf6;color:#173f29}.appointment-calendar__item:hover,.appointment-calendar__item:focus-visible{border-color:#208046;background:#e5f4e9}.appointment-calendar__item span{color:#52675a;font-size:12px}

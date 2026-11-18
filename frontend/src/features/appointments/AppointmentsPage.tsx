@@ -13,6 +13,7 @@ import { hasPermission } from '../../lib/permissions';
 import type { Appointment, AppointmentStatus } from '../../types';
 import { useAuth } from '../auth/AuthContext';
 import { appointmentsApi } from './appointments.api';
+import { AppointmentCalendar } from './AppointmentCalendar';
 import './AppointmentsPage.css';
 
 const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
@@ -150,6 +151,7 @@ export function AppointmentsPage() {
   const [fromDate, setFromDate] = useState(todayIso());
   const [toDate, setToDate] = useState(todayIso());
   const [status, setStatus] = useState('');
+  const [view, setView] = useState<'list' | 'calendar'>('list');
   const [busyId, setBusyId] = useState<number | null>(null);
   const [confirmAction, setConfirmAction] = useState<{
     title: string;
@@ -517,7 +519,8 @@ export function AppointmentsPage() {
         </button>
       </div>
 
-      <div className="appointments-table-panel">
+      <div className="appointment-view-switch" role="group" aria-label="Appointment view"><Button size="sm" variant={view === 'list' ? 'primary' : 'secondary'} onClick={() => setView('list')}>List</Button><Button size="sm" variant={view === 'calendar' ? 'primary' : 'secondary'} onClick={() => setView('calendar')}>Calendar</Button></div>
+      {view === 'calendar' ? <AppointmentCalendar rows={filteredRows} fromDate={fromDate} toDate={toDate} onOpen={(patientId) => navigate(`/patients/${patientId}`)} canOpenPatient={hasPermission(user, 'patients.view')} /> : <div className="appointments-table-panel">
         <Table
           columns={columns}
           rows={filteredRows}
@@ -545,7 +548,7 @@ export function AppointmentsPage() {
           }
           emptyMessage="No appointments for the selected filters."
         />
-      </div>
+      </div>}
 
       <ConfirmDialog
         open={Boolean(confirmAction)}
