@@ -1271,6 +1271,7 @@ try {
   await dataSource.query(`INSERT INTO invoices (invoice_number,patient_id,status,balance_amount) VALUES ${invoiceFixtures.map(() => '(?,?,?,?)').join(',')}`, invoiceFixtures.flat());
   const stockFixtures = Array.from({ length: 11 }, (_, index) => [1, `IT-OPS-BATCH-${index}`, '2026-12-31', 0, 5, 1]);
   await dataSource.query(`INSERT INTO inventory_batches (medication_id,batch_number,expiry_date,quantity,reorder_level,is_active) VALUES ${stockFixtures.map(() => '(?,?,?,?,?,?)').join(',')}`, stockFixtures.flat());
+  await dataSource.query("INSERT INTO inventory_batches (medication_id,batch_number,expiry_date,quantity,reorder_level,is_active) VALUES (1,'IT-OPS-EXPIRED',DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY),2,5,1),(1,'IT-OPS-EXPIRING',DATE_ADD(CURRENT_DATE(), INTERVAL 30 DAY),2,0,1)");
   await dataSource.query("INSERT INTO radiology_modalities (modality_code,modality_name) VALUES ('IT-OPS-RAD','Integration imaging')");
   const labFixtures = Array.from({ length: 11 }, (_, index) => [`IT-OPS-LAB-${index}`, 1, 1, 'ordered']);
   await dataSource.query(`INSERT INTO laboratory_orders (order_number,patient_id,test_id,status) VALUES ${labFixtures.map(() => '(?,?,?,?)').join(',')}`, labFixtures.flat());
@@ -1292,8 +1293,11 @@ try {
   const [billingTotals] = await dataSource.query("SELECT SUM(balance_amount) AS balance FROM invoices WHERE status IN ('open','partially_paid')");
   assert.equal(operations.kpis.billingOutstanding, Number(billingTotals.balance));
   assert.ok(operations.kpis.billingOutstanding > 1000);
-  assert.ok(operations.kpis.lowStockItems >= 11);
+  const [stockAlertCounts] = await dataSource.query("SELECT SUM(expiry_date >= CURRENT_DATE() AND quantity <= reorder_level) AS lowStock, SUM(quantity > 0 AND expiry_date < CURRENT_DATE()) AS expired, SUM(quantity > 0 AND expiry_date BETWEEN CURRENT_DATE() AND DATE_ADD(CURRENT_DATE(), INTERVAL 90 DAY)) AS expiring FROM inventory_batches WHERE is_active = 1");
+  assert.equal(operations.kpis.lowStockItems, Number(stockAlertCounts.lowStock));
   assert.equal(operations.alerts.find((alert: { id: string }) => alert.id === 'low-stock')?.count, operations.kpis.lowStockItems);
+  assert.equal(operations.alerts.find((alert: { id: string }) => alert.id === 'expired-stock')?.count, Number(stockAlertCounts.expired));
+  assert.equal(operations.alerts.find((alert: { id: string }) => alert.id === 'expiring-stock')?.count, Number(stockAlertCounts.expiring));
   await dataSource.query('UPDATE patients SET first_name = ? WHERE id = 1', ['=1+1']);
   const csvResponse = await fetch(`${base}/api/operations/dashboard.csv?date=2027-03-01`, { headers: { authorization: `Bearer ${token}` } });
   assert.equal(csvResponse.status, 200);

@@ -64,8 +64,9 @@ export function PharmacyInventoryPage() {
   const summary = useMemo(() => ({
     units: inventory.reduce((total, row) => total + row.quantity, 0),
     batches: inventory.length,
-    lowStock: inventory.filter((row) => row.quantity <= row.reorderLevel).length,
-    expiring: inventory.filter((row) => row.quantity > 0 && daysToExpiry(row.expiryDate) <= 90).length,
+    lowStock: inventory.filter((row) => daysToExpiry(row.expiryDate) >= 0 && row.quantity <= row.reorderLevel).length,
+    expired: inventory.filter((row) => row.quantity > 0 && daysToExpiry(row.expiryDate) < 0).length,
+    expiring: inventory.filter((row) => row.quantity > 0 && daysToExpiry(row.expiryDate) >= 0 && daysToExpiry(row.expiryDate) <= 90).length,
   }), [inventory]);
 
   const columns = useMemo<TableColumn<InventoryBatch>[]>(() => [
@@ -113,7 +114,7 @@ export function PharmacyInventoryPage() {
       <article><span>Units on hand</span><strong>{summary.units.toLocaleString('en-IN')}</strong><small>Across {summary.batches} batches</small></article>
       <article className="pharmacy-kpi--green"><span>Active batches</span><strong>{summary.batches}</strong><small>Tracked inventory lots</small></article>
       <article className="pharmacy-kpi--amber"><span>Low stock</span><strong>{summary.lowStock}</strong><small>At or below reorder level</small></article>
-      <article className="pharmacy-kpi--red"><span>Expiry watch</span><strong>{summary.expiring}</strong><small>Stock expired or within 90 days</small></article>
+      <article className="pharmacy-kpi--red"><span>Expired stock</span><strong>{summary.expired}</strong><small>Expired batches with stock</small></article><article className="pharmacy-kpi--amber"><span>Expiry watch</span><strong>{summary.expiring}</strong><small>Usable batches expiring within 90 days</small></article>
     </div>
     <section className="pharmacy-section">
       <div className="pharmacy-section__heading"><div><span className="pharmacy-eyebrow">STOCK CONTROL</span><h2>Inventory batches</h2><p>Use FEFO handling: issue medicines with the nearest expiry first.</p></div></div>

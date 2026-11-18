@@ -108,6 +108,8 @@ Current patient chart tabs: Profile and MRD show identity details and audit hist
 - The dispense picker hides expired and empty batches, shows expired stock distinctly, and identifies the earliest usable batch that can supply the requested quantity. The API checks expiry against the database session's current date. When staff select a later eligible batch, the API requires a reason of 5–500 characters and records it on the stock movement for inventory reviewers. This is a single-batch FEFO check; it does not split an issue across batches.
 - Reorder levels and stock/expiry alerts
 
+The operations dashboard now separates three inventory risks using the database's current date: usable batches at or below their reorder level, positive stock already expired, and positive usable stock expiring within 90 days. Empty batches no longer count as expiry risk, and expired batches no longer inflate the reorder alert. The pharmacy inventory summary shows expired and expiring batches separately. These are review counts, not automatic supplier orders or a quarantine action.
+
 ### Phase 6: Laboratory and radiology
 
 - Test catalog, panels, sample collection, lab workflow
