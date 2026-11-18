@@ -13,6 +13,7 @@ export interface OperationsKpis {
 
 export interface OperationsQueueItem {
   id: string | number;
+  patientId?: number | null;
   label: string;
   detail?: string | null;
   status?: string | null;
@@ -59,6 +60,7 @@ function numberValue(...values: unknown[]): number {
 function mapQueueItem(row: any, index: number, prefix: string): OperationsQueueItem {
   return {
     id: row.id ?? row.key ?? `${prefix}-${index}`,
+    patientId: row.patientId ?? row.patient?.id ?? null,
     label: row.label || row.title || row.name || row.patientName || row.orderNumber || row.admissionNumber || `${prefix} item`,
     detail: row.detail || row.description || row.patientMrdNumber || row.mrdNumber || row.testName || row.modalityName || null,
     status: row.status || null,

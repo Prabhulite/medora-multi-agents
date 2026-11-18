@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -43,8 +44,9 @@ function dateLabel(value: string | null | undefined) {
 
 export function BillingDashboardPage() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [invoices, setInvoices] = useState<BillingInvoice[]>([]);
-  const [patientId, setPatientId] = useState('');
+  const [patientId, setPatientId] = useState(() => { const value = searchParams.get('patientId'); return value && /^\d+$/.test(value) && Number(value) > 0 ? value : ''; });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');

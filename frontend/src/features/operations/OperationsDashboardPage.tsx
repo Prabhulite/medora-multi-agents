@@ -30,6 +30,9 @@ function pharmacyAlertPath(id: string | number) {
 function diagnosticQueuePath(destination: 'laboratory' | 'radiology', item: OperationsQueueItem) {
   return `/${destination}?search=${encodeURIComponent(item.label)}`;
 }
+function billingQueuePath(item: OperationsQueueItem) {
+  return item.patientId ? `/billing?patientId=${item.patientId}` : '/billing';
+}
 
 function Queue({ items, itemPath }: { items: OperationsQueueItem[]; itemPath?: (item: OperationsQueueItem) => string }) {
   if (!items.length) return <div className="operations-empty">Nothing is waiting right now.</div>;
@@ -81,7 +84,7 @@ export function OperationsDashboardPage() {
           {hasPermission(user, 'patients.view') ? <FollowUpQueue /> : null}
           <article className="operations-panel"><header><div><small>Front office</small><h2>Appointments</h2></div><b>{k.appointmentsWaiting} waiting</b></header><Queue items={dashboard.queues.appointments} /></article>
           <article className="operations-panel"><header><div><small>Inpatient</small><h2>Admissions</h2></div><b>{k.admissionsActive} active</b></header><Queue items={dashboard.queues.admissions} /></article>
-          <article className="operations-panel"><header><div><small>Finance</small><h2>Billing balances</h2></div><b>{formatCurrency(k.billingOutstanding)}</b></header><Queue items={dashboard.queues.billing} /></article>
+          <article className="operations-panel"><header><div><small>Finance</small><h2>Billing balances</h2></div><b>{formatCurrency(k.billingOutstanding)}</b></header><Queue items={dashboard.queues.billing} itemPath={hasPermission(user, 'billing.view') ? billingQueuePath : undefined} /></article>
           <article className="operations-panel"><header><div><small>Diagnostics</small><h2>Laboratory</h2></div><b>{k.labPending} pending</b></header><Queue items={dashboard.queues.laboratory} itemPath={hasPermission(user, 'laboratory.view') ? (item) => diagnosticQueuePath('laboratory', item) : undefined} /></article>
           <article className="operations-panel"><header><div><small>Diagnostics</small><h2>Radiology</h2></div><b>{k.radiologyPending} pending</b></header><Queue items={dashboard.queues.radiology} itemPath={hasPermission(user, 'radiology.view') ? (item) => diagnosticQueuePath('radiology', item) : undefined} /></article>
         </div>
