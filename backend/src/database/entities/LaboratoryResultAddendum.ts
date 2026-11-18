@@ -12,4 +12,7 @@ export class LaboratoryResultAddendum {
   @Column({ name: 'created_by_id', type: 'int', unsigned: true, nullable: true }) createdById!: number | null;
   @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true }) @JoinColumn({ name: 'created_by_id' }) createdBy!: User | null;
   @CreateDateColumn({ name: 'created_at', type: 'timestamp', precision: 6 }) createdAt!: Date;
+  @Column({ name: 'approved_by_id', type: 'int', unsigned: true, nullable: true }) approvedById!: number | null;
+  @ManyToOne(() => User, { nullable: true, onDelete: 'RESTRICT' }) @JoinColumn({ name: 'approved_by_id' }) approvedBy!: User | null;
+  @Column({ name: 'approved_at', type: 'timestamp', precision: 6, nullable: true }) approvedAt!: Date | null;
 }

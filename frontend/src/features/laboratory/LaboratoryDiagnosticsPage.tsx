@@ -39,6 +39,7 @@ export function LaboratoryDiagnosticsPage() {
   const canVerify = hasPermission(user, 'laboratory.verify');
   const canRelease = hasPermission(user, 'laboratory.release');
   const canAmend = hasPermission(user, 'laboratory.amend');
+  const canApproveAmendment = hasPermission(user, 'laboratory.amend.approve');
   const canCancel = hasPermission(user, 'laboratory.cancel');
   const canManageCatalog = hasPermission(user, 'laboratory.catalog.manage');
   const [tests, setTests] = useState<LaboratoryTest[]>([]);
@@ -230,7 +231,7 @@ export function LaboratoryDiagnosticsPage() {
     {modal === 'collect' && selectedOrder ? <CollectForm order={selectedOrder} saving={saving} onClose={() => { setModal(null); setSelectedOrder(null); }} onSubmit={(label) => void collectSample(label)} /> : null}
     {modal === 'result' && selectedOrder ? <ResultForm order={selectedOrder} saving={saving} error={error} onClose={() => { setModal(null); setSelectedOrder(null); }} onSubmit={(payload) => void saveResult(payload)} /> : null}
     {modal === 'verify' && selectedOrder ? <VerifyForm order={selectedOrder} saving={saving} error={error} onClose={() => { setModal(null); setSelectedOrder(null); }} onSubmit={(confirmation) => void verifyResult(confirmation)} /> : null}
-    {modal === 'view' && selectedOrder ? <ResultView order={selectedOrder} canAmend={canAmend} onClose={() => { setModal(null); setSelectedOrder(null); }} /> : null}
+    {modal === 'view' && selectedOrder ? <ResultView order={selectedOrder} canAmend={canAmend} canApproveAmendment={canApproveAmendment} onClose={() => { setModal(null); setSelectedOrder(null); }} /> : null}
     {modal === 'communications' && selectedOrder ? <CommunicationView order={selectedOrder} canRecord={canRelease} onClose={() => { setModal(null); setSelectedOrder(null); void loadQueue(); }} onRecorded={() => void loadQueue()} /> : null}
     <ConfirmDialog open={Boolean(releaseTarget)} title="Release laboratory result" message="Release this verified result to the care team? The released result cannot be edited in place." confirmLabel="Release result" confirming={saving} onConfirm={() => void releaseResult()} onCancel={() => setReleaseTarget(null)} />
     <ConfirmDialog open={Boolean(retireTarget)} title="Retire laboratory test" message={`Retire ${retireTarget?.name || 'this test'} from new orders? Existing orders remain available.`} confirmLabel="Retire test" tone="danger" confirming={saving} onConfirm={() => void retireTest()} onCancel={() => setRetireTarget(null)} />
@@ -300,7 +301,7 @@ function VerifyForm({ order, saving, error, onClose, onSubmit }: { order: Labora
   </form></ModalShell>;
 }
 
-function ResultView({ order, canAmend, onClose }: { order: LaboratoryOrder; canAmend: boolean; onClose: () => void }) {
+function ResultView({ order, canAmend, canApproveAmendment, onClose }: { order: LaboratoryOrder; canAmend: boolean; canApproveAmendment: boolean; onClose: () => void }) {
   const released = order.status === 'completed';
   const [addenda, setAddenda] = useState<LaboratoryAddendum[]>([]);
   const [loadingAddenda, setLoadingAddenda] = useState(released);
@@ -308,6 +309,7 @@ function ResultView({ order, canAmend, onClose }: { order: LaboratoryOrder; canA
   const [reason, setReason] = useState('');
   const [addendum, setAddendum] = useState('');
   const [error, setError] = useState('');
+  const [approvingId, setApprovingId] = useState<number | null>(null);
   useEffect(() => {
     if (!released) return;
     let active = true;
@@ -320,6 +322,7 @@ function ResultView({ order, canAmend, onClose }: { order: LaboratoryOrder; canA
     catch (err) { setError(getErrorMessage(err, 'Unable to save result addendum')); }
     finally { setSavingAddendum(false); }
   };
+  const approve = async (id: number) => { setApprovingId(id); setError(''); try { const row = await laboratoryApi.approveAddendum(id); setAddenda((current) => current.map((item) => item.id === id ? row : item)); } catch (err) { setError(getErrorMessage(err, 'Unable to approve result correction')); } finally { setApprovingId(null); } };
   return <ModalShell title={`${released ? 'Laboratory report' : 'Verified draft'} · ${order.testName}`} eyebrow={order.orderNumber} onClose={onClose} className={released ? 'laboratory-report' : ''}><div className="laboratory-form">
     <div className="laboratory-result-context"><strong>{order.patientName || `Patient #${order.patientId}`}</strong><span>{order.patientMrdNumber || `Patient ID ${order.patientId}`} · {released ? 'Released result' : 'Awaiting release'}</span></div>
     <dl className="laboratory-report__details"><div><dt>Investigation</dt><dd>{order.testName} {order.testCode && `(${order.testCode})`}</dd></div><div><dt>Priority</dt><dd>{order.priority || 'routine'}</dd></div><div><dt>Ordered</dt><dd>{dateLabel(order.orderedAt)}</dd></div><div><dt>Collected</dt><dd>{dateLabel(order.collectedAt)}</dd></div><div><dt>Specimen label</dt><dd>{order.specimenLabel || 'Not recorded'}</dd></div><div><dt>Referring doctor</dt><dd>{order.doctorName || 'Not assigned'}</dd></div><div><dt>Order number</dt><dd>{order.orderNumber}</dd></div></dl>
@@ -328,7 +331,7 @@ function ResultView({ order, canAmend, onClose }: { order: LaboratoryOrder; canA
     {order.verifiedAt && <p>Verified {dateLabel(order.verifiedAt)} · staff #{order.verifiedById || 'unknown'}</p>}
     {order.completedAt && <p>Released {dateLabel(order.completedAt)} · staff #{order.releasedById || 'unknown'}</p>}
     {released && !order.verifiedAt && <p>Historical result: verification details were not recorded in the earlier workflow.</p>}
-    {released && <section className="laboratory-report__addenda"><h3>Addenda</h3>{loadingAddenda ? <p>Loading corrections…</p> : addenda.length ? addenda.map((row) => <article key={row.id}><strong>{dateLabel(row.createdAt)} · {row.authorName || 'Former user'}</strong><p>Reason: {row.reason}</p><p>{row.addendum}</p></article>) : <p>No corrections recorded.</p>}</section>}
+    {released && <section className="laboratory-report__addenda"><h3>Addenda</h3>{loadingAddenda ? <p>Loading corrections…</p> : addenda.length ? addenda.map((row) => <article key={row.id}><strong>{dateLabel(row.createdAt)} · {row.authorName || 'Former user'}</strong><p>Reason: {row.reason}</p><p>{row.addendum}</p><p>{row.approvedAt ? `Approved ${dateLabel(row.approvedAt)} · ${row.approverName || 'Former user'}` : 'Pending approval'}</p>{canApproveAmendment && !row.approvedAt && <Button type="button" size="sm" loading={approvingId === row.id} disabled={approvingId !== null} onClick={() => void approve(row.id)}>Approve correction</Button>}</article>) : <p>No corrections recorded.</p>}</section>}
     {error && <Alert tone="error">{error}</Alert>}
     <div className="laboratory-modal__footer laboratory-report__actions"><Button type="button" variant="secondary" onClick={onClose}>Close</Button>{released && <Button type="button" disabled={loadingAddenda || Boolean(error)} onClick={() => window.print()}>Print report</Button>}</div>
   </div>{released && canAmend && <form className="laboratory-form laboratory-report__correction" onSubmit={(event) => void saveAddendum(event)}><h3>Add a correction</h3><Input label="Reason" required minLength={5} maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} /><label className="laboratory-textarea"><span>Addendum</span><textarea required rows={4} maxLength={10000} value={addendum} onChange={(event) => setAddendum(event.target.value)} /></label><Button type="submit" loading={savingAddendum} disabled={savingAddendum || reason.trim().length < 5 || !addendum.trim()}>Save addendum</Button></form>}</ModalShell>;

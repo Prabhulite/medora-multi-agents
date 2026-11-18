@@ -24,6 +24,7 @@ router.post('/orders/:id/verify', authorize('laboratory.verify'), validate(labor
 router.post('/orders/:id/release', authorize('laboratory.release'), validate(laboratoryOrderIdParamSchema, 'params'), asyncHandler(laboratoryController.releaseResult));
 router.get('/orders/:id/addenda', authorize('laboratory.view'), validate(laboratoryOrderIdParamSchema, 'params'), asyncHandler(laboratoryController.listAddenda));
 router.post('/orders/:id/addenda', authorize('laboratory.amend'), validate(laboratoryOrderIdParamSchema, 'params'), validate(createLaboratoryAddendumSchema), asyncHandler(laboratoryController.addAddendum));
+router.post('/addenda/:id/approve', authorize('laboratory.amend.approve'), validate(laboratoryOrderIdParamSchema, 'params'), asyncHandler(laboratoryController.approveAddendum));
 router.get('/orders/:id/communications', authorize('laboratory.view'), validate(laboratoryOrderIdParamSchema, 'params'), asyncHandler(laboratoryController.listCommunications));
 router.post('/orders/:id/communications', authorize('laboratory.release'), validate(laboratoryOrderIdParamSchema, 'params'), validate(createLaboratoryCommunicationSchema), asyncHandler(laboratoryController.recordCommunication));
 export default router;

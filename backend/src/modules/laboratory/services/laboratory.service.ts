@@ -23,8 +23,8 @@ export const laboratoryService = {
     const pending = AppDataSource.getRepository(LaboratoryOrder).createQueryBuilder('lab')
       .innerJoin('lab.patient', 'patient').innerJoin('lab.test', 'test')
       .where('lab.status IN (:...readyStatuses)', { readyStatuses: ['verified', 'completed'] })
-      .andWhere("(lab.priority IN (:...priorities) OR lab.critical_result = 1 OR (lab.status = 'completed' AND EXISTS (SELECT 1 FROM laboratory_result_addenda correction WHERE correction.order_id = lab.id)))", { priorities: ['urgent', 'stat'] })
-      .andWhere("NOT EXISTS (SELECT 1 FROM laboratory_communications delivered WHERE delivered.order_id = lab.id AND delivered.outcome = 'delivered' AND (NOT EXISTS (SELECT 1 FROM laboratory_result_addenda correction WHERE correction.order_id = lab.id) OR (delivered.created_at > (SELECT MAX(correction.created_at) FROM laboratory_result_addenda correction WHERE correction.order_id = lab.id) AND delivered.occurred_at >= (SELECT MAX(correction.created_at) FROM laboratory_result_addenda correction WHERE correction.order_id = lab.id))))");
+      .andWhere("(lab.priority IN (:...priorities) OR lab.critical_result = 1 OR (lab.status = 'completed' AND EXISTS (SELECT 1 FROM laboratory_result_addenda correction WHERE correction.order_id = lab.id AND correction.approved_at IS NOT NULL)))", { priorities: ['urgent', 'stat'] })
+      .andWhere("NOT EXISTS (SELECT 1 FROM laboratory_communications delivered WHERE delivered.order_id = lab.id AND delivered.outcome = 'delivered' AND (NOT EXISTS (SELECT 1 FROM laboratory_result_addenda correction WHERE correction.order_id = lab.id AND correction.approved_at IS NOT NULL) OR (delivered.created_at > (SELECT MAX(correction.created_at) FROM laboratory_result_addenda correction WHERE correction.order_id = lab.id AND correction.approved_at IS NOT NULL) AND delivered.occurred_at >= (SELECT MAX(correction.created_at) FROM laboratory_result_addenda correction WHERE correction.order_id = lab.id AND correction.approved_at IS NOT NULL))))");
     if (search) {
       const term = `%${search.replace(/[%_\\]/g, '\\$&')}%`;
       pending.andWhere(new Brackets((terms) => {
@@ -40,8 +40,8 @@ export const laboratoryService = {
       .addSelect('lab.patientId', 'patientId').addSelect('patient.mrdNumber', 'patientMrdNumber')
       .addSelect('patient.firstName', 'firstName').addSelect('patient.middleName', 'middleName').addSelect('patient.lastName', 'lastName')
       .addSelect('test.testName', 'testName').addSelect('lab.priority', 'priority').addSelect('lab.criticalResult', 'criticalResult').addSelect('lab.status', 'status').addSelect('lab.verifiedAt', 'verifiedAt').addSelect('lab.completedAt', 'completedAt')
-      .addSelect('(SELECT MAX(correction.created_at) FROM laboratory_result_addenda correction WHERE correction.order_id = lab.id)', 'latestAddendumAt')
-      .orderBy('COALESCE((SELECT MAX(correction.created_at) FROM laboratory_result_addenda correction WHERE correction.order_id = lab.id), lab.verifiedAt, lab.completedAt, lab.orderedAt)', 'ASC').addOrderBy('lab.id', 'ASC')
+      .addSelect('(SELECT MAX(correction.created_at) FROM laboratory_result_addenda correction WHERE correction.order_id = lab.id AND correction.approved_at IS NOT NULL)', 'latestAddendumAt')
+      .orderBy('COALESCE((SELECT MAX(correction.created_at) FROM laboratory_result_addenda correction WHERE correction.order_id = lab.id AND correction.approved_at IS NOT NULL), lab.verifiedAt, lab.completedAt, lab.orderedAt)', 'ASC').addOrderBy('lab.id', 'ASC')
       .limit(pageSize).offset((page - 1) * pageSize).getRawMany<{
         id: number; orderNumber: string; patientId: number; patientMrdNumber: string; firstName: string; middleName: string | null; lastName: string; testName: string; priority: 'routine' | 'urgent' | 'stat'; criticalResult: boolean; status: 'verified' | 'completed'; verifiedAt: Date | null; completedAt: Date | null; latestAddendumAt: Date | null;
       }>();
@@ -49,7 +49,7 @@ export const laboratoryService = {
     const attempts = ids.length ? await AppDataSource.getRepository(LaboratoryCommunication).createQueryBuilder('contact')
       .select('contact.orderId', 'orderId').addSelect('COUNT(*)', 'attemptCount').addSelect('MAX(contact.occurredAt)', 'lastAttemptAt')
       .where('contact.orderId IN (:...ids)', { ids }).andWhere('contact.outcome = :attempted', { attempted: 'attempted' })
-      .andWhere("(NOT EXISTS (SELECT 1 FROM laboratory_result_addenda correction WHERE correction.order_id = contact.order_id) OR (contact.created_at > (SELECT MAX(correction.created_at) FROM laboratory_result_addenda correction WHERE correction.order_id = contact.order_id) AND contact.occurred_at >= (SELECT MAX(correction.created_at) FROM laboratory_result_addenda correction WHERE correction.order_id = contact.order_id)))")
+      .andWhere("(NOT EXISTS (SELECT 1 FROM laboratory_result_addenda correction WHERE correction.order_id = contact.order_id AND correction.approved_at IS NOT NULL) OR (contact.created_at > (SELECT MAX(correction.created_at) FROM laboratory_result_addenda correction WHERE correction.order_id = contact.order_id AND correction.approved_at IS NOT NULL) AND contact.occurred_at >= (SELECT MAX(correction.created_at) FROM laboratory_result_addenda correction WHERE correction.order_id = contact.order_id AND correction.approved_at IS NOT NULL)))")
       .groupBy('contact.orderId').getRawMany<{ orderId: number; attemptCount: string; lastAttemptAt: Date | null }>() : [];
     const attemptMap = new Map(attempts.map((row) => [Number(row.orderId), row]));
     return { items: rows.map((row) => ({ id: Number(row.id), orderNumber: row.orderNumber, patientId: Number(row.patientId), patientMrdNumber: row.patientMrdNumber, patientName: [row.firstName, row.middleName, row.lastName].filter(Boolean).join(' '), testName: row.testName, priority: row.priority, criticalResult: Boolean(row.criticalResult), status: row.status, verifiedAt: row.verifiedAt, completedAt: row.completedAt, latestAddendumAt: row.latestAddendumAt, attemptCount: Number(attemptMap.get(Number(row.id))?.attemptCount ?? 0), lastAttemptAt: attemptMap.get(Number(row.id))?.lastAttemptAt ?? null })), total, page, pageSize };
@@ -124,8 +124,8 @@ export const laboratoryService = {
     const order = await AppDataSource.getRepository(LaboratoryOrder).findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundError('Laboratory order not found');
     if (order.status !== 'completed') throw new ConflictError('Addenda are available after result release');
-    const rows = await AppDataSource.getRepository(LaboratoryResultAddendum).find({ where: { orderId }, relations: { createdBy: true }, order: { id: 'ASC' } });
-    return rows.map(({ id, reason, addendum, createdById, createdAt, createdBy }) => ({ id, reason, addendum, createdById, createdAt, authorName: createdBy?.fullName ?? null }));
+    const rows = await AppDataSource.getRepository(LaboratoryResultAddendum).find({ where: { orderId }, relations: { createdBy: true, approvedBy: true }, order: { id: 'ASC' } });
+    return rows.map(({ id, reason, addendum, createdById, createdAt, createdBy, approvedById, approvedAt, approvedBy }) => ({ id, reason, addendum, createdById, createdAt, authorName: createdBy?.fullName ?? null, approvedById, approvedAt, approverName: approvedBy?.fullName ?? null }));
   },
   async addAddendum(orderId: number, input: CreateLaboratoryAddendumInput, userId: number) {
     return AppDataSource.transaction(async (manager) => {
@@ -133,16 +133,30 @@ export const laboratoryService = {
       if (!order) throw new NotFoundError('Laboratory order not found');
       if (order.status !== 'completed') throw new ConflictError('Only released results can receive addenda');
       const repo = manager.getRepository(LaboratoryResultAddendum);
-      const row = await repo.save(repo.create({ orderId, reason: input.reason, addendum: input.addendum, createdById: userId }));
+      const row = await repo.save(repo.create({ orderId, reason: input.reason, addendum: input.addendum, createdById: userId, approvedById: null, approvedAt: null }));
       await manager.getRepository(PatientAuditLog).save({ patientId: order.patientId, action: 'laboratory_result_amended', changedById: userId, changeSummary: `Laboratory result amended: ${order.orderNumber}`, beforeData: JSON.stringify({ orderId, status: 'completed' }), afterData: JSON.stringify({ orderId, addendumId: row.id, reason: row.reason }) });
+      const author = await manager.getRepository(User).findOne({ where: { id: userId } });
+      return { id: row.id, reason: row.reason, addendum: row.addendum, createdById: row.createdById, createdAt: row.createdAt, authorName: author?.fullName ?? null, approvedById: null, approvedAt: null, approverName: null };
+    });
+  },
+  async approveAddendum(addendumId: number, userId: number) {
+    return AppDataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(LaboratoryResultAddendum);
+      const row = await repo.createQueryBuilder('addendum').setLock('pessimistic_write').where('addendum.id = :id', { id: addendumId }).getOne();
+      if (!row) throw new NotFoundError('Laboratory result addendum not found');
+      if (row.approvedAt) throw new ConflictError('Laboratory result addendum is already approved');
+      const order = await manager.getRepository(LaboratoryOrder).findOne({ where: { id: row.orderId } });
+      if (!order) throw new NotFoundError('Laboratory order not found');
+      if (order.status !== 'completed') throw new ConflictError('Only released result corrections can be approved');
+      row.approvedById = userId; row.approvedAt = new Date();
+      await repo.save(row);
+      await manager.getRepository(PatientAuditLog).save({ patientId: order.patientId, action: 'laboratory_result_amendment_approved', changedById: userId, changeSummary: `Laboratory result correction approved: ${order.orderNumber}`, beforeData: JSON.stringify({ addendumId: row.id, approved: false }), afterData: JSON.stringify({ addendumId: row.id, approved: true }) });
       if (order.doctorId) {
         const doctor = await manager.getRepository(Doctor).findOne({ where: { id: order.doctorId, isActive: true } });
-        if (doctor?.accountUserId && await manager.getRepository(User).exist({ where: { id: doctor.accountUserId, isActive: true } })) {
-          await manager.getRepository(UserNotification).save({ recipientId: doctor.accountUserId, kind: 'lab_result_amended', sourceId: row.id, title: 'Laboratory result addendum', message: `Laboratory order ${order.orderNumber} has a result addendum. Open the laboratory module to review it.`, route: '/laboratory' });
-        }
+        if (doctor?.accountUserId && await manager.getRepository(User).exist({ where: { id: doctor.accountUserId, isActive: true } })) await manager.getRepository(UserNotification).save({ recipientId: doctor.accountUserId, kind: 'lab_result_amended', sourceId: row.id, title: 'Laboratory result addendum', message: `Laboratory order ${order.orderNumber} has an approved result addendum. Open the laboratory module to review it.`, route: '/laboratory' });
       }
-      const author = await manager.getRepository(User).findOne({ where: { id: userId } });
-      return { id: row.id, reason: row.reason, addendum: row.addendum, createdById: row.createdById, createdAt: row.createdAt, authorName: author?.fullName ?? null };
+      const [author, approver] = await Promise.all([manager.getRepository(User).findOne({ where: { id: row.createdById ?? 0 } }), manager.getRepository(User).findOne({ where: { id: userId } })]);
+      return { id: row.id, reason: row.reason, addendum: row.addendum, createdById: row.createdById, createdAt: row.createdAt, authorName: author?.fullName ?? null, approvedById: row.approvedById, approvedAt: row.approvedAt, approverName: approver?.fullName ?? null };
     });
   },
   listTests() { return AppDataSource.getRepository(LaboratoryTest).find({ where: { isActive: true }, order: { category: 'ASC', testName: 'ASC' } }); },

@@ -18,7 +18,7 @@ export interface LaboratoryWorklist { items: LaboratoryOrder[]; total: number; p
 export interface LaboratoryCommunicationQueueItem { id: number; orderNumber: string; patientId: number; patientName: string | null; patientMrdNumber: string | null; testName: string; priority: 'routine' | 'urgent' | 'stat'; criticalResult: boolean; status: 'verified' | 'completed'; verifiedAt: string | null; completedAt: string | null; latestAddendumAt: string | null; attemptCount: number; lastAttemptAt: string | null; }
 export interface LaboratoryCommunicationQueue { items: LaboratoryCommunicationQueueItem[]; total: number; page: number; pageSize: number; }
 
-export interface LaboratoryAddendum { id: number; reason: string; addendum: string; createdAt: string; createdById: number | null; authorName: string | null; }
+export interface LaboratoryAddendum { id: number; reason: string; addendum: string; createdAt: string; createdById: number | null; authorName: string | null; approvedById: number | null; approvedAt: string | null; approverName: string | null; }
 export interface LaboratoryCommunication { id: number; outcome: 'attempted' | 'delivered'; method: 'phone' | 'in_person' | 'secure_message' | 'other'; recipientName: string; resultSummary: string | null; note: string | null; occurredAt: string; recordedById: number | null; recorderName: string | null; createdAt: string; }
 export type CreateLaboratoryCommunicationPayload = Pick<LaboratoryCommunication, 'outcome' | 'method' | 'recipientName' | 'occurredAt'> & { resultSummary: string; note?: string | null };
 export interface LaboratoryPatientCandidate { id: number; mrdNumber: string; fullName: string; }
@@ -179,6 +179,10 @@ export const laboratoryApi = {
     const response = await api.post<ApiEnvelope<LaboratoryAddendum>>(`/laboratory/orders/${orderId}/addenda`, payload);
     return response.data.data;
   },
+  async approveAddendum(addendumId: number): Promise<LaboratoryAddendum> {
+      const response = await api.post<ApiEnvelope<LaboratoryAddendum>>(`/laboratory/addenda/${addendumId}/approve`);
+      return response.data.data;
+    },
   async verifyResult(orderId: number, confirmation: { patientAndSpecimenChecked: boolean; qualityControlChecked: boolean; criticalResult: boolean; criticalReason: string | null }): Promise<LaboratoryOrder> {
     const response = await api.post<ApiEnvelope<any>>(`/laboratory/orders/${orderId}/verify`, confirmation);
     return mapOrder(response.data.data);

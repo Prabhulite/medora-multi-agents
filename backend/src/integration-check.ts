@@ -1223,6 +1223,11 @@ try {
   assert.equal((await request('POST', `/api/laboratory/orders/${laboratory.id}/release`)).status, 409);
   assert.equal((await request('POST', `/api/laboratory/orders/${laboratory.id}/addenda`, { reason: 'short', addendum: '' })).status, 422);
   const labAddendum = await ok('POST', `/api/laboratory/orders/${laboratory.id}/addenda`, { reason: 'Corrected interpretation', addendum: 'Interpret as within expected limits' }, 201);
+  assert.equal(labAddendum.approvedAt, null);
+  assert.equal((await ok('GET', '/api/laboratory/communication-queue')).total, 0);
+  assert.equal((await ok('GET', `/api/laboratory/orders/${laboratory.id}/addenda`))[0].approvedAt, null);
+  assert.equal((await request('POST', `/api/laboratory/addenda/${labAddendum.id}/approve`)).status, 200);
+  assert.equal((await request('POST', `/api/laboratory/addenda/${labAddendum.id}/approve`)).status, 409);
   const amendedQueue = await ok('GET', '/api/laboratory/communication-queue');
   assert.equal(amendedQueue.total, 1);
   assert.equal(amendedQueue.items[0].id, laboratory.id);
@@ -1234,9 +1239,10 @@ try {
   assert.equal((await ok('GET', '/api/laboratory/communication-queue')).total, 0);
   assert.ok(correctionAttempt.id > laboratoryDelivery.id);
   const laboratoryAuditActions = (await ok('GET', '/api/patients/1/audit-logs')).map((row: { action: string }) => row.action);
-  for (const action of ['laboratory_draft_saved', 'laboratory_result_verified', 'laboratory_result_released', 'laboratory_result_amended']) assert.ok(laboratoryAuditActions.includes(action), `Missing patient audit: ${action}`);
+  for (const action of ['laboratory_draft_saved', 'laboratory_result_verified', 'laboratory_result_released', 'laboratory_result_amended', 'laboratory_result_amendment_approved']) assert.ok(laboratoryAuditActions.includes(action), `Missing patient audit: ${action}`);
   assert.equal(labAddendum.reason, 'Corrected interpretation');
   assert.equal((await ok('GET', `/api/laboratory/orders/${laboratory.id}/addenda`))[0].addendum, 'Interpret as within expected limits');
+  assert.ok((await ok('GET', `/api/laboratory/orders/${laboratory.id}/addenda`))[0].approvedAt);
   assert.equal((await ok('GET', '/api/laboratory/orders?patientId=1')).find((row: { id: number }) => row.id === laboratory.id).resultValue, 'Normal');
   token = (await ok('POST', '/api/auth/login', { username: 'integration_doctor', password: 'Temporary!Pass123' })).token;
   const doctorNotifications = await ok('GET', '/api/notifications');
@@ -1245,6 +1251,7 @@ try {
   token = (await ok('POST', '/api/auth/login', { username: 'integration_clinician', password: 'Temporary!Pass123' })).token;
   assert.equal((await ok('GET', '/api/laboratory/orders?patientId=1')).find((row: { id: number }) => row.id === laboratory.id).resultValue, 'Normal');
   assert.equal((await request('POST', `/api/laboratory/orders/${laboratory.id}/addenda`, { reason: 'Unauthorized edit', addendum: 'No' })).status, 403);
+  assert.equal((await request('POST', `/api/laboratory/addenda/${labAddendum.id}/approve`)).status, 403);
   assert.equal((await ok('GET', `/api/laboratory/orders/${laboratory.id}/addenda`)).length, 1);
   token = adminToken;
   await dataSource.query("INSERT INTO appointments (appointment_number,patient_id,doctor_id,department_id,appointment_date,appointment_time,appointment_type,status) VALUES ('IT-APT-1',1,1,1,'2027-02-01','09:00:00','new_consultation','cancelled')");
