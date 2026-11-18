@@ -91,6 +91,7 @@ export function PatientDashboardPage() {
 
   const canUpdate = hasPermission(user, 'patients.update');
   const canExport = hasPermission(user, 'patients.export');
+  const canPrintClinicalSummary = hasPermission(user, 'clinical.view');
 
   const downloadFhir = async () => {
     if (!patientId) return;
@@ -98,6 +99,11 @@ export function PatientDashboardPage() {
     try { await patientsApi.downloadFhirR4(patientId); }
     catch (err) { setExportError(getErrorMessage(err, 'Unable to export patient resource')); }
     finally { setExporting(false); }
+  };
+
+  const printClinicalSummary = () => {
+    setActiveTab('Dashboard');
+    window.setTimeout(() => window.print(), 150);
   };
 
   useEffect(() => {
@@ -171,6 +177,7 @@ export function PatientDashboardPage() {
           <p>Patient master overview for clinical and front-office reference.</p>
         </div>
         <div className="pd-topbar__actions">
+          {canPrintClinicalSummary ? <Button variant="secondary" size="sm" onClick={printClinicalSummary}>Print clinical summary</Button> : null}
           {canExport ? <Button variant="secondary" size="sm" loading={exporting} onClick={() => void downloadFhir()}>Export FHIR R4</Button> : null}
           {canUpdate ? (
             <Button size="sm" onClick={() => navigate(`/patients/${patient.id}/edit`)}>
