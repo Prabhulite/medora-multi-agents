@@ -8,9 +8,12 @@ export interface LaboratoryTest {
   specimen?: string | null;
   turnaroundHours?: number | null;
   price?: number | null;
+  priority?: 'routine' | 'urgent' | 'stat';
   isActive?: boolean;
 }
 export interface CreateLaboratoryTestPayload { testCode: string; testName: string; category: string | null; priority: 'routine' | 'urgent' | 'stat'; turnaroundHours: number; price: number; }
+export type UpdateLaboratoryTestPayload = Omit<CreateLaboratoryTestPayload, 'testCode'>;
+export interface LaboratoryTestRevision { id: number; testId: number; beforeData: Record<string, unknown>; afterData: Record<string, unknown>; changedById: number; changedByName: string; createdAt: string; }
 
 export type LaboratoryOrderStatus = 'ordered' | 'collected' | 'processing' | 'verified' | 'completed' | 'cancelled';
 export interface LaboratoryWorklist { items: LaboratoryOrder[]; total: number; page: number; pageSize: number; summary: { total: number; pending: number; processing: number; completed: number }; }
@@ -104,6 +107,7 @@ function mapTest(row: any): LaboratoryTest {
     specimen: row.specimen || row.sampleType || row.sample_type || null,
     turnaroundHours: row.turnaroundHours == null ? (row.turnaround_hours == null ? null : Number(row.turnaround_hours)) : Number(row.turnaroundHours),
     price: row.price == null ? null : Number(row.price),
+    priority: row.priority || 'routine',
     isActive: row.isActive ?? row.is_active ?? true,
   };
 }
@@ -172,6 +176,14 @@ export const laboratoryApi = {
   async createTest(payload: CreateLaboratoryTestPayload): Promise<LaboratoryTest> {
     const response = await api.post<ApiEnvelope<any>>('/laboratory/tests', payload);
     return mapTest(response.data.data);
+  },
+  async updateTest(id: number, payload: UpdateLaboratoryTestPayload): Promise<LaboratoryTest> {
+    const response = await api.patch<ApiEnvelope<any>>(`/laboratory/tests/${id}`, payload);
+    return mapTest(response.data.data);
+  },
+  async listTestRevisions(id: number): Promise<LaboratoryTestRevision[]> {
+    const response = await api.get<ApiEnvelope<LaboratoryTestRevision[]>>(`/laboratory/tests/${id}/revisions`);
+    return response.data.data;
   },
   async retireTest(id: number): Promise<void> { await api.post(`/laboratory/tests/${id}/retire`); },
   async cancelOrder(orderId: number, reason: string): Promise<LaboratoryOrder> {

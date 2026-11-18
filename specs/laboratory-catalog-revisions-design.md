@@ -74,7 +74,7 @@ if (Object.keys(changes).length === 0) throw new ConflictError('No catalog field
 
 ## Implementation Tasks
 
-- [ ] Add revision entity and migration.
-- [ ] Add guarded update and history backend endpoints with integration tests.
-- [ ] Add catalog edit/history UI and typed API contracts.
-- [ ] Update roadmap, build, migrate, seed, smoke-test, and commit.
+- [x] Add revision entity and migration.
+- [x] Add guarded update and history backend endpoints with integration tests.
+- [x] Add catalog edit/history UI and typed API contracts.
+- [x] Update roadmap, build, migrate, seed, smoke-test, and commit.

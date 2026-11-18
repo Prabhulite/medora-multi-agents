@@ -6,6 +6,7 @@ export const laboratoryCommunicationQueueSchema = z.object({ page: z.coerce.numb
 export const laboratoryPatientLookupSchema = z.object({ search: z.string().trim().min(2).max(80) });
 export const laboratoryDoctorLookupSchema = z.object({ search: z.string().trim().min(2).max(80) });
 export const createLaboratoryTestSchema = z.object({ testCode: z.string().trim().min(2).max(40).regex(/^[A-Za-z0-9_-]+$/), testName: z.string().trim().min(2).max(180), category: z.string().trim().max(80).nullable().optional(), priority: z.enum(['routine', 'urgent', 'stat']).default('routine'), turnaroundHours: z.number().int().min(1).max(8760), price: z.number().min(0).max(9999999999.99) });
+export const updateLaboratoryTestSchema = z.object({ testName: z.string().trim().min(2).max(180).optional(), category: z.string().trim().max(80).nullable().optional(), priority: z.enum(['routine', 'urgent', 'stat']).optional(), turnaroundHours: z.number().int().min(1).max(8760).optional(), price: z.number().min(0).max(9999999999.99).optional() }).strict().refine((value) => Object.keys(value).length > 0, { message: 'Provide at least one catalog field to revise' });
 export const laboratoryTestIdParamSchema = z.object({ id: z.coerce.number().int().positive() });
 export const createLaboratoryOrderSchema = z.object({ patientId: positiveInt, testId: positiveInt, doctorId: positiveInt.nullable().optional(), priority: z.enum(['routine', 'urgent', 'stat']).default('routine'), clinicalNotes: z.string().trim().max(5000).nullable().optional() });
 export const collectLaboratorySampleSchema = z.object({ specimenLabel: z.string().trim().min(2).max(80) });
@@ -24,6 +25,7 @@ export type UpdateLaboratoryResultInput = z.infer<typeof updateLaboratoryResultS
 export type CollectLaboratorySampleInput = z.infer<typeof collectLaboratorySampleSchema>;
 export type CreateLaboratoryAddendumInput = z.infer<typeof createLaboratoryAddendumSchema>;
 export type CreateLaboratoryTestInput = z.infer<typeof createLaboratoryTestSchema>;
+export type UpdateLaboratoryTestInput = z.infer<typeof updateLaboratoryTestSchema>;
 export type CreateLaboratoryCommunicationInput = z.infer<typeof createLaboratoryCommunicationSchema>;
 export type LaboratoryWorklistInput = z.infer<typeof laboratoryWorklistSchema>;
 export type LaboratoryCommunicationQueueInput = z.infer<typeof laboratoryCommunicationQueueSchema>;

@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
 import { AppDataSource } from '../../../config/data-source.js';
 import { Brackets } from 'typeorm';
-import { Doctor, LaboratoryCommunication, LaboratoryOrder, LaboratoryReportArchive, LaboratoryResultAddendum, LaboratoryTest, Patient, PatientAuditLog, User, UserNotification } from '../../../database/entities/index.js';
+import { Doctor, LaboratoryCommunication, LaboratoryOrder, LaboratoryReportArchive, LaboratoryResultAddendum, LaboratoryTest, LaboratoryTestRevision, Patient, PatientAuditLog, User, UserNotification } from '../../../database/entities/index.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { nextSequenceNumber } from '../../patients/services/number-sequence.service.js';
-import type { CollectLaboratorySampleInput, CreateLaboratoryAddendumInput, CreateLaboratoryCommunicationInput, CreateLaboratoryOrderInput, CreateLaboratoryTestInput, LaboratoryCommunicationQueueInput, LaboratoryWorklistInput, UpdateLaboratoryResultInput, VerifyLaboratoryResultInput } from '../validators/laboratory.validators.js';
+import type { CollectLaboratorySampleInput, CreateLaboratoryAddendumInput, CreateLaboratoryCommunicationInput, CreateLaboratoryOrderInput, CreateLaboratoryTestInput, LaboratoryCommunicationQueueInput, LaboratoryWorklistInput, UpdateLaboratoryResultInput, UpdateLaboratoryTestInput, VerifyLaboratoryResultInput } from '../validators/laboratory.validators.js';
 
 const orderRelations = { patient: true, test: true, doctor: true, collectedBy: true } as const;
 function orderResponse(order: LaboratoryOrder, canViewDraft = true) {
@@ -82,6 +82,39 @@ export const laboratoryService = {
     if (await repo.exist({ where: { testCode: input.testCode } })) throw new ConflictError('Laboratory test code already exists');
     try { return await repo.save(repo.create({ testCode: input.testCode, testName: input.testName, category: input.category ?? null, priority: input.priority, turnaroundHours: input.turnaroundHours, price: input.price.toFixed(2), isActive: true })); }
     catch (error) { if (error && typeof error === 'object' && 'driverError' in error && (error.driverError as { code?: string })?.code === 'ER_DUP_ENTRY') throw new ConflictError('Laboratory test code already exists'); throw error; }
+  },
+  async updateTest(id: number, input: UpdateLaboratoryTestInput, userId: number) {
+    return AppDataSource.transaction(async (manager) => {
+      const tests = manager.getRepository(LaboratoryTest);
+      const test = await tests.createQueryBuilder('test').setLock('pessimistic_write').where('test.id = :id', { id }).getOne();
+      if (!test) throw new NotFoundError('Laboratory test not found');
+      const beforeData: Record<string, unknown> = {};
+      const afterData: Record<string, unknown> = {};
+      const revise = <K extends keyof UpdateLaboratoryTestInput>(field: K, current: unknown, next: UpdateLaboratoryTestInput[K]) => {
+        if (next === undefined || String(current) === String(next)) return;
+        beforeData[field] = field === 'price' ? Number(current) : current;
+        afterData[field] = next;
+      };
+      revise('testName', test.testName, input.testName);
+      revise('category', test.category, input.category);
+      revise('priority', test.priority, input.priority);
+      revise('turnaroundHours', test.turnaroundHours, input.turnaroundHours);
+      revise('price', test.price, input.price);
+      if (Object.keys(afterData).length === 0) throw new ConflictError('The submitted catalog values do not change this test');
+      if (input.testName !== undefined) test.testName = input.testName;
+      if (input.category !== undefined) test.category = input.category;
+      if (input.priority !== undefined) test.priority = input.priority;
+      if (input.turnaroundHours !== undefined) test.turnaroundHours = input.turnaroundHours;
+      if (input.price !== undefined) test.price = input.price.toFixed(2);
+      const saved = await tests.save(test);
+      await manager.getRepository(LaboratoryTestRevision).save({ testId: id, beforeData, afterData, changedById: userId });
+      return saved;
+    });
+  },
+  async listTestRevisions(id: number) {
+    if (!await AppDataSource.getRepository(LaboratoryTest).exist({ where: { id } })) throw new NotFoundError('Laboratory test not found');
+    const revisions = await AppDataSource.getRepository(LaboratoryTestRevision).find({ where: { testId: id }, relations: { changedBy: true }, order: { createdAt: 'DESC', id: 'DESC' } });
+    return revisions.map(({ id: revisionId, testId, beforeData, afterData, changedById, changedBy, createdAt }) => ({ id: revisionId, testId, beforeData, afterData, changedById, changedByName: changedBy.fullName, createdAt }));
   },
   async retireTest(id: number) {
     return AppDataSource.transaction(async (manager) => {

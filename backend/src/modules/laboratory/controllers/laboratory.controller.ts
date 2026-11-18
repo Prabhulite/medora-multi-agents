@@ -7,6 +7,8 @@ export const laboratoryController = {
   listTests: async (_req: Request, res: Response) => res.json({ success: true, data: await laboratoryService.listTests() }),
   listAllTests: async (_req: Request, res: Response) => res.json({ success: true, data: await laboratoryService.listAllTests() }),
   createTest: async (req: Request, res: Response) => res.status(201).json({ success: true, data: await laboratoryService.createTest(req.body) }),
+  updateTest: async (req: Request, res: Response) => res.json({ success: true, data: await laboratoryService.updateTest(Number(req.params.id), req.body, req.user!.id) }),
+  listTestRevisions: async (req: Request, res: Response) => res.json({ success: true, data: await laboratoryService.listTestRevisions(Number(req.params.id)) }),
   retireTest: async (req: Request, res: Response) => res.json({ success: true, data: await laboratoryService.retireTest(Number(req.params.id)) }),
   reactivateTest: async (req: Request, res: Response) => res.json({ success: true, data: await laboratoryService.reactivateTest(Number(req.params.id)) }),
   listOrders: async (req: Request, res: Response) => res.json({ success: true, data: await laboratoryService.listOrders(req.query as { patientId?: number; status?: any }, Boolean(req.user?.isSuperAdmin || req.user?.permissions.some((permission) => ['laboratory.update', 'laboratory.verify', 'laboratory.release'].includes(permission)))) }),

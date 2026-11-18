@@ -24,6 +24,7 @@ export { Supplier } from './Supplier.js';
 export { PurchaseOrder } from './PurchaseOrder.js';
 export { PurchaseOrderItem } from './PurchaseOrderItem.js';
 export { LaboratoryTest } from './LaboratoryTest.js';
+export { LaboratoryTestRevision } from './LaboratoryTestRevision.js';
 export { LaboratoryOrder } from './LaboratoryOrder.js';
 export { RadiologyModality } from './RadiologyModality.js';
 export { RadiologyOrder } from './RadiologyOrder.js';

@@ -10,10 +10,10 @@ import { Table, type TableColumn } from '../../components/ui/Table';
 import { getErrorMessage } from '../../lib/api';
 import { hasPermission } from '../../lib/permissions';
 import { useAuth } from '../auth/AuthContext';
-import { laboratoryApi, type CreateLaboratoryOrderPayload, type CreateLaboratoryTestPayload, type LaboratoryAddendum, type LaboratoryCommunication, type LaboratoryCommunicationQueueItem, type LaboratoryDoctorCandidate, type LaboratoryOrder, type LaboratoryOrderStatus, type LaboratoryPatientCandidate, type LaboratoryReportArchive, type LaboratoryTest, type UpdateLaboratoryResultPayload } from './laboratory.api';
+import { laboratoryApi, type CreateLaboratoryOrderPayload, type CreateLaboratoryTestPayload, type LaboratoryAddendum, type LaboratoryCommunication, type LaboratoryCommunicationQueueItem, type LaboratoryDoctorCandidate, type LaboratoryOrder, type LaboratoryOrderStatus, type LaboratoryPatientCandidate, type LaboratoryReportArchive, type LaboratoryTest, type LaboratoryTestRevision, type UpdateLaboratoryResultPayload, type UpdateLaboratoryTestPayload } from './laboratory.api';
 import './LaboratoryDiagnosticsPage.css';
 
-type Modal = 'order' | 'catalog' | 'collect' | 'result' | 'verify' | 'view' | 'communications' | null;
+type Modal = 'order' | 'catalog' | 'catalog-edit' | 'catalog-history' | 'collect' | 'result' | 'verify' | 'view' | 'communications' | null;
 
 const statusTone: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'neutral'> = {
   ordered: 'info', collected: 'warning', processing: 'warning', verified: 'info', completed: 'success', cancelled: 'danger',
@@ -73,6 +73,8 @@ export function LaboratoryDiagnosticsPage() {
   const [cancelTarget, setCancelTarget] = useState<LaboratoryOrder | null>(null);
   const [cancelReason, setCancelReason] = useState('');
   const [retireTarget, setRetireTarget] = useState<LaboratoryTest | null>(null);
+  const [catalogTarget, setCatalogTarget] = useState<LaboratoryTest | null>(null);
+  const [catalogRevisions, setCatalogRevisions] = useState<LaboratoryTestRevision[]>([]);
 
   const load = async () => {
     const currentRequest = ++requestId.current;
@@ -155,6 +157,22 @@ export function LaboratoryDiagnosticsPage() {
     catch (err) { setRetireTarget(null); setError(getErrorMessage(err, 'Unable to retire laboratory test')); }
     finally { setSaving(false); }
   };
+  const reviseTest = async (payload: UpdateLaboratoryTestPayload) => {
+    if (!catalogTarget) return;
+    setSaving(true); setError('');
+    try {
+      const updated = await laboratoryApi.updateTest(catalogTarget.id, payload);
+      const replace = (current: LaboratoryTest[]) => current.map((row) => row.id === updated.id ? updated : row).sort((a, b) => a.name.localeCompare(b.name));
+      setTests(replace); setCatalogTests(replace); setCatalogTarget(null); setModal('catalog'); setNotice('Laboratory test revision recorded.');
+    } catch (err) { setError(getErrorMessage(err, 'Unable to revise laboratory test')); }
+    finally { setSaving(false); }
+  };
+  const openCatalogHistory = async (test: LaboratoryTest) => {
+    setSaving(true); setError('');
+    try { setCatalogRevisions(await laboratoryApi.listTestRevisions(test.id)); setCatalogTarget(test); setModal('catalog-history'); }
+    catch (err) { setError(getErrorMessage(err, 'Unable to load laboratory test history')); }
+    finally { setSaving(false); }
+  };
   const openCatalog = async () => {
     setError('');
     try { setCatalogTests(await laboratoryApi.listAllTests()); setModal('catalog'); }
@@ -227,7 +245,9 @@ export function LaboratoryDiagnosticsPage() {
       <Table columns={columns} rows={orders} rowKey={(row) => row.id} loading={loading} searchPlaceholder="Search order, patient, or test (2+ characters)" emptyMessage="No matching laboratory orders found." serverPagination={{ page, pageSize, total: worklistTotal, search, onPageChange: setPage, onPageSizeChange: (size) => { setPageSize(size); setPage(1); }, onSearchChange: (value) => { setSearch(value); setPage(1); } }} />
     </section>
     {modal === 'order' ? <OrderForm tests={tests} saving={saving} error={error} onClose={() => setModal(null)} onSubmit={(payload) => void saveOrder(payload)} /> : null}
-    {modal === 'catalog' && <CatalogForm tests={catalogTests} saving={saving} error={error} onClose={() => setModal(null)} onSubmit={(payload) => void saveTest(payload)} onRetire={(test) => setRetireTarget(test)} onReactivate={(test) => void reactivateTest(test)} />}
+    {modal === 'catalog' && <CatalogForm tests={catalogTests} saving={saving} error={error} onClose={() => setModal(null)} onSubmit={(payload) => void saveTest(payload)} onRetire={(test) => setRetireTarget(test)} onReactivate={(test) => void reactivateTest(test)} onRevise={(test) => { setCatalogTarget(test); setError(''); setModal('catalog-edit'); }} onHistory={(test) => void openCatalogHistory(test)} />}
+    {modal === 'catalog-edit' && catalogTarget && <CatalogRevisionForm test={catalogTarget} saving={saving} error={error} onClose={() => { setCatalogTarget(null); setModal('catalog'); }} onSubmit={(payload) => void reviseTest(payload)} />}
+    {modal === 'catalog-history' && catalogTarget && <CatalogHistory test={catalogTarget} revisions={catalogRevisions} error={error} onClose={() => { setCatalogTarget(null); setCatalogRevisions([]); setModal('catalog'); }} />}
     {modal === 'collect' && selectedOrder ? <CollectForm order={selectedOrder} saving={saving} onClose={() => { setModal(null); setSelectedOrder(null); }} onSubmit={(label) => void collectSample(label)} /> : null}
     {modal === 'result' && selectedOrder ? <ResultForm order={selectedOrder} saving={saving} error={error} onClose={() => { setModal(null); setSelectedOrder(null); }} onSubmit={(payload) => void saveResult(payload)} /> : null}
     {modal === 'verify' && selectedOrder ? <VerifyForm order={selectedOrder} saving={saving} error={error} onClose={() => { setModal(null); setSelectedOrder(null); }} onSubmit={(confirmation) => void verifyResult(confirmation)} /> : null}
@@ -243,10 +263,20 @@ function ModalShell({ title, eyebrow, onClose, children, className = '' }: { tit
   return <div className="laboratory-modal-backdrop" role="presentation" onClick={onClose}><section className={`laboratory-modal ${className}`} role="dialog" aria-modal="true" aria-labelledby="laboratory-modal-title" onClick={(event) => event.stopPropagation()}><div className="laboratory-modal__header"><div><span className="laboratory-eyebrow">{eyebrow}</span><h2 id="laboratory-modal-title">{title}</h2></div><button type="button" onClick={onClose} aria-label={`Close ${title}`}>×</button></div>{children}</section></div>;
 }
 
-function CatalogForm({ tests, saving, error, onClose, onSubmit, onRetire, onReactivate }: { tests: LaboratoryTest[]; saving: boolean; error: string; onClose: () => void; onSubmit: (payload: CreateLaboratoryTestPayload) => void; onRetire: (test: LaboratoryTest) => void; onReactivate: (test: LaboratoryTest) => void }) {
+function CatalogForm({ tests, saving, error, onClose, onSubmit, onRetire, onReactivate, onRevise, onHistory }: { tests: LaboratoryTest[]; saving: boolean; error: string; onClose: () => void; onSubmit: (payload: CreateLaboratoryTestPayload) => void; onRetire: (test: LaboratoryTest) => void; onReactivate: (test: LaboratoryTest) => void; onRevise: (test: LaboratoryTest) => void; onHistory: (test: LaboratoryTest) => void }) {
   const [form, setForm] = useState({ testCode: '', testName: '', category: '', priority: 'routine' as CreateLaboratoryTestPayload['priority'], turnaroundHours: '24', price: '0' });
   const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
-  return <ModalShell title="Laboratory test catalog" eyebrow="INVESTIGATIONS" onClose={onClose}><div className="laboratory-form"><h3>Active tests</h3><div className="laboratory-catalog-list">{tests.map((test) => <div key={test.id}><span>{test.name} · {test.code} · {test.isActive ? 'Active' : 'Retired'}</span>{test.isActive ? <Button size="sm" variant="secondary" onClick={() => onRetire(test)}>Retire</Button> : <Button size="sm" variant="secondary" onClick={() => onReactivate(test)}>Reactivate</Button>}</div>)}</div></div><form className="laboratory-form" onSubmit={(event) => { event.preventDefault(); onSubmit({ testCode: form.testCode.trim(), testName: form.testName.trim(), category: form.category.trim() || null, priority: form.priority, turnaroundHours: Number(form.turnaroundHours), price: Number(form.price) }); }}><h3>Add test</h3><div className="laboratory-form__grid"><Input label="Code" required minLength={2} maxLength={40} value={form.testCode} onChange={(event) => update('testCode', event.target.value)} /><Input label="Name" required minLength={2} maxLength={180} value={form.testName} onChange={(event) => update('testName', event.target.value)} /><Input label="Category" maxLength={80} value={form.category} onChange={(event) => update('category', event.target.value)} /><Select label="Default priority" value={form.priority} onChange={(event) => update('priority', event.target.value)} options={[{ value: 'routine', label: 'Routine' }, { value: 'urgent', label: 'Urgent' }, { value: 'stat', label: 'STAT' }]} /><Input label="Turnaround hours" type="number" min="1" required value={form.turnaroundHours} onChange={(event) => update('turnaroundHours', event.target.value)} /><Input label="Price" type="number" min="0" required value={form.price} onChange={(event) => update('price', event.target.value)} /></div>{error && <Alert tone="error">{error}</Alert>}<FormFooter saving={saving} onClose={onClose} submitLabel="Add test" /></form></ModalShell>;
+  return <ModalShell title="Laboratory test catalog" eyebrow="INVESTIGATIONS" onClose={onClose}><div className="laboratory-form"><h3>Tests</h3><div className="laboratory-catalog-list">{tests.map((test) => <div key={test.id}><span>{test.name} · {test.code} · {test.isActive ? 'Active' : 'Retired'}</span><div className="laboratory-actions"><Button size="sm" variant="secondary" onClick={() => onRevise(test)}>Revise</Button><Button size="sm" variant="secondary" onClick={() => onHistory(test)}>History</Button>{test.isActive ? <Button size="sm" variant="secondary" onClick={() => onRetire(test)}>Retire</Button> : <Button size="sm" variant="secondary" onClick={() => onReactivate(test)}>Reactivate</Button>}</div></div>)}</div></div><form className="laboratory-form" onSubmit={(event) => { event.preventDefault(); onSubmit({ testCode: form.testCode.trim(), testName: form.testName.trim(), category: form.category.trim() || null, priority: form.priority, turnaroundHours: Number(form.turnaroundHours), price: Number(form.price) }); }}><h3>Add test</h3><div className="laboratory-form__grid"><Input label="Code" required minLength={2} maxLength={40} value={form.testCode} onChange={(event) => update('testCode', event.target.value)} /><Input label="Name" required minLength={2} maxLength={180} value={form.testName} onChange={(event) => update('testName', event.target.value)} /><Input label="Category" maxLength={80} value={form.category} onChange={(event) => update('category', event.target.value)} /><Select label="Default priority" value={form.priority} onChange={(event) => update('priority', event.target.value)} options={[{ value: 'routine', label: 'Routine' }, { value: 'urgent', label: 'Urgent' }, { value: 'stat', label: 'STAT' }]} /><Input label="Turnaround hours" type="number" min="1" required value={form.turnaroundHours} onChange={(event) => update('turnaroundHours', event.target.value)} /><Input label="Price" type="number" min="0" required value={form.price} onChange={(event) => update('price', event.target.value)} /></div>{error && <Alert tone="error">{error}</Alert>}<FormFooter saving={saving} onClose={onClose} submitLabel="Add test" /></form></ModalShell>;
+}
+
+function CatalogRevisionForm({ test, saving, error, onClose, onSubmit }: { test: LaboratoryTest; saving: boolean; error: string; onClose: () => void; onSubmit: (payload: UpdateLaboratoryTestPayload) => void }) {
+  const [form, setForm] = useState({ testName: test.name, category: test.category || '', priority: (test.priority || 'routine') as UpdateLaboratoryTestPayload['priority'], turnaroundHours: String(test.turnaroundHours || 24), price: String(test.price ?? 0) });
+  const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
+  return <ModalShell title="Revise laboratory test" eyebrow={test.code} onClose={onClose}><form className="laboratory-form" onSubmit={(event) => { event.preventDefault(); onSubmit({ testName: form.testName.trim(), category: form.category.trim() || null, priority: form.priority, turnaroundHours: Number(form.turnaroundHours), price: Number(form.price) }); }}><Alert tone="info">Test code is permanent. This creates a field-level revision history and does not alter existing orders.</Alert><div className="laboratory-form__grid"><Input label="Name" required minLength={2} maxLength={180} value={form.testName} onChange={(event) => update('testName', event.target.value)} /><Input label="Category" maxLength={80} value={form.category} onChange={(event) => update('category', event.target.value)} /><Select label="Default priority" value={form.priority} onChange={(event) => update('priority', event.target.value)} options={[{ value: 'routine', label: 'Routine' }, { value: 'urgent', label: 'Urgent' }, { value: 'stat', label: 'STAT' }]} /><Input label="Turnaround hours" type="number" min="1" required value={form.turnaroundHours} onChange={(event) => update('turnaroundHours', event.target.value)} /><Input label="Price" type="number" min="0" required value={form.price} onChange={(event) => update('price', event.target.value)} /></div>{error && <Alert tone="error">{error}</Alert>}<FormFooter saving={saving} onClose={onClose} submitLabel="Record revision" /></form></ModalShell>;
+}
+
+function CatalogHistory({ test, revisions, error, onClose }: { test: LaboratoryTest; revisions: LaboratoryTestRevision[]; error: string; onClose: () => void }) {
+  return <ModalShell title="Catalog revision history" eyebrow={`${test.name} · ${test.code}`} onClose={onClose}><div className="laboratory-form"><p>Each entry shows only the fields changed in that revision.</p>{error && <Alert tone="error">{error}</Alert>}{revisions.length ? revisions.map((revision) => <section key={revision.id} className="laboratory-report__result"><strong>{dateLabel(revision.createdAt)} · {revision.changedByName || `staff #${revision.changedById}`}</strong>{Object.keys(revision.afterData).map((key) => <p key={key}><b>{key}</b>: {String(revision.beforeData[key] ?? 'Not set')} → {String(revision.afterData[key] ?? 'Not set')}</p>)}</section>) : <p>No catalog revisions recorded.</p>}<div className="laboratory-modal__footer"><Button type="button" onClick={onClose}>Close</Button></div></div></ModalShell>;
 }
 
 function OrderForm({ tests, saving, error, onClose, onSubmit }: { tests: LaboratoryTest[]; saving: boolean; error: string; onClose: () => void; onSubmit: (payload: CreateLaboratoryOrderPayload) => void }) {
