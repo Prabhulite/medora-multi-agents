@@ -41,3 +41,4 @@ Follow [DB-BACKUP-RESTORE.md](DB-BACKUP-RESTORE.md) for the detailed procedure. 
 ## Sign-off evidence
 
 Before release approval, record build, integration, browser-smoke, dependency-audit, migration/seed, readiness, backup, role-review, secret-rotation, and clinical-owner walkthrough outcomes. Only check items in [ADVANCED-HMS-COMPLETION-CHECKLIST.md](ADVANCED-HMS-COMPLETION-CHECKLIST.md) when their required evidence exists.
+See [dependency audit record](DEPENDENCY-AUDIT.md) for the current automated production dependency-audit baseline. This does not replace the independent security review release gate.
