@@ -101,7 +101,7 @@ try {
     await evaluate(`Array.from(document.querySelectorAll('.operations-panel')).find(panel => panel.querySelector('h2')?.textContent === 'Laboratory')?.querySelector('.operations-queue__link')?.click(); true`);
     let operationsLaboratoryDrillThroughReady = false;
     for (let attempt = 0; attempt < 100; attempt++) {
-      try { operationsLaboratoryDrillThroughReady = await evaluate(`location.pathname === '/laboratory' && new URLSearchParams(location.search).get('search') === ${JSON.stringify(operationsLaboratoryOrderNumber)} && document.querySelector('.laboratory-section .ui-table-search input')?.value === ${JSON.stringify(operationsLaboratoryOrderNumber)}`); } catch { /* navigation resets the execution context */ }
+      try { operationsLaboratoryDrillThroughReady = await evaluate(`location.pathname === '/laboratory' && new URLSearchParams(location.search).get('search') === ${JSON.stringify(operationsLaboratoryOrderNumber)} && Array.from(document.querySelectorAll('.laboratory-section .ui-table-search input')).some((input) => input.value === ${JSON.stringify(operationsLaboratoryOrderNumber)})`); } catch { /* navigation resets the execution context */ }
       if (operationsLaboratoryDrillThroughReady) break;
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
