@@ -6,6 +6,7 @@ import type {
   PatientAuditLog,
   RegistrationSource,
   RegistrationSourceEvent,
+  RegistrationSourceReport,
   UpsertPatientPayload,
 } from '../../types';
 
@@ -24,6 +25,10 @@ export const patientsApi = {
   },
   registrationSourceHistory: async (id: number) => {
     const { data } = await api.get<ApiResponse<RegistrationSourceEvent[]>>(`/patients/registration-sources/${id}/history`);
+    return data.data;
+  },
+  registrationSourceReport: async (from: string, to: string) => {
+    const { data } = await api.get<ApiResponse<RegistrationSourceReport>>('/patients/registration-source-report', { params: { from, to } });
     return data.data;
   },
   downloadFhirR4: async (patientId: number) => {

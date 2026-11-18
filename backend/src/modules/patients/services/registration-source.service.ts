@@ -17,6 +17,26 @@ export const registrationSourceService = {
     });
   },
 
+  async report(from: string, to: string) {
+    const [sources, counts] = await Promise.all([
+      this.list(),
+      AppDataSource.query(
+        'SELECT registration_source_id AS sourceId, COUNT(*) AS count FROM patients WHERE registration_at >= ? AND registration_at < DATE_ADD(?, INTERVAL 1 DAY) GROUP BY registration_source_id',
+        [from, to],
+      ) as Promise<Array<{ sourceId: number | null; count: number | string }>>,
+    ]);
+    const countBySource = new Map(counts.map((row) => [row.sourceId == null ? null : Number(row.sourceId), Number(row.count)]));
+    const rows = sources.map((source) => ({ sourceId: source.id, code: source.code, name: source.name, isActive: source.isActive, count: countBySource.get(source.id) ?? 0 }));
+    const unassigned = countBySource.get(null) ?? 0;
+    rows.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+    return {
+      from, to,
+      total: counts.reduce((sum, row) => sum + Number(row.count), 0),
+      unassigned,
+      rows: [...rows, { sourceId: null, code: null, name: 'Unassigned', isActive: false, count: unassigned }],
+    };
+  },
+
   async history(id: number) {
     const source = await AppDataSource.getRepository(RegistrationSource).findOne({ where: { id } });
     if (!source) throw new NotFoundError('Registration source not found');

@@ -169,6 +169,13 @@ export const updatePatientSchema = patientBaseObjectSchema.partial().extend({
 });
 
 export const registrationSourceIdParamSchema = z.object({ sourceId: z.coerce.number().int().positive() });
+export const registrationSourceReportQuerySchema = z.object({
+  from: z.string().date(),
+  to: z.string().date(),
+}).superRefine((value, ctx) => {
+  const days = (Date.parse(`${value.to}T00:00:00Z`) - Date.parse(`${value.from}T00:00:00Z`)) / 86_400_000;
+  if (days < 0 || days > 365) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['to'], message: 'Choose a range of up to 366 days with To on or after From' });
+});
 export const createRegistrationSourceSchema = z.object({
   code: z.string().trim().regex(/^[a-z][a-z0-9_]{1,79}$/, 'Use lowercase letters, numbers, and underscores'),
   name: z.string().trim().min(2).max(120),

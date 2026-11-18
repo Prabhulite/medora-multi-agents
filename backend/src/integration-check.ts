@@ -1379,6 +1379,20 @@ try {
     address: { addressLine1: 'Integration address', country: 'India', state: 'Tamil Nadu', district: 'Chennai', city: 'Chennai', pincode: '600001' },
   }, 201);
   assert.equal(newSourcedPatient.registrationSourceName, 'Integration walk-in');
+  const [registrationDay] = await dataSource.query("SELECT DATE_FORMAT(registration_at, '%Y-%m-%d') AS day FROM patients WHERE id = ?", [newSourcedPatient.id]);
+  const reportPath = `/api/patients/registration-source-report?from=${registrationDay.day}&to=${registrationDay.day}`;
+  assert.equal((await request('GET', '/api/patients/registration-source-report?from=2026-13-01&to=2026-13-01')).status, 422);
+  assert.equal((await request('GET', '/api/patients/registration-source-report?from=2026-12-02&to=2026-12-01')).status, 422);
+  assert.equal((await request('GET', '/api/patients/registration-source-report?from=2025-01-01&to=2026-01-02')).status, 422);
+  const sourceReport = await ok('GET', reportPath);
+  const [expectedReportTotal] = await dataSource.query('SELECT COUNT(*) AS count FROM patients WHERE registration_at >= ? AND registration_at < DATE_ADD(?, INTERVAL 1 DAY)', [registrationDay.day, registrationDay.day]);
+  assert.equal(sourceReport.total, Number(expectedReportTotal.count));
+  assert.equal(sourceReport.rows.reduce((sum: number, row: { count: number }) => sum + row.count, 0), sourceReport.total);
+  assert.equal(sourceReport.rows.find((row: { sourceId: number | null }) => row.sourceId === newSourcedPatient.registrationSourceId).count, 1);
+  assert.equal(sourceReport.rows.find((row: { sourceId: number | null }) => row.sourceId === null).count, sourceReport.unassigned);
+  token = driverToken;
+  assert.equal((await request('GET', reportPath)).status, 403);
+  token = adminToken;
   const systemAudit = await ok('GET', '/api/audit-logs?limit=20&page=1');
   const actorEntry = systemAudit.rows.find((row: { user?: { id: number } | null }) => row.user);
   assert.ok(actorEntry, 'Expected an audit event attributed to a staff user');

@@ -8,6 +8,9 @@ export const patientController = {
   async registrationSources(_req: Request, res: Response) {
     return sendSuccess(res, await registrationSourceService.list(), 'Registration sources fetched');
   },
+  async registrationSourceReport(req: Request, res: Response) {
+    return sendSuccess(res, await registrationSourceService.report(String(req.query.from), String(req.query.to)), 'Registration source report fetched');
+  },
   async createRegistrationSource(req: Request, res: Response) {
     return sendCreated(res, await registrationSourceService.create(req.body, req.user?.id ?? null), 'Registration source created');
   },

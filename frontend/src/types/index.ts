@@ -681,6 +681,14 @@ export interface RegistrationSourceEvent {
   createdAt: string;
 }
 
+export interface RegistrationSourceReport {
+  from: string;
+  to: string;
+  total: number;
+  unassigned: number;
+  rows: Array<{ sourceId: number | null; code: string | null; name: string; isActive: boolean; count: number }>;
+}
+
 export interface AppointmentSlot {
   time: string;
   available: boolean;

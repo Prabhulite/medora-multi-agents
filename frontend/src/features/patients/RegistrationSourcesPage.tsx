@@ -7,9 +7,15 @@ import { Modal } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Table, type TableColumn } from '../../components/ui/Table';
 import { getErrorMessage } from '../../lib/api';
-import type { RegistrationSource, RegistrationSourceEvent } from '../../types';
+import type { RegistrationSource, RegistrationSourceEvent, RegistrationSourceReport } from '../../types';
 import { patientsApi } from './patients.api';
 import './RegistrationSourcesPage.css';
+
+function localDate(daysAgo = 0) {
+  const date = new Date();
+  date.setDate(date.getDate() - daysAgo);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
 
 export function RegistrationSourcesPage() {
   const navigate = useNavigate();
@@ -25,6 +31,11 @@ export function RegistrationSourcesPage() {
   const [historyRows, setHistoryRows] = useState<RegistrationSourceEvent[]>([]);
   const [historyError, setHistoryError] = useState('');
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [reportFrom, setReportFrom] = useState(localDate(29));
+  const [reportTo, setReportTo] = useState(localDate());
+  const [report, setReport] = useState<RegistrationSourceReport | null>(null);
+  const [reportError, setReportError] = useState('');
+  const [reportLoading, setReportLoading] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -69,6 +80,16 @@ export function RegistrationSourcesPage() {
     finally { setHistoryLoading(false); }
   };
 
+  const loadReport = async (event: FormEvent) => {
+    event.preventDefault(); setReportError(''); setReport(null);
+    const days = (Date.parse(`${reportTo}T00:00:00Z`) - Date.parse(`${reportFrom}T00:00:00Z`)) / 86_400_000;
+    if (!reportFrom || !reportTo || days < 0 || days > 365) { setReportError('Choose a date range of up to 366 days.'); return; }
+    setReportLoading(true);
+    try { setReport(await patientsApi.registrationSourceReport(reportFrom, reportTo)); }
+    catch (err) { setReportError(getErrorMessage(err, 'Unable to load source report')); }
+    finally { setReportLoading(false); }
+  };
+
   const columns: TableColumn<RegistrationSource>[] = [
     { key: 'code', header: 'Code', render: (row) => <strong>{row.code}</strong> },
     { key: 'name', header: 'Display name', render: (row) => editingId === row.id ? <Input label="Display name" value={editName} maxLength={120} onChange={(event) => setEditName(event.target.value)} /> : row.name },
@@ -89,6 +110,22 @@ export function RegistrationSourcesPage() {
     </form>
     <p className="registration-sources-note">Codes stay fixed. Retiring a source removes it from new registrations while keeping its name on existing patient charts.</p>
     <Table columns={columns} rows={rows} rowKey={(row) => row.id} loading={loading} onRefresh={() => void load()} searchText={(row) => `${row.code} ${row.name}`} emptyMessage="No registration sources yet." />
+    <section className="registration-sources-report" aria-label="Registration source report">
+      <h2>Source report</h2>
+      <p>Patient records by registration date and their current source assignment. Inactive and merged records are included; later source edits can change historical totals.</p>
+      <form className="registration-sources-report__filters" onSubmit={(event) => void loadReport(event)}>
+        <Input label="From" type="date" value={reportFrom} onChange={(event) => setReportFrom(event.target.value)} required />
+        <Input label="To" type="date" value={reportTo} onChange={(event) => setReportTo(event.target.value)} required />
+        <Button size="sm" type="submit" loading={reportLoading}>Run report</Button>
+      </form>
+      {reportError ? <Alert tone="error">{reportError}</Alert> : null}
+      {report ? <div>
+        <strong>{report.total.toLocaleString()} registered patients</strong>
+        <table className="registration-sources-report__table"><thead><tr><th>Source</th><th>Status</th><th>Patients</th><th>Share</th></tr></thead><tbody>
+          {report.rows.map((row) => <tr key={row.sourceId ?? 'unassigned'}><td>{row.name}</td><td>{row.sourceId === null ? '—' : row.isActive ? 'Active' : 'Retired'}</td><td>{row.count.toLocaleString()}</td><td>{report.total ? `${(row.count / report.total * 100).toFixed(1)}%` : '0.0%'}</td></tr>)}
+        </tbody></table>
+      </div> : null}
+    </section>
     <Modal open={Boolean(historySource)} title={`History: ${historySource?.name || ''}`} onClose={() => setHistorySource(null)}>
       {historyLoading ? <p>Loading history...</p> : historyError ? <Alert tone="error">{historyError}</Alert> : historyRows.length ? <ol className="registration-sources-history">
         {historyRows.map((event) => <li key={event.id}>
