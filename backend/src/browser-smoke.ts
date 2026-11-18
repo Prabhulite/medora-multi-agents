@@ -66,6 +66,19 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   assert.ok(sessionRestored, 'Frontend did not restore the authenticated session after login');
+  await evaluate('history.pushState({}, "", "/"); window.dispatchEvent(new PopStateEvent("popstate")); true');
+  let dashboardReady = false;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    dashboardReady = await evaluate('Boolean(document.querySelector(".dashboard-home__links"))');
+    if (dashboardReady) break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.ok(dashboardReady, 'Role based dashboard did not render');
+  assert.equal(await evaluate('document.querySelectorAll(".dashboard-home__link").length > 0'), true, 'No permitted dashboard workspaces rendered');
+  assert.equal(await evaluate('Boolean(document.querySelector(".dashboard-overview"))'), false, 'Placeholder dashboard panel rendered');
+  await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  assert.equal(await evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1'), true, 'Dashboard overflows the mobile viewport');
+  await send('Emulation.clearDeviceMetricsOverride');
   await evaluate('history.pushState({}, "", "/laboratory"); window.dispatchEvent(new PopStateEvent("popstate")); true');
   let loaded = false;
   for (let attempt = 0; attempt < 100; attempt++) {

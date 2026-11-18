@@ -16,6 +16,8 @@ This checklist tracks verified delivery work for Medora. A box is checked only a
 - [x] Permission based dashboard with real workflow entry points
 - [x] Shared color, heading, spacing, and keyboard focus rules
 - [x] Small screen shell spacing
+- [x] Headless browser check of dashboard links and mobile viewport width
+- [x] Browser smoke checks for major clinical, front office, pharmacy, and billing screens
 - [ ] Visual review of every role and major workflow in a running browser
 - [ ] Hospital staff usability review and follow-up refinements
 
