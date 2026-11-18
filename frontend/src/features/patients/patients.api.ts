@@ -8,6 +8,10 @@ import type {
 } from '../../types';
 
 export const patientsApi = {
+  registrationSources: async () => {
+    const { data } = await api.get<ApiResponse<Array<{ id: number; code: string; name: string; isActive: boolean }>>>('/patients/registration-sources');
+    return data.data;
+  },
   downloadFhirR4: async (patientId: number) => {
     let response;
     try {

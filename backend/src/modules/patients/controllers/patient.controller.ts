@@ -4,6 +4,9 @@ import { patientService } from '../services/patient.service.js';
 import { communicationService } from '../services/communication.service.js';
 
 export const patientController = {
+  async registrationSources(_req: Request, res: Response) {
+    return sendSuccess(res, await patientService.registrationSources(), 'Registration sources fetched');
+  },
   async followUps(req: Request, res: Response) {
     return sendSuccess(res, await communicationService.followUps(req.query.status === 'overdue' ? 'overdue' : 'open'), 'Patient follow-ups fetched');
   },

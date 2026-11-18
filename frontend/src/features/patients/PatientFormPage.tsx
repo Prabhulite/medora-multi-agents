@@ -115,6 +115,8 @@ export function PatientFormPage() {
   const [occupation, setOccupation] = useState('');
   const [patientCategory, setPatientCategory] = useState<PatientCategory | ''>('general');
   const [referredBy, setReferredBy] = useState('');
+  const [registrationSourceId, setRegistrationSourceId] = useState<number | ''>('');
+  const [registrationSources, setRegistrationSources] = useState<Array<{ id: number; name: string; isActive: boolean }>>([]);
   const [referralDoctorId, setReferralDoctorId] = useState<number | ''>('');
   const [preferredLanguage, setPreferredLanguage] = useState('Tamil');
   const [specialRemarks, setSpecialRemarks] = useState('');
@@ -149,7 +151,8 @@ export function PatientFormPage() {
       setLoading(true);
       setError('');
       try {
-        const doctors = await doctorsApi.list();
+        const [doctors, sources] = await Promise.all([doctorsApi.list(), patientsApi.registrationSources()]);
+        setRegistrationSources(sources);
         setDoctorOptions([
           { label: 'Select referral doctor', value: '' },
           ...doctors
@@ -210,6 +213,7 @@ export function PatientFormPage() {
           setOccupation(patient.occupation || '');
           setPatientCategory(patient.patientCategory || 'general');
           setReferredBy(patient.referredBy || '');
+          setRegistrationSourceId(patient.registrationSourceId || '');
           setReferralDoctorId(patient.referralDoctorId || '');
           setPreferredLanguage(patient.preferredLanguage || 'Tamil');
           setSpecialRemarks(patient.specialRemarks || '');
@@ -319,6 +323,7 @@ export function PatientFormPage() {
       occupation: occupation || null,
       patientCategory: (patientCategory || null) as PatientCategory | null,
       referredBy: referredBy || null,
+      registrationSourceId: registrationSourceId === '' ? null : registrationSourceId,
       referralDoctorId: referralDoctorId === '' ? null : Number(referralDoctorId),
       preferredLanguage: preferredLanguage || null,
       specialRemarks: specialRemarks.trim() || null,
@@ -881,6 +886,14 @@ export function PatientFormPage() {
               { label: 'Staff', value: 'staff' },
               { label: 'VIP', value: 'vip' },
             ]}
+          />
+          <Select
+            label="Registration Source"
+            value={registrationSourceId}
+            onChange={(event) => setRegistrationSourceId(event.target.value ? Number(event.target.value) : '')}
+            options={[{ label: 'Select source', value: '' }, ...registrationSources
+              .filter((source) => source.isActive || source.id === registrationSourceId)
+              .map((source) => ({ label: `${source.name}${source.isActive ? '' : ' (inactive)'}`, value: source.id }))]}
           />
           <Select
             label="Referred By"

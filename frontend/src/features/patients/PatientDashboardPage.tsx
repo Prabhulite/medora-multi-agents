@@ -360,6 +360,7 @@ export function PatientDashboardPage() {
                   value={fmtDateTime(patient.registrationAt || patient.createdAt)}
                 />
                 <DetailRow label="Registered By" value={patient.createdByName || '—'} />
+                <DetailRow label="Registration Source" value={patient.registrationSourceName || '—'} />
                 <DetailRow label="Referred By" value={patient.referredBy || '—'} />
                 <DetailRow
                   label="Referral Doctor"

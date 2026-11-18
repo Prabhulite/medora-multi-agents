@@ -139,6 +139,7 @@ const patientBaseObjectSchema = z.object({
     .nullable()
     .optional(),
   referredBy: optionalText(120),
+  registrationSourceId: z.number().int().positive().nullable().optional(),
   referralDoctorId: z.number().int().positive().nullable().optional(),
   preferredLanguage: optionalText(60),
   specialRemarks: optionalText(2000),

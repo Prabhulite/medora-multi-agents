@@ -1,4 +1,5 @@
-import type { IdProofType } from '../../../database/entities/index.js';
+import { RegistrationSource, type IdProofType } from '../../../database/entities/index.js';
+import { AppDataSource } from '../../../config/data-source.js';
 import { NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { doctorRepository } from '../../doctors/repositories/doctor.repository.js';
 import { patientRepository } from '../repositories/patient.repository.js';
@@ -66,7 +67,19 @@ async function assertReferralDoctor(referralDoctorId?: number | null) {
   }
 }
 
+async function assertRegistrationSource(sourceId?: number | null) {
+  if (sourceId == null) return;
+  const source = await AppDataSource.getRepository(RegistrationSource).findOne({ where: { id: sourceId, isActive: true } });
+  if (!source) throw new ValidationError('Registration source is invalid or inactive');
+}
+
 export const patientService = {
+  registrationSources() {
+    return AppDataSource.getRepository(RegistrationSource).find({
+      select: { id: true, code: true, name: true, isActive: true },
+      order: { name: 'ASC' },
+    });
+  },
   list(includeInactive = false) {
     return patientRepository.findAll(includeInactive);
   },
@@ -101,6 +114,7 @@ export const patientService = {
 
   async create(input: CreatePatientInput, userId: number | null) {
     await assertReferralDoctor(input.referralDoctorId ?? null);
+    await assertRegistrationSource(input.registrationSourceId ?? null);
 
     return patientRepository.createWithDetails({
       title: input.title ?? null,
@@ -119,6 +133,7 @@ export const patientService = {
       occupation: input.occupation ?? null,
       patientCategory: input.patientCategory ?? null,
       referredBy: input.referredBy ?? null,
+      registrationSourceId: input.registrationSourceId ?? null,
       referralDoctorId: input.referralDoctorId ?? null,
       preferredLanguage: input.preferredLanguage ?? null,
       specialRemarks: input.specialRemarks ?? null,
@@ -163,6 +178,9 @@ export const patientService = {
     if (input.referralDoctorId !== undefined) {
       await assertReferralDoctor(input.referralDoctorId);
     }
+    if (input.registrationSourceId !== undefined) {
+      await assertRegistrationSource(input.registrationSourceId);
+    }
 
     const updated = await patientRepository.updateWithDetails(id, {
       title: input.title,
@@ -181,6 +199,7 @@ export const patientService = {
       occupation: input.occupation,
       patientCategory: input.patientCategory,
       referredBy: input.referredBy,
+      registrationSourceId: input.registrationSourceId,
       referralDoctorId: input.referralDoctorId,
       preferredLanguage: input.preferredLanguage,
       specialRemarks: input.specialRemarks,

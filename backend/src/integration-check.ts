@@ -76,6 +76,16 @@ try {
   assert.equal((await request('GET', '/api/fhir/r4/Patient/1')).status, 401);
   token = adminToken;
 
+  await dataSource.query("INSERT INTO registration_sources (code,name,is_active) VALUES ('it_walk_in','Integration walk-in',1),('it_retired','Retired channel',0)");
+  const sources = await ok('GET', '/api/patients/registration-sources');
+  assert.equal(sources.length, 2);
+  assert.equal((await request('PUT', '/api/patients/1', { registrationSourceId: 999999 })).status, 422);
+  assert.equal((await request('PUT', '/api/patients/1', { registrationSourceId: sources.find((source: { code: string }) => source.code === 'it_retired').id })).status, 422);
+  const sourcedPatient = await ok('PUT', '/api/patients/1', { registrationSourceId: sources.find((source: { code: string }) => source.code === 'it_walk_in').id });
+  assert.equal(sourcedPatient.registrationSourceName, 'Integration walk-in');
+  assert.equal((await ok('GET', '/api/patients/1')).registrationSourceId, sourcedPatient.registrationSourceId);
+  await ok('PUT', '/api/patients/1', { registrationSourceId: null });
+
   assert.equal((await ok('GET', '/api/doctors/account-candidates?search=IT-DOCTOR-LOGIN')).some((row: { username: string }) => row.username === 'integration_doctor'), true);
   assert.equal((await request('POST', '/api/doctors/1/account-link', { userId: 3, doctorCode: 'WRONG', reason: 'Verified staff identity against roster' })).status, 422);
   const linkedDoctor = await ok('POST', '/api/doctors/1/account-link', { userId: 3, doctorCode: 'IT-DOC-1', reason: 'Verified staff identity against roster' });
@@ -1336,6 +1346,13 @@ try {
   assert.equal((await ok('GET', `/api/appointments/${raceAppointment.id}`)).status, 'completed');
   const [raceCompletionCount] = await dataSource.query("SELECT COUNT(*) AS count FROM appointment_status_history WHERE appointment_id = ? AND to_status = 'completed'", [raceAppointment.id]);
   assert.equal(Number(raceCompletionCount.count), 1);
+  const newSourcedPatient = await ok('POST', '/api/patients', {
+    firstName: 'Sourced', gender: 'other', ageYears: 30, createVisit: false,
+    registrationSourceId: sources.find((source: { code: string }) => source.code === 'it_walk_in').id,
+    contact: { mobileNumber: '9999999988' },
+    address: { addressLine1: 'Integration address', country: 'India', state: 'Tamil Nadu', district: 'Chennai', city: 'Chennai', pincode: '600001' },
+  }, 201);
+  assert.equal(newSourcedPatient.registrationSourceName, 'Integration walk-in');
   const systemAudit = await ok('GET', '/api/audit-logs?limit=20&page=1');
   const actorEntry = systemAudit.rows.find((row: { user?: { id: number } | null }) => row.user);
   assert.ok(actorEntry, 'Expected an audit event attributed to a staff user');

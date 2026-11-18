@@ -19,6 +19,7 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/', authorize('patients.view'), asyncHandler(patientController.list));
+router.get('/registration-sources', authorize('patients.view'), asyncHandler(patientController.registrationSources));
 
 router.get(
   '/search',

@@ -422,6 +422,8 @@ export interface Patient {
   religion?: string | null;
   occupation?: string | null;
   referredBy?: string | null;
+  registrationSourceId?: number | null;
+  registrationSourceName?: string | null;
   referralDoctorId?: number | null;
   referralDoctorName?: string | null;
   preferredLanguage?: string | null;
@@ -486,6 +488,7 @@ export interface UpsertPatientPayload {
   occupation?: string | null;
   patientCategory?: PatientCategory | null;
   referredBy?: string | null;
+  registrationSourceId?: number | null;
   referralDoctorId?: number | null;
   preferredLanguage?: string | null;
   specialRemarks?: string | null;

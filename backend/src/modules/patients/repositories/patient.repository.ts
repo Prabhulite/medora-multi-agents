@@ -55,6 +55,8 @@ export interface PatientDetailView extends PatientListView {
   religion: string | null;
   occupation: string | null;
   referredBy: string | null;
+  registrationSourceId: number | null;
+  registrationSourceName: string | null;
   referralDoctorId: number | null;
   referralDoctorName: string | null;
   preferredLanguage: string | null;
@@ -163,6 +165,8 @@ function toDetailView(patient: Patient): PatientDetailView {
     religion: patient.religion,
     occupation: patient.occupation,
     referredBy: patient.referredBy,
+    registrationSourceId: patient.registrationSourceId,
+    registrationSourceName: patient.registrationSource?.name ?? null,
     referralDoctorId: patient.referralDoctorId,
     referralDoctorName: patient.referralDoctor?.name ?? null,
     preferredLanguage: patient.preferredLanguage,
@@ -229,6 +233,7 @@ const detailRelations = {
   emergencyContact: true,
   visits: true,
   referralDoctor: true,
+  registrationSource: true,
   createdBy: true,
   updatedBy: true,
 } as const;
@@ -429,6 +434,7 @@ export const patientRepository = {
     occupation: string | null;
     patientCategory: PatientCategory | null;
     referredBy: string | null;
+    registrationSourceId: number | null;
     referralDoctorId: number | null;
     preferredLanguage: string | null;
     specialRemarks: string | null;
@@ -494,6 +500,7 @@ export const patientRepository = {
         occupation: input.occupation,
         patientCategory: input.patientCategory,
         referredBy: input.referredBy,
+        registrationSourceId: input.registrationSourceId,
         referralDoctorId: input.referralDoctorId,
         preferredLanguage: input.preferredLanguage,
         specialRemarks: input.specialRemarks,
@@ -610,6 +617,7 @@ export const patientRepository = {
       occupation?: string | null;
       patientCategory?: PatientCategory | null;
       referredBy?: string | null;
+      registrationSourceId?: number | null;
       referralDoctorId?: number | null;
       preferredLanguage?: string | null;
       specialRemarks?: string | null;
@@ -702,6 +710,7 @@ export const patientRepository = {
       if (input.occupation !== undefined) patientPatch.occupation = input.occupation;
       if (input.patientCategory !== undefined) patientPatch.patientCategory = input.patientCategory;
       if (input.referredBy !== undefined) patientPatch.referredBy = input.referredBy;
+      if (input.registrationSourceId !== undefined) patientPatch.registrationSourceId = input.registrationSourceId;
       if (input.referralDoctorId !== undefined) {
         patientPatch.referralDoctorId = input.referralDoctorId;
       }
