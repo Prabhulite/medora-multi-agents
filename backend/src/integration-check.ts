@@ -1172,6 +1172,7 @@ try {
   token = adminToken;
   await dataSource.query('INSERT INTO users (employee_id,username,full_name,password_hash,is_active,is_super_admin,session_version) VALUES (?,?,?,?,1,1,1)', ['IT-LAB-VERIFIER', 'integration_lab_verifier', 'Integration Lab Verifier', hash]);
   token = (await ok('POST', '/api/auth/login', { username: 'integration_lab_verifier', password: 'Temporary!Pass123' })).token;
+  const laboratoryVerifierToken = token;
   const verifiedLab = await ok('POST', `/api/laboratory/orders/${laboratory.id}/verify`, normalVerify);
   assert.equal(verifiedLab.status, 'verified');
   assert.ok(verifiedLab.verifiedAt);
@@ -1226,8 +1227,12 @@ try {
   assert.equal(labAddendum.approvedAt, null);
   assert.equal((await ok('GET', '/api/laboratory/communication-queue')).total, 0);
   assert.equal((await ok('GET', `/api/laboratory/orders/${laboratory.id}/addenda`))[0].approvedAt, null);
-  assert.equal((await request('POST', `/api/laboratory/addenda/${labAddendum.id}/approve`)).status, 200);
+  assert.equal((await request('POST', `/api/laboratory/addenda/${labAddendum.id}/approve`)).status, 422);
+  token = laboratoryVerifierToken;
+  const approvedLabAddendum = await ok('POST', `/api/laboratory/addenda/${labAddendum.id}/approve`);
+  assert.equal(approvedLabAddendum.approvedById === labAddendum.createdById, false);
   assert.equal((await request('POST', `/api/laboratory/addenda/${labAddendum.id}/approve`)).status, 409);
+  token = adminToken;
   const amendedQueue = await ok('GET', '/api/laboratory/communication-queue');
   assert.equal(amendedQueue.total, 1);
   assert.equal(amendedQueue.items[0].id, laboratory.id);
@@ -1450,8 +1455,8 @@ try {
   const routineContactOrder = await ok('POST', '/api/laboratory/orders', { patientId: 1, testId: newLabTest.id, priority: 'routine' }, 201);
   await ok('PATCH', `/api/laboratory/orders/${routineContactOrder.id}/collect`, { specimenLabel: 'IT-ROUTINE-SPECIMEN' });
   await ok('PATCH', `/api/laboratory/orders/${routineContactOrder.id}/result`, { status: 'processing', resultValue: 'Routine result' });
-  token = (await ok('POST', '/api/auth/login', { username: 'integration_lab_verifier', password: 'Temporary!Pass123' })).token;
-  const routineVerifierToken = token;
+  const routineVerifierToken = laboratoryVerifierToken;
+  token = routineVerifierToken;
   await ok('POST', `/api/laboratory/orders/${routineContactOrder.id}/verify`, normalVerify);
   token = adminToken;
   assert.equal((await ok('GET', '/api/laboratory/communication-queue')).total, 0);
@@ -1460,7 +1465,11 @@ try {
   await ok('POST', `/api/laboratory/orders/${routineContactOrder.id}/release`);
   assert.equal((await ok('GET', '/api/laboratory/communication-queue')).total, 0);
   assert.equal((await ok('POST', `/api/laboratory/orders/${routineContactOrder.id}/communications`, routineContactPayload, 201)).outcome, 'delivered');
-  await ok('POST', `/api/laboratory/orders/${routineContactOrder.id}/addenda`, { reason: 'Corrected routine result', addendum: 'Updated routine interpretation' }, 201);
+  const routineAddendum = await ok('POST', `/api/laboratory/orders/${routineContactOrder.id}/addenda`, { reason: 'Corrected routine result', addendum: 'Updated routine interpretation' }, 201);
+  assert.equal((await ok('GET', '/api/laboratory/communication-queue')).total, 0);
+  token = routineVerifierToken;
+  await ok('POST', `/api/laboratory/addenda/${routineAddendum.id}/approve`);
+  token = adminToken;
   const routineCorrectionQueue = await ok('GET', '/api/laboratory/communication-queue');
   assert.equal(routineCorrectionQueue.total, 1);
   assert.equal(routineCorrectionQueue.items[0].priority, 'routine');

@@ -145,6 +145,7 @@ export const laboratoryService = {
       const row = await repo.createQueryBuilder('addendum').setLock('pessimistic_write').where('addendum.id = :id', { id: addendumId }).getOne();
       if (!row) throw new NotFoundError('Laboratory result addendum not found');
       if (row.approvedAt) throw new ConflictError('Laboratory result addendum is already approved');
+      if (row.createdById === userId) throw new ValidationError('A correction author cannot approve their own correction');
       const order = await manager.getRepository(LaboratoryOrder).findOne({ where: { id: row.orderId } });
       if (!order) throw new NotFoundError('Laboratory order not found');
       if (order.status !== 'completed') throw new ConflictError('Only released result corrections can be approved');
