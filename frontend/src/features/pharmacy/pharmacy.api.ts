@@ -37,6 +37,7 @@ export interface DispenseStockPayload {
 }
 export interface DispenseRecord { id: number; quantity: number; createdAt: string; reference: string | null; batch: { batchNumber: string; medication: { brandName: string } }; prescription: { id: number; medicineName: string } | null; createdBy: { fullName: string } | null }
 export interface PharmacyPatientCandidate { id: number; mrdNumber: string; fullName: string }
+export interface InventoryMedicationCandidate { id: number; medicineCode: string; brandName: string; genericName: string }
 export interface StockMovement { id: number; type: 'receipt' | 'dispense' | 'adjustment' | 'quarantine' | 'release' | 'disposal'; quantity: number; reference: string | null; notes: string | null; fefoOverrideReason: string | null; createdAt: string; createdByName: string | null }
 export interface StockMovementPage { items: StockMovement[]; total: number; page: number; pageSize: number }
 export interface StockAdjustment { batchId: number; previousQuantity: number; countedQuantity: number; difference: number; movementId: number }
@@ -70,6 +71,14 @@ function mapBatch(row: any): InventoryBatch {
 }
 
 export const pharmacyApi = {
+  async medicationCandidates(search: string): Promise<InventoryMedicationCandidate[]> {
+    const response = await api.get<ApiEnvelope<InventoryMedicationCandidate[]>>('/pharmacy/inventory/medications', { params: { search } });
+    return response.data.data;
+  },
+  async medicationBatches(medicationId: number): Promise<InventoryBatch[]> {
+    const response = await api.get<ApiEnvelope<any[]>>(`/pharmacy/inventory/medications/${medicationId}/batches`);
+    return response.data.data.map(mapBatch);
+  },
   async inventoryWorklist(page: number, pageSize: number, search: string, alert: string | null): Promise<InventoryWorklist> {
     const response = await api.get<ApiEnvelope<InventoryWorklist>>('/pharmacy/inventory/worklist', { params: { page, pageSize, ...(search.trim() ? { search: search.trim() } : {}), ...(alert ? { alert } : {}) } });
     return { ...response.data.data, items: response.data.data.items.map(mapBatch) };

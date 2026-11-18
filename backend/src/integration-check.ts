@@ -744,6 +744,15 @@ try {
   const [todayBatch] = await dataSource.query("SELECT id FROM inventory_batches WHERE batch_number = 'IT-EXPIRES-TODAY'");
   assert.equal((await ok('POST', '/api/pharmacy/inventory/dispense', { batchId: todayBatch.id, quantity: 1 })).quantity, 0);
   const laterBatch = await ok('POST', '/api/pharmacy/inventory/receipts', { medicationId: 1, batchNumber: 'IT-LATER', expiryDate: '2031-12-31', purchasePrice: 1, sellingPrice: 2, quantity: 2, reorderLevel: 1 }, 201);
+  assert.equal((await request('GET', '/api/pharmacy/inventory/medications?search=I')).status, 422);
+  const medicationMatches = await ok('GET', '/api/pharmacy/inventory/medications?search=Integration');
+  assert.ok(medicationMatches.some((row: { id: number }) => row.id === 1));
+  assert.ok(medicationMatches.length <= 20);
+  assert.ok((await ok('GET', '/api/pharmacy/inventory/medications/1/batches')).every((row: { quantity: number; isQuarantined: boolean; batchNumber: string }) => row.quantity > 0 && !row.isQuarantined && row.batchNumber !== 'IT-EXPIRED'));
+  assert.equal((await request('GET', '/api/pharmacy/inventory/medications/999999/batches')).status, 404);
+  token = radiologyViewerToken;
+  assert.equal((await request('GET', '/api/pharmacy/inventory/medications?search=Integration')).status, 403);
+  token = adminToken;
   assert.equal((await request('POST', '/api/pharmacy/inventory/dispense', { batchId: laterBatch.id, quantity: 1 })).status, 422);
   assert.equal((await request('POST', '/api/pharmacy/inventory/dispense', { batchId: laterBatch.id, quantity: 1, fefoOverrideReason: 'bad' })).status, 422);
   assert.equal((await ok('POST', '/api/pharmacy/inventory/dispense', { batchId: laterBatch.id, quantity: 1, fefoOverrideReason: 'Earlier batch container damaged' })).quantity, 1);

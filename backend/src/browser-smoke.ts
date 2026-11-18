@@ -195,6 +195,7 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   assert.ok(dispenseReady, 'Pharmacy dispense form did not show patient search');
+  assert.equal(await evaluate('document.querySelector(".pharmacy-modal")?.innerText.includes("Search stocked medication")'), true, 'Pharmacy dispense form did not show medication lookup');
   await evaluate('document.querySelector(".pharmacy-modal__header button").click(); true');
   await evaluate('Array.from(document.querySelectorAll("button")).find(button => button.innerText === "Dispense history").click(); true');
   assert.equal(await evaluate('document.querySelector(".pharmacy-modal")?.innerText.includes("Search patient by name or MRD") && Boolean(document.querySelector(".pharmacy-modal button[type=submit]:disabled"))'), true, 'Pharmacy history did not require patient selection');

@@ -5,6 +5,7 @@ export const inventoryListSchema = z.object({ medicationId: z.coerce.number().in
 export const inventoryWorklistSchema = z.object({ page: z.coerce.number().int().min(1).max(100000).default(1), pageSize: z.coerce.number().int().min(10).max(100).default(25), search: z.string().trim().max(80).optional(), alert: z.enum(['low-stock', 'expired-stock', 'expiring-stock', 'quarantined-stock']).optional() });
 export type InventoryWorklistInput = z.infer<typeof inventoryWorklistSchema>;
 export const inventoryPatientLookupSchema = z.object({ search: z.string().trim().min(2).max(80) });
+export const inventoryMedicationLookupSchema = z.object({ search: z.string().trim().min(2).max(80) });
 export const adjustStockSchema = z.object({ expectedQuantity: z.number().int().min(0).max(1000000), countedQuantity: z.number().int().min(0).max(1000000), reason: z.string().trim().min(5).max(500) });
 export const batchHoldSchema = z.object({ reason: z.string().trim().min(5).max(500) });
 export const disposeStockSchema = z.object({ expectedQuantity: z.number().int().min(1).max(1000000), quantity: positiveInt.max(1000000), reason: z.string().trim().min(5).max(500) });

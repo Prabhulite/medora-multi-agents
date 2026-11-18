@@ -5,6 +5,22 @@ import type { AdjustStockInput, DispenseStockInput, DisposeStockInput, Inventory
 import { assertNoRecordedAllergy } from '../../clinical/services/allergy-check.js';
 
 export const inventoryService = {
+  async medications(search: string) {
+    const escaped = search.replace(/[%_\\]/g, '\\$&');
+    return AppDataSource.getRepository(Medication).createQueryBuilder('medication')
+      .select(['medication.id', 'medication.medicineCode', 'medication.brandName', 'medication.genericName'])
+      .where('EXISTS (SELECT 1 FROM inventory_batches batch WHERE batch.medication_id = medication.id AND batch.is_active = 1 AND batch.is_quarantined = 0 AND batch.quantity > 0 AND batch.expiry_date >= CURRENT_DATE())')
+      .andWhere('(medication.brand_name LIKE :search OR medication.generic_name LIKE :search OR medication.medicine_code LIKE :search)', { search: `%${escaped}%` })
+      .orderBy('medication.brandName', 'ASC').addOrderBy('medication.id', 'ASC').take(20).getMany();
+  },
+  async medicationBatches(medicationId: number) {
+    const medication = await AppDataSource.getRepository(Medication).exist({ where: { id: medicationId } });
+    if (!medication) throw new NotFoundError('Medication not found');
+    return AppDataSource.getRepository(InventoryBatch).createQueryBuilder('batch')
+      .leftJoinAndSelect('batch.medication', 'medication')
+      .where('batch.medication_id = :medicationId AND batch.is_active = 1 AND batch.is_quarantined = 0 AND batch.quantity > 0 AND batch.expiry_date >= CURRENT_DATE()', { medicationId })
+      .orderBy('batch.expiryDate', 'ASC').addOrderBy('batch.id', 'ASC').getMany();
+  },
   async worklist(input: InventoryWorklistInput) {
     const query = AppDataSource.getRepository(InventoryBatch).createQueryBuilder('batch')
       .leftJoinAndSelect('batch.medication', 'medication').where('batch.is_active = 1');

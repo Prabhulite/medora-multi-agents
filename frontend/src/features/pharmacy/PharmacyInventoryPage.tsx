@@ -12,7 +12,7 @@ import { hasPermission } from '../../lib/permissions';
 import { useAuth } from '../auth/AuthContext';
 import { prescriptionsApi } from '../clinical/prescriptions.api';
 import type { Prescription } from '../../types';
-import { pharmacyApi, type DispenseRecord, type DispenseStockPayload, type InventoryBatch, type InventorySummary, type PharmacyPatientCandidate, type ReceiveStockPayload, type StockMovement } from './pharmacy.api';
+import { pharmacyApi, type DispenseRecord, type DispenseStockPayload, type InventoryBatch, type InventoryMedicationCandidate, type InventorySummary, type PharmacyPatientCandidate, type ReceiveStockPayload, type StockMovement } from './pharmacy.api';
 import './PharmacyInventoryPage.css';
 
 const currency = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
@@ -50,8 +50,6 @@ export function PharmacyInventoryPage() {
   const [pageSize, setPageSize] = useState(25);
   const [search, setSearch] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
-  const [dispenseInventory, setDispenseInventory] = useState<InventoryBatch[]>([]);
-  const [dispenseLoading, setDispenseLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -73,12 +71,6 @@ export function PharmacyInventoryPage() {
   }, [page, pageSize, search, alertFilter, refreshKey]);
   const load = async () => { setRefreshKey((current) => current + 1); };
   const chooseAlert = (alert: string | null) => { setPage(1); setSearchParams(alert ? { alert } : {}); };
-  const openDispense = async () => {
-    setDispenseLoading(true); setError('');
-    try { setDispenseInventory(await pharmacyApi.listInventory()); setModal('dispense'); }
-    catch (err) { setError(getErrorMessage(err, 'Unable to load dispensing choices')); }
-    finally { setDispenseLoading(false); }
-  };
 
   const columns = useMemo<TableColumn<InventoryBatch>[]>(() => [
     { key: 'medication', header: 'Medication', render: (row) => <div><div className="ui-table__cell-title">{row.medicationName}</div><div className="ui-table__cell-sub">{row.medicationCode || 'Medication'} · Batch {row.batchNumber}</div></div> },
@@ -136,7 +128,7 @@ export function PharmacyInventoryPage() {
   };
 
   return <div className="pharmacy-page">
-    <PageHeader title="Pharmacy inventory" subtitle="Monitor medicine availability, expiry risk, and stock movements." actions={<div className="pharmacy-actions"><Button variant="secondary" size="sm" onClick={() => setModal('history')}>Dispense history</Button>{canDispense && <Button variant="secondary" size="sm" onClick={() => void openDispense()}>{dispenseLoading ? 'Loading stock...' : 'Dispense stock'}</Button>}{canReceive && <Button size="sm" onClick={() => setModal('receive')}>Receive stock</Button>}</div>} />
+    <PageHeader title="Pharmacy inventory" subtitle="Monitor medicine availability, expiry risk, and stock movements." actions={<div className="pharmacy-actions"><Button variant="secondary" size="sm" onClick={() => setModal('history')}>Dispense history</Button>{canDispense && <Button variant="secondary" size="sm" onClick={() => setModal('dispense')}>Dispense stock</Button>}{canReceive && <Button size="sm" onClick={() => setModal('receive')}>Receive stock</Button>}</div>} />
     {error ? <Alert tone="error">{error}</Alert> : null}
     {notice ? <Alert tone="success">{notice}</Alert> : null}
     <div className="pharmacy-kpis" aria-label="Pharmacy inventory summary">
@@ -152,7 +144,7 @@ export function PharmacyInventoryPage() {
       <Table columns={columns} rows={inventory} rowKey={(row) => row.id} loading={loading} onRefresh={() => void load()} serverPagination={{ page, pageSize, total, search, onPageChange: setPage, onPageSizeChange: (size) => { setPage(1); setPageSize(size); }, onSearchChange: (value) => { setPage(1); setSearch(value); } }} searchPlaceholder="Search medicine, batch, or location" emptyMessage={alertFilter ? 'No batches match this stock alert.' : 'No inventory batches found. Receive stock to start tracking medicines.'} />
     </section>
     {modal === 'receive' && canReceive ? <ReceiveStockForm saving={saving} onClose={() => setModal(null)} onSubmit={(payload) => void saveReceipt(payload)} /> : null}
-    {modal === 'dispense' && canDispense ? <DispenseStockForm inventory={dispenseInventory} saving={saving} onClose={() => setModal(null)} onSubmit={(payload) => void saveDispense(payload)} /> : null}
+    {modal === 'dispense' && canDispense ? <DispenseStockForm saving={saving} onClose={() => setModal(null)} onSubmit={(payload) => void saveDispense(payload)} /> : null}
     {modal === 'history' ? <DispenseHistory onClose={() => setModal(null)} /> : null}
     {modal === 'adjust' && selectedBatch && canAdjust ? <AdjustStockForm batch={selectedBatch} saving={saving} error={error} onClose={() => setModal(null)} onSubmit={(count, reason) => void saveAdjustment(count, reason)} /> : null}
     {modal === 'hold' && selectedBatch && canAdjust ? <BatchHoldForm batch={selectedBatch} saving={saving} error={error} onClose={() => setModal(null)} onSubmit={(reason) => void saveHold(reason)} /> : null}
@@ -222,9 +214,14 @@ function PharmacyPatientPicker({ patientId, onSelect, optional = false }: { pati
   return <div className="pharmacy-patient-picker"><Input label={optional ? 'Patient (optional)' : 'Search patient by name or MRD'} value={query} onChange={(event) => { setQuery(event.target.value); onSelect(''); }} placeholder="Search name or MRD (2+ characters)" />{matches.length > 0 && <Select label="Matching patients" value={patientId} onChange={(event) => { const patient = matches.find((row) => String(row.id) === event.target.value); onSelect(event.target.value); if (patient) setQuery(`${patient.fullName} (${patient.mrdNumber})`); }} options={[{ value: '', label: 'Select a patient' }, ...matches.map((row) => ({ value: row.id, label: `${row.fullName} · ${row.mrdNumber}` }))]} />}{patientId && <small>Selected patient ID: {patientId}</small>}{error && <Alert tone="error">{error}</Alert>}</div>;
 }
 
-function DispenseStockForm({ inventory, saving, onClose, onSubmit }: { inventory: InventoryBatch[]; saving: boolean; onClose: () => void; onSubmit: (payload: DispenseStockPayload) => void }) {
+function DispenseStockForm({ saving, onClose, onSubmit }: { saving: boolean; onClose: () => void; onSubmit: (payload: DispenseStockPayload) => void }) {
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [lookupError, setLookupError] = useState('');
+  const [medicationQuery, setMedicationQuery] = useState('');
+  const [medications, setMedications] = useState<InventoryMedicationCandidate[]>([]);
+  const [inventory, setInventory] = useState<InventoryBatch[]>([]);
+  const [batchesLoading, setBatchesLoading] = useState(false);
+  const [medicationId, setMedicationId] = useState('');
   const [form, setForm] = useState({ batchId: '', quantity: '', patientId: '', prescriptionId: '', reference: '', fefoOverrideReason: '' });
   useEffect(() => {
     if (!form.patientId || !Number.isInteger(Number(form.patientId)) || Number(form.patientId) < 1) { setPrescriptions([]); return; }
@@ -233,12 +230,26 @@ function DispenseStockForm({ inventory, saving, onClose, onSubmit }: { inventory
     return () => { active = false; };
   }, [form.patientId]);
   const selectedPrescription = prescriptions.find((row) => String(row.id) === form.prescriptionId);
+  useEffect(() => {
+    if (medicationQuery.trim().length < 2 || medicationId || selectedPrescription) { setMedications([]); return; }
+    let active = true;
+    const timer = window.setTimeout(() => { void pharmacyApi.medicationCandidates(medicationQuery.trim()).then((rows) => { if (active) { setMedications(rows); setLookupError(''); } }).catch((err) => { if (active) setLookupError(getErrorMessage(err, 'Unable to find medication stock')); }); }, 250);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [medicationQuery, medicationId, selectedPrescription]);
+  const selectedMedicationId = selectedPrescription?.medicationId ? String(selectedPrescription.medicationId) : medicationId;
+  useEffect(() => {
+    if (!selectedMedicationId) { setInventory([]); return; }
+    let active = true;
+    setInventory([]); setBatchesLoading(true);
+    void pharmacyApi.medicationBatches(Number(selectedMedicationId)).then((rows) => { if (active) { setInventory(rows); setLookupError(''); } }).catch((err) => { if (active) setLookupError(getErrorMessage(err, 'Unable to load medication batches')); }).finally(() => { if (active) setBatchesLoading(false); });
+    return () => { active = false; };
+  }, [selectedMedicationId]);
   const sortedInventory = [...inventory].filter((row) => row.quantity > 0 && !row.isQuarantined && daysToExpiry(row.expiryDate) >= 0 && (!selectedPrescription || row.medicationId === selectedPrescription.medicationId)).sort((a, b) => a.expiryDate.localeCompare(b.expiryDate) || a.id - b.id);
   const selected = sortedInventory.find((row) => String(row.id) === form.batchId);
   const suggested = selected ? sortedInventory.find((row) => row.medicationId === selected.medicationId && row.quantity >= Math.max(1, Number(form.quantity) || 1)) : null;
   const needsFefoReason = !!selected && !!suggested && suggested.expiryDate < selected.expiryDate && Number(form.quantity) > 0 && Number(form.quantity) <= selected.quantity;
   const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value, ...(key === 'patientId' ? { prescriptionId: '', batchId: '' } : {}), ...(key === 'prescriptionId' ? { batchId: '' } : {}) }));
-  return <ModalShell title="Dispense stock" eyebrow="PHARMACY ISSUE" onClose={onClose}>{lookupError && <Alert tone="error">{lookupError}</Alert>}<form className="pharmacy-form" onSubmit={(event) => { event.preventDefault(); onSubmit({ batchId: Number(form.batchId), quantity: Number(form.quantity), patientId: form.patientId ? Number(form.patientId) : null, prescriptionId: form.prescriptionId ? Number(form.prescriptionId) : null, reference: form.reference || null, fefoOverrideReason: needsFefoReason ? form.fefoOverrideReason.trim() : null }); }}><div className="pharmacy-form__grid"><PharmacyPatientPicker patientId={form.patientId} onSelect={(id) => update('patientId', id)} optional /><Select label="Active catalog prescription" value={form.prescriptionId} onChange={(event) => update('prescriptionId', event.target.value)} options={[{ value: '', label: 'General stock issue' }, ...prescriptions.map((row) => ({ value: row.id, label: `${row.medicineName} · ${row.quantityPrescribed} units prescribed` }))]} /></div><Select label="Batch (FEFO order)" required value={form.batchId} onChange={(event) => update('batchId', event.target.value)} options={[{ value: '', label: sortedInventory.length ? 'Select a batch' : 'No matching stock available' }, ...sortedInventory.map((row) => ({ value: String(row.id), label: `${row.medicationName} · ${row.batchNumber} · ${row.quantity} units` }))]} /><div className="pharmacy-fefo-note" role="status"><strong>FEFO suggestion:</strong> {selected ? Number(form.quantity) > selected.quantity ? `Selected batch has only ${selected.quantity} units. Reduce the quantity or choose another batch.` : suggested && suggested.expiryDate < selected.expiryDate ? `Earlier eligible batch ${suggested.batchNumber} expires ${dateLabel(suggested.expiryDate)}. A reason is required to issue this later batch.` : `Selected batch ${selected.batchNumber} is the earliest eligible batch for this quantity (${dateLabel(selected.expiryDate)} expiry).` : 'Select a usable batch to see the earliest eligible stock.'}</div><div className="pharmacy-form__grid"><Input label="Quantity to dispense" type="number" min="1" max={selected?.quantity || undefined} required value={form.quantity} onChange={(event) => update('quantity', event.target.value)} /><Input label="Reference" value={form.reference} onChange={(event) => update('reference', event.target.value)} placeholder="Dispensing note or issue number" /></div>{needsFefoReason && <Input label="Reason for FEFO exception" required minLength={5} maxLength={500} value={form.fefoOverrideReason} onChange={(event) => update("fefoOverrideReason", event.target.value)} placeholder="Why is the earlier batch unsuitable?" />}<FormFooter saving={saving} onClose={onClose} submitLabel="Dispense stock" disabled={!sortedInventory.length || (needsFefoReason && form.fefoOverrideReason.trim().length < 5)} /></form></ModalShell>;
+  return <ModalShell title="Dispense stock" eyebrow="PHARMACY ISSUE" onClose={onClose}>{lookupError && <Alert tone="error">{lookupError}</Alert>}<form className="pharmacy-form" onSubmit={(event) => { event.preventDefault(); onSubmit({ batchId: Number(form.batchId), quantity: Number(form.quantity), patientId: form.patientId ? Number(form.patientId) : null, prescriptionId: form.prescriptionId ? Number(form.prescriptionId) : null, reference: form.reference || null, fefoOverrideReason: needsFefoReason ? form.fefoOverrideReason.trim() : null }); }}><div className="pharmacy-form__grid"><PharmacyPatientPicker patientId={form.patientId} onSelect={(id) => update('patientId', id)} optional /><Select label="Active catalog prescription" value={form.prescriptionId} onChange={(event) => update('prescriptionId', event.target.value)} options={[{ value: '', label: 'General stock issue' }, ...prescriptions.map((row) => ({ value: row.id, label: `${row.medicineName} · ${row.quantityPrescribed} units prescribed` }))]} /></div>{!selectedPrescription && <><Input label="Search stocked medication" value={medicationQuery} onChange={(event) => { setMedicationQuery(event.target.value); setMedicationId(''); update('batchId', ''); }} placeholder="Brand, generic name, or medicine code" />{medications.length > 0 && <Select label="Matching medications" value={medicationId} onChange={(event) => { const id = event.target.value; setMedicationId(id); update('batchId', ''); const medication = medications.find((row) => String(row.id) === id); if (medication) setMedicationQuery(`${medication.brandName} (${medication.medicineCode})`); }} options={[{ value: '', label: 'Select a medication' }, ...medications.map((row) => ({ value: row.id, label: `${row.brandName} � ${row.genericName} � ${row.medicineCode}` }))]} />}</>}{selectedPrescription && <p>Medication: <strong>{selectedPrescription.medicineName}</strong></p>}<Select label="Batch (FEFO order)" required value={form.batchId} onChange={(event) => update('batchId', event.target.value)} options={[{ value: '', label: batchesLoading ? 'Loading batches...' : sortedInventory.length ? 'Select a batch' : 'No eligible stock available' }, ...sortedInventory.map((row) => ({ value: String(row.id), label: `${row.medicationName} · ${row.batchNumber} · ${row.quantity} units` }))]} /><div className="pharmacy-fefo-note" role="status"><strong>FEFO suggestion:</strong> {selected ? Number(form.quantity) > selected.quantity ? `Selected batch has only ${selected.quantity} units. Reduce the quantity or choose another batch.` : suggested && suggested.expiryDate < selected.expiryDate ? `Earlier eligible batch ${suggested.batchNumber} expires ${dateLabel(suggested.expiryDate)}. A reason is required to issue this later batch.` : `Selected batch ${selected.batchNumber} is the earliest eligible batch for this quantity (${dateLabel(selected.expiryDate)} expiry).` : 'Select a usable batch to see the earliest eligible stock.'}</div><div className="pharmacy-form__grid"><Input label="Quantity to dispense" type="number" min="1" max={selected?.quantity || undefined} required value={form.quantity} onChange={(event) => update('quantity', event.target.value)} /><Input label="Reference" value={form.reference} onChange={(event) => update('reference', event.target.value)} placeholder="Dispensing note or issue number" /></div>{needsFefoReason && <Input label="Reason for FEFO exception" required minLength={5} maxLength={500} value={form.fefoOverrideReason} onChange={(event) => update("fefoOverrideReason", event.target.value)} placeholder="Why is the earlier batch unsuitable?" />}<FormFooter saving={saving} onClose={onClose} submitLabel="Dispense stock" disabled={!sortedInventory.length || (needsFefoReason && form.fefoOverrideReason.trim().length < 5)} /></form></ModalShell>;
 }
 
 function ModalShell({ title, eyebrow, onClose, children }: { title: string; eyebrow: string; onClose: () => void; children: React.ReactNode }) {
