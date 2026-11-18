@@ -602,6 +602,7 @@ try {
   assert.equal(pendingHandoffs.items[0].recipientId, receiver.id);
   assert.equal(pendingHandoffs.items[0].recipientName, 'Integration Receiver');
   assert.ok(pendingHandoffs.items[0].acknowledgementDueAt);
+  assert.equal(pendingHandoffs.items[0].overdueRemindedAt, null);
   assert.equal('conditionSummary' in pendingHandoffs.items[0], false);
   assert.equal((await request('GET', '/api/inpatient/handoffs/pending?scope=unknown')).status, 422);
   assert.equal((await ok('GET', '/api/inpatient/handoffs/pending?scope=mine')).total, 0);
@@ -615,6 +616,7 @@ try {
   assert.equal((await ok('GET', '/api/inpatient/handoffs/pending?overdue=true')).items[0].id, handoff.id);
   assert.equal((await Promise.all([sendOverdueHandoffReminders(), sendOverdueHandoffReminders()])).reduce((total, count) => total + count, 0), 1);
   assert.equal(await sendOverdueHandoffReminders(), 0);
+  assert.ok((await ok('GET', '/api/inpatient/handoffs/pending')).items[0].overdueRemindedAt);
   token = (await (await import('./modules/auth/services/auth.service.js')).authService.login({ username: 'integration_receiver', password: 'Temporary!Pass123' })).token;
   assert.equal((await ok('GET', '/api/notifications')).items.filter((item: { kind: string; sourceId: number; message: string }) => item.kind === 'nursing_handoff_overdue' && item.sourceId === handoff.id && !item.message.includes('Fall risk')).length, 1);
   token = adminToken;
@@ -641,6 +643,7 @@ try {
   assert.equal((await request('POST', `/api/inpatient/admissions/${admission.id}/handoffs/${handoff.id}/reassign`, { recipientId: receiver.id, reason: 'Same receiver' })).status, 409);
   assert.equal((await ok('POST', `/api/inpatient/admissions/${admission.id}/handoffs/${handoff.id}/reassign`, { recipientId: bystander.id, reason: 'Receiver unavailable' })).recipientId, bystander.id);
   assert.equal((await dataSource.query('SELECT overdue_reminded_at AS remindedAt FROM nursing_handoffs WHERE id = ?', [handoff.id]))[0].remindedAt, null);
+  assert.equal((await ok('GET', '/api/inpatient/handoffs/pending')).items[0].overdueRemindedAt, null);
   await dataSource.query('UPDATE nursing_handoffs SET acknowledgement_due_at = DATE_SUB(NOW(), INTERVAL 1 MINUTE) WHERE id = ?', [handoff.id]);
   assert.equal(await sendOverdueHandoffReminders(), 1);
   assert.equal(await sendOverdueHandoffReminders(), 0);

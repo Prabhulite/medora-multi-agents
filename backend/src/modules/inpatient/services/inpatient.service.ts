@@ -120,6 +120,7 @@ export const inpatientService = {
     const items = await query.select('handoff.id', 'id').addSelect('handoff.admissionId', 'admissionId')
       .addSelect('handoff.createdAt', 'createdAt').addSelect('outgoing.id', 'outgoingById')
       .addSelect('handoff.acknowledgementDueAt', 'acknowledgementDueAt')
+      .addSelect('handoff.overdueRemindedAt', 'overdueRemindedAt')
       .addSelect('outgoing.fullName', 'outgoingByName')
       .addSelect('handoff.recipientId', 'recipientId')
       .addSelect('recipient.fullName', 'recipientName')
