@@ -83,6 +83,24 @@ try {
   assert.ok(worklistReady, 'Laboratory orders did not finish loading');
   assert.equal(await evaluate('Boolean(document.querySelector(".laboratory-section .ui-table-search input")) && Boolean(document.querySelector(".laboratory-section .ui-table-toolbar__entries select"))'), true, 'Worklist search and paging controls did not render');
   assert.equal(await evaluate('document.body.innerText.includes("Unable to load laboratory diagnostics")'), false, 'Laboratory workbench showed a load error');
+  await evaluate('Array.from(document.querySelectorAll("button")).find(button => button.innerText === "Manage tests")?.click(); true');
+  let laboratoryCatalogReady = false;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    laboratoryCatalogReady = await evaluate('document.querySelector(".laboratory-modal")?.innerText.includes("Laboratory test catalog") && Boolean(Array.from(document.querySelectorAll(".laboratory-catalog-list button")).find(button => button.innerText === "Revise")) && Boolean(Array.from(document.querySelectorAll(".laboratory-catalog-list button")).find(button => button.innerText === "History"))');
+    if (laboratoryCatalogReady) break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.ok(laboratoryCatalogReady, 'Laboratory catalog revision controls did not render');
+  await evaluate('Array.from(document.querySelectorAll(".laboratory-catalog-list button")).find(button => button.innerText === "History").click(); true');
+  let laboratoryCatalogHistoryReady = false;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    laboratoryCatalogHistoryReady = await evaluate('document.querySelector(".laboratory-modal")?.innerText.includes("Catalog revision history")');
+    if (laboratoryCatalogHistoryReady) break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.ok(laboratoryCatalogHistoryReady, 'Laboratory catalog revision history did not render');
+  await evaluate('document.querySelector(".laboratory-modal__header button")?.click(); true');
+  await evaluate('document.querySelector(".laboratory-modal__header button")?.click(); true');
   const releasedLaboratoryLookup = await evaluate('fetch("/api/laboratory/worklist?status=completed&page=1&pageSize=10", { credentials: "include" }).then(async response => ({ status: response.status, body: await response.json() }))') as { status: number; body: { data?: { items?: Array<{ id: number; orderNumber: string }> } } };
   assert.equal(releasedLaboratoryLookup.status, 200, `Released laboratory worklist returned ${releasedLaboratoryLookup.status}`);
   let releasedLaboratoryOrderNumber: string | null = null;
@@ -396,7 +414,7 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   assert.ok(opdQueueReady, 'OPD consultation queue filters did not render');
-  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, communication queues${releasedLaboratoryOrderNumber ? ', released laboratory archive action' : ''}, pharmacy patient forms${hasBatch ? ', stock movements and count form' : ''}, inpatient dashboard, patient registration${hasPatientRow ? ' and merge confirmation' : ''}, registration source management, history and report${patientLookup.body.data?.length ? ', radiology patient selection' : ''}${finalOrderNumber ? ', finalized radiology report print output' : ''}, cashier and receivables reports, cash closeout review, and OPD queue rendered in headless Chrome.`);
+  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, communication queues, laboratory catalog history${releasedLaboratoryOrderNumber ? ', released laboratory archive action' : ''}, pharmacy patient forms${hasBatch ? ', stock movements and count form' : ''}, inpatient dashboard, patient registration${hasPatientRow ? ' and merge confirmation' : ''}, registration source management, history and report${patientLookup.body.data?.length ? ', radiology patient selection' : ''}${finalOrderNumber ? ', finalized radiology report print output' : ''}, cashier and receivables reports, cash closeout review, and OPD queue rendered in headless Chrome.`);
   await send('Browser.close').catch(() => undefined);
   socket.close();
 } finally {
