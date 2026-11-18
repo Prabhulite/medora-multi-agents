@@ -33,6 +33,9 @@ function diagnosticQueuePath(destination: 'laboratory' | 'radiology', item: Oper
 function billingQueuePath(item: OperationsQueueItem) {
   return item.patientId ? `/billing?patientId=${item.patientId}` : '/billing';
 }
+function appointmentQueuePath(item: OperationsQueueItem) {
+  return item.patientId ? `/appointments?patientId=${item.patientId}` : '/appointments';
+}
 
 function Queue({ items, itemPath }: { items: OperationsQueueItem[]; itemPath?: (item: OperationsQueueItem) => string }) {
   if (!items.length) return <div className="operations-empty">Nothing is waiting right now.</div>;
@@ -82,7 +85,7 @@ export function OperationsDashboardPage() {
       <section className="operations-content" aria-label="Operational queues">
         <div className="operations-panels">
           {hasPermission(user, 'patients.view') ? <FollowUpQueue /> : null}
-          <article className="operations-panel"><header><div><small>Front office</small><h2>Appointments</h2></div><b>{k.appointmentsWaiting} waiting</b></header><Queue items={dashboard.queues.appointments} /></article>
+          <article className="operations-panel"><header><div><small>Front office</small><h2>Appointments</h2></div><b>{k.appointmentsWaiting} waiting</b></header><Queue items={dashboard.queues.appointments} itemPath={hasPermission(user, 'appointments.view') ? appointmentQueuePath : undefined} /></article>
           <article className="operations-panel"><header><div><small>Inpatient</small><h2>Admissions</h2></div><b>{k.admissionsActive} active</b></header><Queue items={dashboard.queues.admissions} /></article>
           <article className="operations-panel"><header><div><small>Finance</small><h2>Billing balances</h2></div><b>{formatCurrency(k.billingOutstanding)}</b></header><Queue items={dashboard.queues.billing} itemPath={hasPermission(user, 'billing.view') ? billingQueuePath : undefined} /></article>
           <article className="operations-panel"><header><div><small>Diagnostics</small><h2>Laboratory</h2></div><b>{k.labPending} pending</b></header><Queue items={dashboard.queues.laboratory} itemPath={hasPermission(user, 'laboratory.view') ? (item) => diagnosticQueuePath('laboratory', item) : undefined} /></article>

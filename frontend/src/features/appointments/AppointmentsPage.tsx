@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ActionMenu, type ActionMenuItem } from '../../components/ui/ActionMenu';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
@@ -141,7 +141,9 @@ function todayIso() {
 
 export function AppointmentsPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  const linkedPatientId = (() => { const value = searchParams.get('patientId'); return value && /^\d+$/.test(value) && Number(value) > 0 ? Number(value) : undefined; })();
   const [rows, setRows] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -201,6 +203,7 @@ export function AppointmentsPage() {
         await appointmentsApi.list({
           fromDate: from,
           toDate: to,
+          patientId: linkedPatientId,
         }),
       );
     } catch (err) {
@@ -212,7 +215,7 @@ export function AppointmentsPage() {
 
   useEffect(() => {
     void load();
-  }, [fromDate, toDate]);
+  }, [fromDate, toDate, linkedPatientId]);
 
   const updateStatus = (row: Appointment, next: AppointmentStatus) => {
     const labels: Record<string, string> = {
