@@ -30,10 +30,11 @@ export function CashierCloseoutPanel({ onClose }: { onClose: () => void }) {
   const [notice, setNotice] = useState('');
   const canClose = hasPermission(user, 'billing.closeout');
   const canDeposit = hasPermission(user, 'billing.deposit');
+  const canVoidDeposit = hasPermission(user, 'billing.deposit.void');
   const isToday = date === localDate(new Date());
   const alreadyClosed = rows.some((row) => row.cashierId === user?.id);
   const selectedCloseout = rows.find((row) => String(row.id) === depositCloseoutId);
-  const remaining = selectedCloseout ? Math.max(0, Math.round(Number(selectedCloseout.countedCash) * 100) - deposits.filter((row) => row.closeoutId === selectedCloseout.id).reduce((sum, row) => sum + Math.round(Number(row.amount) * 100), 0)) / 100 : 0;
+  const remaining = selectedCloseout ? Math.max(0, Math.round(Number(selectedCloseout.countedCash) * 100) - deposits.filter((row) => row.closeoutId === selectedCloseout.id && !row.voidedAt).reduce((sum, row) => sum + Math.round(Number(row.amount) * 100), 0)) / 100 : 0;
 
   const load = async (selectedDate: string) => {
     setLoading(true); setError('');
@@ -71,6 +72,17 @@ export function CashierCloseoutPanel({ onClose }: { onClose: () => void }) {
     } catch (err) { setError(getErrorMessage(err, 'Unable to record bank deposit')); }
     finally { setSaving(false); }
   };
+  const voidDeposit = async (deposit: CashDeposit) => {
+    const voidReason = window.prompt(`Void bank reference ${deposit.bankReference}? Give a reason (at least 10 characters).`);
+    if (voidReason === null) return;
+    setSaving(true); setError(''); setNotice('');
+    try {
+      await billingApi.voidDeposit(deposit.id, voidReason.trim());
+      setNotice(`Bank deposit ${deposit.bankReference} voided. Its amount is available to record again.`);
+      await load(date);
+    } catch (err) { setError(getErrorMessage(err, 'Unable to void bank deposit')); }
+    finally { setSaving(false); }
+  };
 
   return <div className="billing-modal-backdrop" role="presentation" onClick={onClose}>
     <section className="billing-modal billing-modal--wide" role="dialog" aria-modal="true" aria-labelledby="cash-closeout-title" onClick={(event) => event.stopPropagation()}>
@@ -81,7 +93,7 @@ export function CashierCloseoutPanel({ onClose }: { onClose: () => void }) {
         <small>Business dates follow the database session time. Closed amounts are a saved snapshot.</small>
         <div className="billing-ledger-scroll"><table className="billing-ledger-table"><thead><tr><th>Cashier</th><th>Received</th><th>Refunded</th><th>Expected</th><th>Counted</th><th>Variance</th><th>Closed</th><th>Reason</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td>{row.cashierName}</td><td>{currency.format(Number(row.cashReceived))}</td><td>{currency.format(Number(row.cashRefunded))}</td><td>{currency.format(Number(row.expectedCash))}</td><td>{currency.format(Number(row.countedCash))}</td><td>{currency.format(Number(row.variance))}</td><td>{new Date(row.closedAt).toLocaleString()}</td><td>{row.reason || '—'}</td></tr>)}{!loading && rows.length === 0 && <tr><td colSpan={8}>No closeouts for this date.</td></tr>}</tbody></table></div>
         <h3>Recorded bank deposits</h3>
-        <div className="billing-ledger-scroll"><table className="billing-ledger-table"><thead><tr><th>Cashier</th><th>Deposit date</th><th>Amount</th><th>Bank reference</th><th>Recorded by</th><th>Note</th></tr></thead><tbody>{deposits.map((row) => <tr key={row.id}><td>{row.cashierName}</td><td>{row.depositDate}</td><td>{currency.format(Number(row.amount))}</td><td>{row.bankReference}</td><td>{row.recordedByName}</td><td>{row.note || '—'}</td></tr>)}{!loading && deposits.length === 0 && <tr><td colSpan={6}>No deposits recorded for these closeouts.</td></tr>}</tbody></table></div>
+        <div className="billing-ledger-scroll"><table className="billing-ledger-table"><thead><tr><th>Cashier</th><th>Deposit date</th><th>Amount</th><th>Bank reference</th><th>Recorded by</th><th>Status</th><th>Note</th><th>Action</th></tr></thead><tbody>{deposits.map((row) => <tr key={row.id}><td>{row.cashierName}</td><td>{row.depositDate}</td><td>{currency.format(Number(row.amount))}</td><td>{row.bankReference}</td><td>{row.recordedByName}</td><td>{row.voidedAt ? `Voided by ${row.voidedByName || 'unknown'}` : 'Recorded'}</td><td>{row.voidedAt ? row.voidReason : row.note || '—'}</td><td>{canVoidDeposit && !row.voidedAt ? <Button type="button" variant="secondary" onClick={() => void voidDeposit(row)} disabled={saving}>Void</Button> : '—'}</td></tr>)}{!loading && deposits.length === 0 && <tr><td colSpan={8}>No deposits recorded for these closeouts.</td></tr>}</tbody></table></div>
         {canDeposit && rows.length > 0 && <form className="billing-form billing-closeout-form" onSubmit={(event) => void submitDeposit(event)}>
           <h3>Record a bank deposit</h3><p>Record a bank reference for cash already counted at closeout. Remaining for the selected closeout: <strong>{currency.format(remaining)}</strong>.</p>
           <div className="billing-form__grid"><Select label="Cash closeout" required value={depositCloseoutId} onChange={(event) => setDepositCloseoutId(event.target.value)} options={[{ value: '', label: 'Select a cashier closeout' }, ...rows.map((row) => ({ value: row.id, label: `${row.cashierName} · ${row.businessDate} · ${currency.format(Number(row.countedCash))}` }))]} /><Input label="Deposit date" type="date" required min={selectedCloseout?.businessDate} max={localDate(new Date())} value={depositDate} onChange={(event) => setDepositDate(event.target.value)} /><Input label="Amount deposited" type="number" required min="0.01" max={remaining || undefined} step="0.01" value={depositAmount} onChange={(event) => setDepositAmount(event.target.value)} /><Input label="Bank reference" required minLength={4} maxLength={120} value={bankReference} onChange={(event) => setBankReference(event.target.value)} /></div>

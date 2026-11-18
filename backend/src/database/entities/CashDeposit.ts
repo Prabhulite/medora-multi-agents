@@ -15,4 +15,8 @@ export class CashDeposit {
   @Column({ name: 'recorded_by_id', type: 'int', unsigned: true }) recordedById!: number;
   @ManyToOne(() => User, { onDelete: 'RESTRICT' }) @JoinColumn({ name: 'recorded_by_id' }) recordedBy!: User;
   @CreateDateColumn({ name: 'recorded_at', type: 'timestamp', precision: 6 }) recordedAt!: Date;
+  @Column({ name: 'voided_at', type: 'timestamp', precision: 6, nullable: true }) voidedAt!: Date | null;
+  @Column({ name: 'voided_by_id', type: 'int', unsigned: true, nullable: true }) voidedById!: number | null;
+  @ManyToOne(() => User, { nullable: true, onDelete: 'RESTRICT' }) @JoinColumn({ name: 'voided_by_id' }) voidedBy!: User | null;
+  @Column({ name: 'void_reason', type: 'varchar', length: 500, nullable: true }) voidReason!: string | null;
 }

@@ -14,6 +14,7 @@ export const billingController = {
   async closeout(req: Request, res: Response) { return sendCreated(res, await billingService.closeout(req.body, req.user?.id ?? null), 'Cashier day closed'); },
   async deposits(req: Request, res: Response) { return sendSuccess(res, await cashDepositService.list(String(req.query.date)), 'Cash deposits fetched'); },
   async deposit(req: Request, res: Response) { return sendCreated(res, await cashDepositService.create(Number(req.params.id), req.body, req.user!.id), 'Cash deposit recorded'); },
+  async voidDeposit(req: Request, res: Response) { return sendSuccess(res, await cashDepositService.void(Number(req.params.id), req.body.reason, req.user!.id), 'Cash deposit voided'); },
   async receipt(req: Request, res: Response) { return sendSuccess(res, await billingService.receipt(Number(req.params.id)), 'Payment receipt fetched'); },
   async cashierReport(req: Request, res: Response) { return sendSuccess(res, await cashierReportService.get(String(req.query.from), String(req.query.to)), 'Cashier report fetched'); },
   async cashierReportExport(req: Request, res: Response) {

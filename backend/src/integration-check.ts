@@ -1016,6 +1016,7 @@ try {
   token = radiologyViewerToken;
   assert.equal((await request('POST', depositPath, { depositDate: closeoutDate, amount: 10, bankReference: 'IT-DENIED' })).status, 403);
   assert.equal((await request('GET', `/api/billing/deposits?date=${closeoutDate}`)).status, 403);
+  assert.equal((await request('POST', '/api/billing/deposits/1/void', { reason: 'Unauthorized void attempt' })).status, 403);
   token = adminToken;
   const competingDeposits = await Promise.all(['IT-DEP-1', 'IT-DEP-2'].map((bankReference) => request('POST', depositPath, { depositDate: closeoutDate, amount: 30, bankReference })));
   assert.deepEqual(competingDeposits.map((response) => response.status).sort(), [201, 422]);
@@ -1026,7 +1027,18 @@ try {
   assert.equal((await request('POST', depositPath, { depositDate: closeoutDate, amount: 30, bankReference: 'IT-DEP-OVER' })).status, 422);
   const finalDeposit = await ok('POST', depositPath, { depositDate: closeoutDate, amount: 29.5, bankReference: 'IT-DEP-FINAL', note: 'Second deposit' }, 201);
   assert.equal(finalDeposit.amount, '29.50');
-  assert.equal((await ok('GET', `/api/billing/deposits?date=${closeoutDate}`)).length, 2);
+  const voidPath = `/api/billing/deposits/${firstDeposit.id}/void`;
+  assert.equal((await request('POST', voidPath, { reason: 'short' })).status, 422);
+  const voidedDeposit = await ok('POST', voidPath, { reason: 'Bank reference entered against the wrong drawer' });
+  assert.ok(voidedDeposit.voidedAt);
+  assert.equal(voidedDeposit.voidedByName, 'Integration Admin');
+  assert.equal(voidedDeposit.voidReason, 'Bank reference entered against the wrong drawer');
+  assert.equal((await request('POST', voidPath, { reason: 'Repeat void must be rejected' })).status, 409);
+  const replacementDeposit = await ok('POST', depositPath, { depositDate: closeoutDate, amount: 30, bankReference: 'IT-DEP-REPLACEMENT' }, 201);
+  assert.equal(replacementDeposit.amount, '30.00');
+  const listedDeposits = await ok('GET', `/api/billing/deposits?date=${closeoutDate}`);
+  assert.equal(listedDeposits.length, 3);
+  assert.equal(listedDeposits.find((row: { id: number }) => row.id === firstDeposit.id).voidReason, 'Bank reference entered against the wrong drawer');
   assert.equal((await ok('GET', `/api/billing/closeouts?date=${closeoutDate}`))[0].countedCash, '59.50');
   assert.equal((await request('POST', '/api/billing/closeouts', { countedCash: 60 })).status, 409);
   assert.equal((await request('POST', `/api/billing/invoices/${invoice.id}/payments`, { amount: 1, method: 'cash' })).status, 409);
