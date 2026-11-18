@@ -1,5 +1,7 @@
 # Medora Advanced HMS Roadmap
 
+> Release tracking: see [Advanced HMS Completion Checklist](ADVANCED-HMS-COMPLETION-CHECKLIST.md). Completed boxes require implementation, documentation, and verification.
+
 ## Objective
 
 Evolve Medora from its current administration, patient-registration, doctor, and appointment foundation into a production-oriented hospital management system for Indian hospitals and clinics.
