@@ -1,12 +1,12 @@
 import { AppDataSource } from '../../../config/data-source.js';
 import { IsNull } from 'typeorm';
-import { Admission, AdmissionHomeMedicationReview, Bed, BedTransfer, Department, DischargeHomeMedicationReview, DischargeMedicationReview, Doctor, HomeMedication, MedicationAdministration, NursingCarePlan, NursingCarePlanReview, NursingHandoff, NursingHandoffAssignment, NursingObservation, Patient, PatientAuditLog, Prescription, Ward, Medication, User, UserNotification } from '../../../database/entities/index.js';
+import { Admission, AdmissionHomeMedicationReview, Bed, BedTransfer, Department, DischargeHomeMedicationReview, DischargeMedicationReview, Doctor, HomeMedication, MedicationAdministration, NursingCarePlan, NursingCarePlanReview, NursingHandoff, NursingHandoffAssignment, NursingHandoffEscalation, NursingObservation, Patient, PatientAuditLog, Prescription, Ward, Medication, User, UserNotification } from '../../../database/entities/index.js';
 import { assertNoRecordedAllergy } from '../../clinical/services/allergy-check.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { nextSequenceNumber } from '../../patients/services/number-sequence.service.js';
 import type { CreateAdmissionInput } from '../validators/inpatient.validators.js';
 import type { z } from 'zod';
-import { admissionMedicationReviewSchema, closeCarePlanSchema, continueCarePlanSchema, createCarePlanSchema, createNursingHandoffSchema, dischargeSummarySchema, medicationAdministrationSchema, nursingObservationSchema, reassignNursingHandoffSchema, transferBedSchema } from '../validators/inpatient.validators.js';
+import { admissionMedicationReviewSchema, closeCarePlanSchema, continueCarePlanSchema, createCarePlanSchema, createNursingHandoffSchema, dischargeSummarySchema, escalateNursingHandoffSchema, medicationAdministrationSchema, nursingObservationSchema, reassignNursingHandoffSchema, transferBedSchema } from '../validators/inpatient.validators.js';
 
 function carePlanResponse(plan: NursingCarePlan | null) {
   if (!plan) throw new NotFoundError('Care plan not found');
@@ -21,6 +21,36 @@ const observationResponse = (row: NursingObservation) => ({ ...row, recordedBy: 
 const handoffResponse = (row: NursingHandoff) => { const { outgoingBy, recipient, acknowledgedBy, closedOnDischargeBy, ...fields } = row; return { ...fields, outgoingBy: staffReference(outgoingBy), recipient: staffReference(recipient), acknowledgedBy: staffReference(acknowledgedBy), closedOnDischargeBy: staffReference(closedOnDischargeBy) }; };
 
 export const inpatientService = {
+  async nursingHandoffEscalations(admissionId: number, handoffId: number) {
+    if (!(await AppDataSource.getRepository(NursingHandoff).exist({ where: { id: handoffId, admissionId } }))) throw new NotFoundError('Handoff not found');
+    const rows = await AppDataSource.getRepository(NursingHandoffEscalation).find({ where: { handoffId }, relations: { recipient: true, raisedBy: true }, order: { id: 'ASC' } });
+    return rows.map(({ recipient, raisedBy, ...fields }) => ({ ...fields, recipient: staffReference(recipient), raisedBy: staffReference(raisedBy) }));
+  },
+  async escalateNursingHandoff(admissionId: number, handoffId: number, input: z.infer<typeof escalateNursingHandoffSchema>, userId: number | null) {
+    if (!userId) throw new ValidationError('Staff identity is required');
+    return AppDataSource.transaction(async (manager) => {
+      const admission = await manager.getRepository(Admission).createQueryBuilder('admission').setLock('pessimistic_write').where('admission.id = :id', { id: admissionId }).getOne();
+      if (!admission) throw new NotFoundError('Admission not found');
+      if (admission.status === 'discharged') throw new ConflictError('Cannot escalate a handoff after discharge');
+      const handoff = await manager.getRepository(NursingHandoff).createQueryBuilder('handoff').setLock('pessimistic_write').where('handoff.id = :handoffId AND handoff.admission_id = :admissionId', { handoffId, admissionId }).getOne();
+      if (!handoff) throw new NotFoundError('Handoff not found');
+      if (handoff.acknowledgedAt || handoff.closedOnDischargeAt) throw new ConflictError('Handoff is no longer pending');
+      if (!handoff.acknowledgementDueAt || handoff.acknowledgementDueAt.getTime() > Date.now()) throw new ConflictError('Handoff is not overdue');
+      if (input.recipientId === handoff.recipientId || input.recipientId === handoff.outgoingById) throw new ValidationError('Choose another staff member for escalation');
+      const recipient = await manager.getRepository(User).createQueryBuilder('staff')
+        .leftJoin('staff.roles', 'role', 'role.is_active = 1').leftJoin('role.permissions', 'permission')
+        .leftJoin('staff.roles', 'viewRole', 'viewRole.is_active = 1')
+        .leftJoin('viewRole.permissions', 'viewPermission', 'viewPermission.code = :viewCode', { viewCode: 'inpatient.view' })
+        .where('staff.id = :recipientId AND staff.is_active = 1', { recipientId: input.recipientId })
+        .andWhere('(staff.is_super_admin = 1 OR (permission.code = :code AND viewPermission.code = :viewCode))', { code: 'inpatient.update', viewCode: 'inpatient.view' }).getOne();
+      if (!recipient) throw new ValidationError('Escalation recipient must have active inpatient view and update permissions');
+      if (await manager.getRepository(NursingHandoffEscalation).exist({ where: { handoffId, recipientId: recipient.id } })) throw new ConflictError('Handoff has already been escalated to this staff member');
+      const event = await manager.getRepository(NursingHandoffEscalation).save({ handoffId, recipientId: recipient.id, raisedById: userId, reason: input.reason });
+      await manager.getRepository(UserNotification).save({ recipientId: recipient.id, kind: 'nursing_handoff_escalated', sourceId: handoffId, title: 'Overdue nursing handoff', message: `Handoff for admission ${admission.admissionNumber} is overdue. Review it in Inpatient Management.`, route: '/inpatient' });
+      await manager.getRepository(PatientAuditLog).save({ patientId: admission.patientId, action: 'nursing_handoff_escalated', changedById: userId, changeSummary: `Overdue nursing handoff escalated for admission ${admission.admissionNumber}`, beforeData: JSON.stringify({ admissionId, handoffId }), afterData: JSON.stringify({ admissionId, handoffId, escalationId: event.id, recipientId: recipient.id }) });
+      return { ...event, recipient: staffReference(recipient), raisedBy: staffReference(await manager.getRepository(User).findOneBy({ id: userId })) };
+    });
+  },
   async nursingHandoffAssignments(admissionId: number, handoffId: number) {
     if (!(await AppDataSource.getRepository(NursingHandoff).exist({ where: { id: handoffId, admissionId } }))) throw new NotFoundError('Handoff not found');
     const rows = await AppDataSource.getRepository(NursingHandoffAssignment).find({ where: { handoffId }, relations: { fromRecipient: true, toRecipient: true, changedBy: true }, order: { id: 'ASC' } });

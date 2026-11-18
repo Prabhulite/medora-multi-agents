@@ -157,6 +157,7 @@ const PERMISSIONS = [
   { code: 'inpatient.create', module: 'inpatient', action: 'create', description: 'Admit patients' },
   { code: 'inpatient.update', module: 'inpatient', action: 'update', description: 'Update and discharge admissions' },
   { code: 'inpatient.handoff.reassign', module: 'inpatient', action: 'handoff_reassign', description: 'Reassign an unacknowledged nursing handoff with a reason' },
+  { code: 'inpatient.handoff.escalate', module: 'inpatient', action: 'handoff_escalate', description: 'Escalate an overdue nursing handoff to another staff member' },
   { code: 'billing.view', module: 'billing', action: 'view', description: 'View invoices and balances' },
   { code: 'billing.closeout', module: 'billing', action: 'closeout', description: 'Close cashier cash drawer' },
   { code: 'billing.create', module: 'billing', action: 'create', description: 'Create invoices' },
