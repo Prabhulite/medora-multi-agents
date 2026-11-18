@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -73,9 +73,12 @@ function DetailRow({ label, value }: { label: string; value: ReactNode }) {
 
 export function PatientDashboardPage() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const patientId = id ? Number(id) : null;
+  const visitId = Number(searchParams.get('visitId'));
+  const activeVisitId = Number.isSafeInteger(visitId) && visitId > 0 ? visitId : undefined;
 
   const [patient, setPatient] = useState<Patient | null>(null);
   const [loading, setLoading] = useState(true);
@@ -391,7 +394,7 @@ export function PatientDashboardPage() {
 
             <PatientCommunicationsPanel patientId={patient.id} canRecord={canUpdate} />
 
-            {hasPermission(user, 'clinical.view') ? <ClinicalEncountersPanel patientId={patient.id} onAllergiesChanged={() => setAllergyRevision((value) => value + 1)} /> : null}
+            {hasPermission(user, 'clinical.view') ? <ClinicalEncountersPanel patientId={patient.id} activeVisitId={activeVisitId} onAllergiesChanged={() => setAllergyRevision((value) => value + 1)} /> : null}
           </div>
         </>
       )}

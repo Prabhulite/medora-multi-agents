@@ -1275,6 +1275,11 @@ try {
   token = adminToken;
   const consultingVisit = await ok('POST', `/api/visits/${waitingQueue[0].id}/start-consultation`);
   assert.equal(consultingVisit.status, 'consulting');
+  const linkedEncounter = await ok('POST', '/api/clinical/encounters', { patientId: consultingVisit.patientId, visitId: consultingVisit.id, assessment: 'OP consultation draft' }, 201);
+  assert.equal(linkedEncounter.visitId, consultingVisit.id);
+  assert.equal(linkedEncounter.doctorId, consultingVisit.doctorId);
+  assert.equal((await request('POST', '/api/clinical/encounters', { patientId: consultingVisit.patientId, visitId: consultingVisit.id, doctorId: 2, assessment: 'Wrong doctor' })).status, 422);
+  assert.equal((await request('POST', '/api/clinical/encounters', { patientId: consultingVisit.patientId === 1 ? 2 : 1, visitId: consultingVisit.id, assessment: 'Wrong patient' })).status, 422);
   assert.ok(consultingVisit.consultationStartedAt);
   assert.equal(consultingVisit.consultationStartedByName, 'Integration Admin');
   assert.equal((await request('POST', `/api/visits/${waitingQueue[0].id}/start-consultation`)).status, 409);

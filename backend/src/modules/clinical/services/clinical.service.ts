@@ -27,9 +27,12 @@ export const clinicalService = {
     return AppDataSource.transaction(async (manager) => {
       const patient = await manager.getRepository(Patient).createQueryBuilder('patient').setLock('pessimistic_write').where('patient.id = :id', { id: input.patientId }).getOne();
       if (!patient || !patient.isActive || patient.mergedIntoPatientId) throw new NotFoundError('Active patient not found');
+      let visitDoctorId: number | null = null;
       if (input.visitId) {
         const visit = await manager.getRepository(PatientVisit).findOne({ where: { id: input.visitId, patientId: input.patientId } });
         if (!visit) throw new ValidationError('Visit does not belong to this patient');
+        visitDoctorId = visit.doctorId;
+        if (input.doctorId && visitDoctorId && input.doctorId !== visitDoctorId) throw new ValidationError('Doctor does not match the visit');
       }
       if (input.doctorId) {
         const doctor = await manager.getRepository(Doctor).findOne({ where: { id: input.doctorId, isActive: true } });
@@ -41,6 +44,7 @@ export const clinicalService = {
       if (input.diagnosisTermId && !diagnosisTerm) throw new ValidationError('Diagnosis term is invalid or inactive');
       const encounter = await manager.getRepository(ClinicalEncounter).save(manager.getRepository(ClinicalEncounter).create({
         ...input,
+        doctorId: visitDoctorId ?? input.doctorId ?? null,
         status: 'draft',
         signedAt: null,
         signedById: null,

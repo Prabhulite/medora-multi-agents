@@ -61,6 +61,7 @@ export function CheckinListPage() {
   const canCheckin = hasPermission(user, 'visits.checkin');
   const canCheckout = hasPermission(user, 'visits.checkout');
   const canConsult = hasPermission(user, 'visits.consult');
+  const canOpenChart = hasPermission(user, 'clinical.view');
 
   const load = async () => {
     setLoading(true);
@@ -233,9 +234,11 @@ export function CheckinListPage() {
         render: (row: OpCheckinVisit) => {
           const canStart = canConsult && row.status === 'in_progress' && row.visitState === 'inside' && busyId !== row.id;
           const canFinish = canCheckout && row.visitState === 'inside' && busyId !== row.id;
-          if (!canStart && !canFinish) return <span className="checkin-actions-empty">—</span>;
+          const canChart = canOpenChart && row.status === 'consulting';
+          if (!canStart && !canFinish && !canChart) return <span className="checkin-actions-empty">—</span>;
           return (
             <div className="checkin-actions-cell">
+              {canChart && <button type="button" className="checkin-consult-btn" onClick={() => navigate(`/patients/${row.patientId}?visitId=${row.id}`)}>Open chart</button>}
               {canStart && <button type="button" className="checkin-consult-btn" onClick={() => void startConsultation(row)}>Start consultation</button>}
               {canFinish && <button
                 type="button"
@@ -249,7 +252,7 @@ export function CheckinListPage() {
         },
       },
     ],
-    [busyId, canCheckout, canConsult, date, doctorId, status],
+    [busyId, canCheckout, canConsult, canOpenChart, date, doctorId, status],
   );
 
   return (

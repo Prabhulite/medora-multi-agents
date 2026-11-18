@@ -18,7 +18,7 @@ function dateTime(value: string) {
   return new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-export function ClinicalEncountersPanel({ patientId, onAllergiesChanged }: { patientId: number; onAllergiesChanged?: () => void }) {
+export function ClinicalEncountersPanel({ patientId, activeVisitId, onAllergiesChanged }: { patientId: number; activeVisitId?: number; onAllergiesChanged?: () => void }) {
   const { user } = useAuth();
   const canCreateClinical = hasPermission(user, 'clinical.create');
   const canSignClinical = hasPermission(user, 'clinical.update');
@@ -133,7 +133,7 @@ export function ClinicalEncountersPanel({ patientId, onAllergiesChanged }: { pat
     setBusy(true); setError('');
     try {
       await clinicalApi.create({
-        patientId, complaints, assessment, plan, diagnosisName: diagnosisTermId ? null : diagnosisName,
+        patientId, visitId: activeVisitId, complaints, assessment, plan, diagnosisName: diagnosisTermId ? null : diagnosisName,
         diagnosisTermId: diagnosisTermId ? Number(diagnosisTermId) : null,
         vitals: { temperature, pulse, bloodPressure, spo2, weight },
       });
@@ -220,6 +220,7 @@ export function ClinicalEncountersPanel({ patientId, onAllergiesChanged }: { pat
         <label className="ui-field"><span className="ui-field__label">Presenting complaints</span><textarea className="ui-field__input clinical-encounter-textarea" value={complaints} onChange={(event) => setComplaints(event.target.value)} /></label>
         <label className="ui-field"><span className="ui-field__label">Assessment</span><textarea className="ui-field__input clinical-encounter-textarea" value={assessment} onChange={(event) => setAssessment(event.target.value)} /></label>
         <label className="ui-field"><span className="ui-field__label">Plan / treatment</span><textarea className="ui-field__input clinical-encounter-textarea" value={plan} onChange={(event) => setPlan(event.target.value)} /></label>
+        {activeVisitId ? <p className="pd-empty">This encounter will be linked to OP visit #{activeVisitId}.</p> : null}
         <Button size="sm" loading={busy} onClick={() => void save()}>Save Encounter</Button>
       </div> : null}
       {canManageDiagnosisCatalog ? <div className="clinical-prescription-section">
