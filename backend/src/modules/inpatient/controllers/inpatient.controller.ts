@@ -31,6 +31,7 @@ export const inpatientController = {
   async wards(_req: Request, res: Response) { return sendSuccess(res, await inpatientService.wards(), 'Wards fetched'); },
   async beds(_req: Request, res: Response) { return sendSuccess(res, await inpatientService.beds(), 'Beds fetched'); },
   async admissions(req: Request, res: Response) { return sendSuccess(res, await inpatientService.admissions({ status: typeof req.query.status === 'string' ? req.query.status : undefined, patientId: req.query.patientId ? Number(req.query.patientId) : undefined }), 'Admissions fetched'); },
+  async admission(req: Request, res: Response) { return sendSuccess(res, await inpatientService.admission(Number(req.params.id)), 'Admission fetched'); },
   async admit(req: Request, res: Response) { return sendCreated(res, await inpatientService.admit(req.body, req.user?.id ?? null), 'Patient admitted'); },
   async discharge(req: Request, res: Response) { return sendSuccess(res, await inpatientService.discharge(Number(req.params.id), req.body, req.user?.id ?? null), 'Patient discharged'); },
 };

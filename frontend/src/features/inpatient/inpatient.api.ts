@@ -131,6 +131,7 @@ export const inpatientApi = {
   listWards: async () => (await getOrFallback<any[]>('/inpatient/wards', [])).map(mapWard),
   listBeds: async () => (await getOrFallback<any[]>('/inpatient/beds', [])).map(mapBed),
   listAdmissions: async () => (await getOrFallback<any[]>('/inpatient/admissions', [])).map(mapAdmission),
+  getAdmission: async (id: number) => mapAdmission((await api.get<ApiEnvelope<any>>(`/inpatient/admissions/${id}`)).data.data),
   dueCarePlans: async (page: number) => (await api.get<ApiEnvelope<DueCarePlanPage>>('/inpatient/care-plans/due', { params: { page, pageSize: 10 } })).data.data,
   createAdmission: async (payload: CreateAdmissionPayload) => {
     const response = await api.post<ApiEnvelope<any>>('/inpatient/admissions', { patientId: payload.patientId, bedId: payload.bedId, doctorId: payload.doctorId || null, reason: payload.diagnosis || null, notes: payload.notes || null });

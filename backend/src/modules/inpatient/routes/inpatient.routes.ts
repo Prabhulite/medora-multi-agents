@@ -14,6 +14,7 @@ router.get('/handoffs/pending', authorize('inpatient.view'), validate(pendingHan
 router.get('/handoffs/receivers', authorize('inpatient.update'), validate(handoffReceiverQuerySchema, 'query'), asyncHandler(inpatientController.handoffReceivers));
 router.get('/admissions', authorize('inpatient.view'), validate(admissionListQuerySchema, 'query'), asyncHandler(inpatientController.admissions));
 router.post('/admissions', authorize('inpatient.create'), validate(createAdmissionSchema), asyncHandler(inpatientController.admit));
+router.get('/admissions/:id', authorize('inpatient.view'), validate(admissionIdParamSchema, 'params'), asyncHandler(inpatientController.admission));
 router.get('/admissions/:id/handoffs', authorize('inpatient.view'), validate(admissionIdParamSchema, 'params'), asyncHandler(inpatientController.nursingHandoffs));
 router.post('/admissions/:id/handoffs', authorize('inpatient.update'), validate(admissionIdParamSchema, 'params'), validate(createNursingHandoffSchema), asyncHandler(inpatientController.createNursingHandoff));
 router.post('/admissions/:id/handoffs/:handoffId/acknowledge', authorize('inpatient.update'), validate(nursingHandoffIdParamSchema, 'params'), asyncHandler(inpatientController.acknowledgeNursingHandoff));

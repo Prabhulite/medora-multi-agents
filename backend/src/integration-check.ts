@@ -411,6 +411,12 @@ try {
   assert.equal((await ok('PATCH', `/api/emergency/cases/${emergency.id}/status`, { status: 'in_care' })).status, 'in_care');
 
   const admission = await ok('POST', '/api/inpatient/admissions', { patientId: 1, bedId: 1 }, 201);
+  const fetchedAdmission = await ok('GET', `/api/inpatient/admissions/${admission.id}`);
+  assert.equal(fetchedAdmission.id, admission.id);
+  assert.equal(fetchedAdmission.patient.mrdNumber, 'IT-MRD-001');
+  assert.equal(fetchedAdmission.bed.ward.name, 'Integration Ward');
+  assert.equal((await request('GET', '/api/inpatient/admissions/999999')).status, 404);
+  assert.equal((await request('GET', '/api/inpatient/admissions/invalid')).status, 422);
   const emptyEncounter = await ok('POST', '/api/clinical/encounters', { patientId: 1 }, 201);
   assert.equal((await request('POST', `/api/clinical/encounters/${emptyEncounter.id}/sign`)).status, 422);
   assert.equal((await request('POST', `/api/clinical/encounters/${emptyEncounter.id}/addenda`, { reason: 'Correction', addendum: 'Not signed yet' })).status, 409);
@@ -561,6 +567,7 @@ try {
   assert.deepEqual(Object.keys((await ok('GET', `/api/inpatient/admissions/${admission.id}/observations`))[0].recordedBy).sort(), ['fullName', 'id']);
   token = radiologyViewerToken;
   assert.equal((await request('GET', `/api/inpatient/admissions/${admission.id}/handoffs`)).status, 403);
+  assert.equal((await request('GET', `/api/inpatient/admissions/${admission.id}`)).status, 403);
   assert.equal((await request('GET', '/api/inpatient/handoffs/pending')).status, 403);
   assert.equal((await request('POST', `/api/inpatient/admissions/${admission.id}/handoffs`, { conditionSummary: 'Unauthorized', pendingTasks: 'Unauthorized' })).status, 403);
   token = adminToken;

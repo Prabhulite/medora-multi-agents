@@ -362,6 +362,11 @@ export const inpatientService = {
   async admissions(filters: { status?: string; patientId?: number }) {
     return AppDataSource.getRepository(Admission).find({ where: { ...(filters.status ? { status: filters.status as Admission['status'] } : {}), ...(filters.patientId ? { patientId: filters.patientId } : {}) }, relations: { patient: true, bed: { ward: true }, doctor: true, department: true }, order: { admittedAt: 'DESC' } });
   },
+  async admission(id: number) {
+    const row = await AppDataSource.getRepository(Admission).findOne({ where: { id }, relations: { patient: true, bed: { ward: true }, doctor: true, department: true } });
+    if (!row) throw new NotFoundError('Admission not found');
+    return row;
+  },
   async admit(input: CreateAdmissionInput, userId: number | null) {
     return AppDataSource.transaction(async (manager) => {
       const patient = await manager.getRepository(Patient).createQueryBuilder('patient').setLock('pessimistic_write').where('patient.id = :id', { id: input.patientId }).getOne();
