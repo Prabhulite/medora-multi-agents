@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { PageLoader } from '../../components/ui/Loader';
 import { PatientAvatar } from '../../components/ui/PatientAvatar';
 import {
   AlertCircleIcon,
@@ -148,7 +149,7 @@ export function PatientDashboardPage() {
   }, [patient]);
 
   if (loading) {
-    return <div className="pd-loading">Loading patient dashboard…</div>;
+    return <PageLoader label="Loading patient dashboard…" />;
   }
 
   if (error || !patient) {

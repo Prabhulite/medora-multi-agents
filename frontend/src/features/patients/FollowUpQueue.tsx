@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Loader } from '../../components/ui/Loader';
 import { getErrorMessage } from '../../lib/api';
 import { hasPermission } from '../../lib/permissions';
 import { useAuth } from '../auth/AuthContext';
@@ -25,7 +26,7 @@ export function FollowUpQueue() {
     finally { setBusy(false); }
   };
   return <article className="operations-panel"><header><div><small>Front office</small><h2>Patient follow-ups</h2></div><b>{rows.length} loaded</b></header>
-    {error ? <div className="operations-error" role="alert">{error}</div> : loading ? <div className="operations-empty">Loading follow-ups…</div> : rows.length ? <ul className="operations-queue" aria-label="Patient follow-up queue">
+    {error ? <div className="operations-error" role="alert">{error}</div> : loading ? <Loader size="sm" variant="block" label="Loading follow-ups…" /> : rows.length ? <ul className="operations-queue" aria-label="Patient follow-up queue">
       {rows.slice(0, 10).map((row) => <li className="operations-queue__item" key={row.id}><div><strong><Link to={`/patients/${row.patientId}`}>{row.patientName} · {row.patientMrdNumber}</Link></strong><span>{row.subject} · {row.channel} · {row.overdue ? 'Overdue' : 'Open'} · Due {new Date(row.followUpDueAt).toLocaleString()}</span></div>{canComplete ? <button type="button" className="operations-refresh" disabled={busy} onClick={() => void complete(row)}>Complete</button> : null}</li>)}
     </ul> : <div className="operations-empty">No open follow-ups.</div>}
   </article>;

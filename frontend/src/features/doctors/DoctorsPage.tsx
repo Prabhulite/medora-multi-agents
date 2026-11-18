@@ -5,6 +5,7 @@ import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { openMasterDocument } from '../../components/ui/DocumentUploadField';
+import { Loader } from '../../components/ui/Loader';
 import { Modal } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
 import {
@@ -212,7 +213,7 @@ export function DoctorsPage() {
           </Button>
         }
       >
-        {docsLoading ? <p className="doc-docs-empty">Loading documents…</p> : null}
+        {docsLoading ? <Loader size="sm" variant="block" label="Loading documents…" /> : null}
         {docsError ? <Alert tone="error">{docsError}</Alert> : null}
         {!docsLoading && !docsError ? (
           documents.length ? (

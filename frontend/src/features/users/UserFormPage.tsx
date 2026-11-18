@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { PageLoader } from '../../components/ui/Loader';
 import { MultiSelectSearch } from '../../components/ui/MultiSelectSearch';
 import { Select } from '../../components/ui/Select';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
@@ -181,7 +182,7 @@ export function UserFormPage() {
   };
 
   if (loading) {
-    return <div className="um-form-loading">Loading user form…</div>;
+    return <PageLoader label="Loading user form…" />;
   }
 
   if (error) {

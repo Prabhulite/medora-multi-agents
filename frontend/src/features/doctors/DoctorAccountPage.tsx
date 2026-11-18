@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { PageLoader } from '../../components/ui/Loader';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Select } from '../../components/ui/Select';
 import { getErrorMessage } from '../../lib/api';
@@ -43,7 +44,7 @@ export function DoctorAccountPage() {
   return <div className="doctor-account-page">
     <PageHeader title="Doctor account link" subtitle="Connect a verified doctor record to one staff login." actions={<Link to={`/doctors/${doctorId}/edit`}>Back to doctor</Link>} />
     {error && <Alert tone="error">{error}</Alert>}{notice && <Alert tone="success">{notice}</Alert>}
-    {!record ? <p>Loading doctor record...</p> : <>
+    {!record ? <PageLoader label="Loading doctor record…" /> : <>
       <section className="doctor-account-card"><h2>Doctor record</h2><p><strong>{record.doctor.name}</strong> · {record.doctor.doctorCode}</p><p>Medical registration: {record.doctor.medicalRegistrationNumber}</p><p>Status: {record.doctor.isActive ? 'Active' : 'Inactive'}</p></section>
       <section className="doctor-account-card"><h2>Staff login</h2>{record.account ? <p><strong>{record.account.fullName}</strong> · {record.account.username} · {record.account.employeeId || 'No employee ID'} · {record.account.designation || 'No designation'}</p> : <p>No staff login linked.</p>}
         <Alert tone="warning">Verify the staff member's identity and medical registration against hospital records before linking. This connection controls who receives clinician notifications.</Alert>

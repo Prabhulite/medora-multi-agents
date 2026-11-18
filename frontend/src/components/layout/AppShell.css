@@ -305,15 +305,28 @@
 
 .app-shell__header-right {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: flex-end;
-  gap: 0.75rem;
+  gap: 0.65rem;
   min-width: 0;
   flex: 1;
 }
 
 .app-shell__header-right .patient-search-field {
   width: min(360px, 100%);
+  gap: 0.28rem;
+}
+
+.app-shell__header-right .patient-search-field__label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  color: var(--color-text-secondary);
+}
+
+.app-shell__header-right .patient-search-field__control input {
+  min-height: 42px;
 }
 
 @media (max-width: 900px) {
@@ -376,9 +389,65 @@
   object-fit: contain;
 }
 
-.app-shell__notification-link { display: inline-flex; align-items: center; gap: 6px; padding: 8px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-md); color: var(--color-heading); text-decoration: none; }
-.app-shell__notification-link:hover, .app-shell__notification-link.active { color: var(--color-primary); border-color: var(--color-primary); }
-.app-shell__notification-link span { min-width: 20px; padding: 2px 5px; border-radius: 999px; background: var(--color-primary); color: white; font-size: 11px; text-align: center; }
+.app-shell__notification-btn {
+  position: relative;
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #f4f6f8 100%);
+  color: #334155;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 6px 16px rgba(15, 23, 42, 0.05);
+  text-decoration: none;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.app-shell__notification-btn:hover,
+.app-shell__notification-btn.active {
+  background: linear-gradient(180deg, #ffffff 0%, #eef1f5 100%);
+  border-color: rgba(15, 23, 42, 0.12);
+  color: #0f172a;
+  box-shadow:
+    0 2px 4px rgba(15, 23, 42, 0.06),
+    0 10px 22px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+.app-shell__notification-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+
+.app-shell__notification-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 2px solid #fff;
+  background: linear-gradient(180deg, #fb7185 0%, #e11d48 100%);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 4px 10px rgba(225, 29, 72, 0.28);
+}
 
 .app-shell__sidebar-footer {
   margin-top: auto;
@@ -470,7 +539,8 @@
   }
 }
 .app-shell__loading {
-  padding: 2rem;
-  color: #475569;
-  font-weight: 600;
+  display: grid;
+  place-items: center;
+  min-height: min(60vh, 480px);
+  padding: 1rem;
 }

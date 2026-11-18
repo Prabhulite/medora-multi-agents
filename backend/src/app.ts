@@ -10,6 +10,8 @@ import visitRoutes from './modules/visits/routes/visit.routes.js';
 import clinicalRoutes from './modules/clinical/routes/clinical.routes.js';
 import authRoutes from './modules/auth/routes/auth.routes.js';
 import departmentRoutes from './modules/departments/routes/department.routes.js';
+import serviceCategoryRoutes from './modules/service-categories/routes/service-category.routes.js';
+import serviceRoutes from './modules/services/routes/service.routes.js';
 import doctorRoutes from './modules/doctors/routes/doctor.routes.js';
 import hospitalProfileRoutes from './modules/hospital-profile/routes/hospital-profile.routes.js';
 import menuRoutes from './modules/menus/routes/menu.routes.js';
@@ -75,6 +77,8 @@ export function createApp() {
   app.use('/api/auth', rateLimit({ windowMs: 60_000, max: 20, keyPrefix: 'auth' }), authRoutes);
   app.use('/api/users', userRoutes);
   app.use('/api/departments', departmentRoutes);
+  app.use('/api/service-categories', serviceCategoryRoutes);
+  app.use('/api/services', serviceRoutes);
   app.use('/api/specializations', specializationRoutes);
   app.use('/api/doctors', doctorRoutes);
   app.use('/api/patients', patientRoutes);

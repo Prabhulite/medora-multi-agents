@@ -12,6 +12,8 @@ const RoleFormPage = lazy(() => import('../features/roles/RoleFormPage').then((m
 const RolesPage = lazy(() => import('../features/roles/RolesPage').then((module) => ({ default: module.RolesPage })));
 const DepartmentFormPage = lazy(() => import('../features/departments/DepartmentFormPage').then((module) => ({ default: module.DepartmentFormPage })));
 const DepartmentsPage = lazy(() => import('../features/departments/DepartmentsPage').then((module) => ({ default: module.DepartmentsPage })));
+const ServiceFormPage = lazy(() => import('../features/services/ServiceFormPage').then((module) => ({ default: module.ServiceFormPage })));
+const ServicesPage = lazy(() => import('../features/services/ServicesPage').then((module) => ({ default: module.ServicesPage })));
 const DoctorFormPage = lazy(() => import('../features/doctors/DoctorFormPage').then((module) => ({ default: module.DoctorFormPage })));
 const DoctorAccountPage = lazy(() => import('../features/doctors/DoctorAccountPage').then((module) => ({ default: module.DoctorAccountPage })));
 const DoctorsPage = lazy(() => import('../features/doctors/DoctorsPage').then((module) => ({ default: module.DoctorsPage })));
@@ -20,6 +22,7 @@ const AppointmentFormPage = lazy(() => import('../features/appointments/Appointm
 const AppointmentsPage = lazy(() => import('../features/appointments/AppointmentsPage').then((module) => ({ default: module.AppointmentsPage })));
 const CheckinPage = lazy(() => import('../features/checkin/CheckinPage').then((module) => ({ default: module.CheckinPage })));
 const CheckinListPage = lazy(() => import('../features/checkin/CheckinListPage').then((module) => ({ default: module.CheckinListPage })));
+const QuickOpBillPage = lazy(() => import('../features/checkin/QuickOpBillPage').then((module) => ({ default: module.QuickOpBillPage })));
 const PatientDashboardPage = lazy(() => import('../features/patients/PatientDashboardPage').then((module) => ({ default: module.PatientDashboardPage })));
 const PatientFormPage = lazy(() => import('../features/patients/PatientFormPage').then((module) => ({ default: module.PatientFormPage })));
 const PatientsPage = lazy(() => import('../features/patients/PatientsPage').then((module) => ({ default: module.PatientsPage })));
@@ -75,6 +78,15 @@ export default function App() {
               <Route element={<ProtectedRoute permission="departments.update" />}>
                 <Route path="departments/:id/edit" element={<DepartmentFormPage />} />
               </Route>
+              <Route element={<ProtectedRoute permission="services.view" />}>
+                <Route path="services" element={<ServicesPage />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="services.create" />}>
+                <Route path="services/new" element={<ServiceFormPage />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="services.update" />}>
+                <Route path="services/:id/edit" element={<ServiceFormPage />} />
+              </Route>
               <Route element={<ProtectedRoute permission="specializations.view" />}>
                 <Route path="specializations" element={<SpecializationsPage />} />
               </Route>
@@ -124,6 +136,9 @@ export default function App() {
               </Route>
               <Route element={<ProtectedRoute permission="visits.checkin" />}>
                 <Route path="checkin/new" element={<CheckinPage />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="billing.create" />}>
+                <Route path="checkin/:visitId/bill" element={<QuickOpBillPage />} />
               </Route>
               <Route element={<ProtectedRoute permission="inpatient.view" />}>
                 <Route path="inpatient" element={<InpatientDashboardPage />} />

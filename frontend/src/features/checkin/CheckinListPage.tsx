@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
@@ -47,29 +47,46 @@ function money(value: number | null | undefined) {
 
 export function CheckinListPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [rows, setRows] = useState<OpCheckinVisit[]>([]);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [date, setDate] = useState(todayIso());
+  const [fromDate, setFromDate] = useState(todayIso());
+  const [toDate, setToDate] = useState(todayIso());
   const [doctorId, setDoctorId] = useState('');
   const [status, setStatus] = useState<'all' | 'inside' | 'waiting' | 'consulting' | 'done'>('all');
   const [busyId, setBusyId] = useState<number | null>(null);
   const [checkoutTarget, setCheckoutTarget] = useState<OpCheckinVisit | null>(null);
+  const [notice, setNotice] = useState('');
+
+  useEffect(() => {
+    const message = (location.state as { notice?: string } | null)?.notice;
+    if (!message) return;
+    setNotice(message);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.pathname, location.state, navigate]);
 
   const canCheckin = hasPermission(user, 'visits.checkin');
   const canCheckout = hasPermission(user, 'visits.checkout');
   const canConsult = hasPermission(user, 'visits.consult');
   const canOpenChart = hasPermission(user, 'clinical.view') && hasPermission(user, 'patients.view');
+  const canBill = hasPermission(user, 'billing.create');
 
   const load = async () => {
     setLoading(true);
     setError('');
     try {
+      if (fromDate && toDate && fromDate > toDate) {
+        setError('From date cannot be after To date.');
+        setRows([]);
+        return;
+      }
       setRows(
         await checkinApi.list({
-          date: date || undefined,
+          fromDate: fromDate || undefined,
+          toDate: toDate || undefined,
           doctorId: doctorId ? Number(doctorId) : undefined,
           status: status === 'all' ? undefined : status,
         }),
@@ -90,7 +107,7 @@ export function CheckinListPage() {
 
   useEffect(() => {
     void load();
-  }, [date, doctorId, status]);
+  }, [fromDate, toDate, doctorId, status]);
 
   const requestCheckout = (row: OpCheckinVisit) => {
     setCheckoutTarget(row);
@@ -196,17 +213,25 @@ export function CheckinListPage() {
             <button
               type="button"
               className="checkin-bill__amount"
-              onClick={() => navigate(`/billing?patientId=${row.patientId}`)}
+              onClick={() => {
+                if (canBill) {
+                  navigate(`/checkin/${row.id}/bill`, { state: { visit: row } });
+                }
+              }}
             >
               {money(row.billAmount)}
             </button>
-            <button
-              type="button"
-              className="checkin-bill__quick"
-              onClick={() => navigate(`/billing?patientId=${row.patientId}`)}
-            >
-              Quick Bill
-            </button>
+            {canBill ? (
+              <button
+                type="button"
+                className="checkin-bill__quick"
+                onClick={() =>
+                  navigate(`/checkin/${row.id}/bill`, { state: { visit: row } })
+                }
+              >
+                Quick Bill
+              </button>
+            ) : null}
           </div>
         ),
       },
@@ -252,7 +277,7 @@ export function CheckinListPage() {
         },
       },
     ],
-    [busyId, canCheckout, canConsult, canOpenChart, date, doctorId, status],
+    [busyId, canBill, canCheckout, canConsult, canOpenChart, navigate],
   );
 
   return (
@@ -270,9 +295,21 @@ export function CheckinListPage() {
       />
 
       {error ? <Alert tone="error">{error}</Alert> : null}
+      {notice ? <Alert tone="success">{notice}</Alert> : null}
 
       <div className="checkin-list-filters">
-        <Input label="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        <Input
+          label="From date"
+          type="date"
+          value={fromDate}
+          onChange={(e) => setFromDate(e.target.value)}
+        />
+        <Input
+          label="To date"
+          type="date"
+          value={toDate}
+          onChange={(e) => setToDate(e.target.value)}
+        />
         <Select
           label="Doctor"
           value={doctorId}
@@ -340,6 +377,7 @@ export function CheckinListPage() {
           if (target) void checkout(target);
         }}
       />
+
     </div>
   );
 }

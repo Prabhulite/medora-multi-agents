@@ -5,6 +5,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Input } from '../../components/ui/Input';
+import { Loader } from '../../components/ui/Loader';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Select } from '../../components/ui/Select';
 import { Table, type TableColumn } from '../../components/ui/Table';
@@ -370,7 +371,7 @@ function ResultView({ order, canAmend, canApproveAmendment, canExportFhir, curre
     {order.verifiedAt && <p>Verified {dateLabel(order.verifiedAt)} · staff #{order.verifiedById || 'unknown'}</p>}
     {order.completedAt && <p>Released {dateLabel(order.completedAt)} · staff #{order.releasedById || 'unknown'}</p>}
     {released && !order.verifiedAt && <p>Historical result: verification details were not recorded in the earlier workflow.</p>}
-    {released && <section className="laboratory-report__addenda"><h3>Addenda</h3>{loadingAddenda ? <p>Loading corrections…</p> : addenda.length ? addenda.map((row) => <article key={row.id}><strong>{dateLabel(row.createdAt)} · {row.authorName || 'Former user'}</strong><p>Reason: {row.reason}</p><p>{row.addendum}</p><p>{row.approvedAt ? `Approved ${dateLabel(row.approvedAt)} · ${row.approverName || 'Former user'}` : 'Pending independent approval'}</p>{canApproveAmendment && !row.approvedAt && row.createdById !== currentUserId && <Button type="button" size="sm" loading={approvingId === row.id} disabled={approvingId !== null} onClick={() => void approve(row.id)}>Approve correction</Button>}</article>) : <p>No corrections recorded.</p>}</section>}
+    {released && <section className="laboratory-report__addenda"><h3>Addenda</h3>{loadingAddenda ? <Loader size="sm" variant="block" label="Loading corrections…" /> : addenda.length ? addenda.map((row) => <article key={row.id}><strong>{dateLabel(row.createdAt)} · {row.authorName || 'Former user'}</strong><p>Reason: {row.reason}</p><p>{row.addendum}</p><p>{row.approvedAt ? `Approved ${dateLabel(row.approvedAt)} · ${row.approverName || 'Former user'}` : 'Pending independent approval'}</p>{canApproveAmendment && !row.approvedAt && row.createdById !== currentUserId && <Button type="button" size="sm" loading={approvingId === row.id} disabled={approvingId !== null} onClick={() => void approve(row.id)}>Approve correction</Button>}</article>) : <p>No corrections recorded.</p>}</section>}
     {error && <Alert tone="error">{error}</Alert>}
     {archiveError && <Alert tone="error">{archiveError}</Alert>}
     <div className="laboratory-modal__footer laboratory-report__actions"><Button type="button" variant="secondary" onClick={onClose}>Close</Button>{released && !archive && <Button type="button" variant="secondary" loading={loadingArchive} onClick={() => void loadArchive()}>View release archive</Button>}{released && canExportFhir && <Button type="button" variant="secondary" onClick={() => void downloadFhir()}>Export FHIR R4</Button>}{released && <Button type="button" disabled={loadingAddenda || Boolean(error)} onClick={() => window.print()}>Print report</Button>}</div>
@@ -404,7 +405,7 @@ function CommunicationView({ order, canRecord, onClose, onRecorded }: { order: L
       <div className="laboratory-result-context"><strong>{order.patientName || `Patient #${order.patientId}`}</strong><span>{order.patientMrdNumber || `Patient ID ${order.patientId}`}</span></div>
       <Alert tone="warning">Record actual contact attempts and confirmed delivery. An in-app notification does not confirm receipt.</Alert>
       {error && <Alert tone="error">{error}</Alert>}
-      <section className="laboratory-report__communications"><h3>Contact history</h3>{loading ? <p>Loading…</p> : rows.length ? rows.map((row) => <article key={row.id}><strong>{row.outcome === 'delivered' ? 'Delivered' : 'Attempted'} · {dateLabel(row.occurredAt)}</strong><p>{row.method.replace('_', ' ')} · {row.recipientName}</p><p>{row.resultSummary ?? 'Result details are restricted until report release.'}</p>{row.note && <p>{row.note}</p>}<small>Recorded by {row.recorderName || 'Former user'} · {dateLabel(row.createdAt)}</small></article>) : <p>No communication recorded.</p>}</section>
+      <section className="laboratory-report__communications"><h3>Contact history</h3>{loading ? <Loader size="sm" variant="block" label="Loading…" /> : rows.length ? rows.map((row) => <article key={row.id}><strong>{row.outcome === 'delivered' ? 'Delivered' : 'Attempted'} · {dateLabel(row.occurredAt)}</strong><p>{row.method.replace('_', ' ')} · {row.recipientName}</p><p>{row.resultSummary ?? 'Result details are restricted until report release.'}</p>{row.note && <p>{row.note}</p>}<small>Recorded by {row.recorderName || 'Former user'} · {dateLabel(row.createdAt)}</small></article>) : <p>No communication recorded.</p>}</section>
     </div>
     {canRecord && <form className="laboratory-form laboratory-report__contact-form" onSubmit={(event) => void save(event)}>
       <h3>Record contact</h3>

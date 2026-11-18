@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { PageLoader } from '../../components/ui/Loader';
 import { Select } from '../../components/ui/Select';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
 import { getErrorMessage } from '../../lib/api';
@@ -91,7 +92,7 @@ export function SpecializationFormPage() {
     }
   };
 
-  if (loading) return <div className="dm-form-loading">Loading specialization…</div>;
+  if (loading) return <PageLoader label="Loading specialization…" />;
 
   if (error) {
     return (

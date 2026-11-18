@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
+import { Loader } from '../../components/ui/Loader';
 import { getErrorMessage } from '../../lib/api';
 import { homeMedicationApi, type HomeMedication } from '../clinical/homeMedication.api';
 import { inpatientApi, type Admission, type AdmissionHomeMedicationDecision, type AdmissionMedicationReview } from './inpatient.api';
@@ -64,7 +65,7 @@ export function AdmissionMedicationReviewPanel({ admission, onClose }: { admissi
       <div className="inpatient-admission-review">
         <Alert tone="warning">This is an unverified reported medication history. Review each medicine with the patient or source. Decisions do not create prescriptions or medication orders.</Alert>
         {error ? <Alert tone="error">{error}</Alert> : null}
-        {loading ? <p>Loading medication history…</p> : <>
+        {loading ? <Loader size="sm" variant="block" label="Loading medication history…" /> : <>
           {hasInitialReview && review ? <section aria-label="Saved admission medication decisions">
             <p>Initial review: {review.reviewedAt ? new Date(review.reviewedAt).toLocaleString() : 'Date unavailable'}</p>
             {review.items.length ? review.items.map((item) => <article className="inpatient-discharge-review__item" key={item.id}><strong>{item.medicineName}</strong>{details(item)}<span>Decision: {item.decision}</span>{item.reason ? <span>Reason: {item.reason}</span> : null}<small>Reviewed {new Date(item.reviewedAt).toLocaleString()} · {item.reviewedById ? `Staff ID ${item.reviewedById}` : 'Reviewer unavailable'}</small></article>) : <p>No home medications were recorded in the initial review.</p>}

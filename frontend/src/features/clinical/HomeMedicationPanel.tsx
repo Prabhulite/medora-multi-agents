@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { Loader } from '../../components/ui/Loader';
 import { Select } from '../../components/ui/Select';
 import { getErrorMessage } from '../../lib/api';
 import { homeMedicationApi, type HomeMedication, type HomeMedicationSource } from './homeMedication.api';
@@ -80,7 +81,7 @@ export function HomeMedicationPanel({ patientId, canCreate }: { patientId: numbe
     <h4>Home medication history</h4>
     <Alert tone="warning">Unverified medication history from the patient or another reported source. This is not a prescription. Confirm medicines before clinical use.</Alert>
     {error ? <Alert tone="error">{error}</Alert> : null}
-    {loading ? <p>Loading home medications…</p> : rows.length ? rows.map((row) => <div key={row.id} className="pd-visit-row">
+    {loading ? <Loader size="sm" variant="block" label="Loading home medications…" /> : rows.length ? rows.map((row) => <div key={row.id} className="pd-visit-row">
       <div>
         <div className="ui-table__cell-title">{row.medicineName} · {row.isCurrent ? 'Current' : 'Ceased'}</div>
         <div className="ui-table__cell-sub">

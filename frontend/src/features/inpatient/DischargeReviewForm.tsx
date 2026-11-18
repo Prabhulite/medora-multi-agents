@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
+import { Loader } from '../../components/ui/Loader';
 import { Select } from '../../components/ui/Select';
 import { getErrorMessage } from '../../lib/api';
 import { inpatientApi, type Admission, type AdmissionMedicationReview, type DischargePayload, type MedicationOrder } from './inpatient.api';
@@ -76,7 +77,7 @@ export function DischargeReviewForm({ admission, saving, submitError, onClose, o
           <section className="inpatient-discharge-review">
             <h3>Review active prescriptions</h3>
             <p>Choose what happens to each current prescription. Stopped prescriptions are marked stopped in the chart. Continuing a prescription does not create a new take-home prescription.</p>
-            {loading ? <p>Loading prescriptions…</p> : error ? <Alert tone="error">{error}</Alert> : orders.length ? orders.map((order) => {
+            {loading ? <Loader size="sm" variant="block" label="Loading prescriptions…" /> : error ? <Alert tone="error">{error}</Alert> : orders.length ? orders.map((order) => {
               const choice = decisions[order.id];
               return <div className="inpatient-discharge-review__item" key={order.id}>
                 <strong>{order.medicineName}</strong><small>{[order.dosage, order.frequency, order.route].filter(Boolean).join(' · ')}</small>
@@ -91,7 +92,7 @@ export function DischargeReviewForm({ admission, saving, submitError, onClose, o
             <h3>Review reported home medicines</h3>
             <p>These entries came from the patient, caregiver, or prior records. Compare them with the prescriptions above; they are not verified prescriptions.</p>
             {!loading && !error && (!admissionReview?.reviewedAt ? <Alert tone="warning">No admission medication review was recorded for this stay. Confirm the reported history and all discharge decisions with the patient or another reliable source.</Alert> : <p>Admission history reviewed {new Date(admissionReview.reviewedAt).toLocaleString('en-IN')}. Compare each admission decision with the discharge plan.</p>)}
-            {loading ? <p>Loading home medicines…</p> : homeRows.length ? homeRows.map((home) => {
+            {loading ? <Loader size="sm" variant="block" label="Loading home medicines…" /> : homeRows.length ? homeRows.map((home) => {
               const choice = homeDecisions[home.id];
               const prior = admissionDecisions.get(home.id);
               return <div className="inpatient-discharge-review__item" key={home.id}>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
+import { Loader } from '../../components/ui/Loader';
 import { getErrorMessage } from '../../lib/api';
 import { clinicalApi } from './clinical.api';
 
@@ -19,7 +20,7 @@ export function PatientTimeline({ patientId }: { patientId: number }) {
   return <section className="pd-card pd-card--wide">
     <div className="pd-card__head"><h3>Patient timeline</h3><Badge tone="info">Latest 100 events</Badge></div>
     {error ? <Alert tone="error">{error}</Alert> : null}
-    {loading ? <p className="pd-empty">Loading timeline…</p> : events.length ? <div className="pd-card__body pd-visits">
+    {loading ? <Loader size="sm" variant="block" label="Loading timeline…" /> : events.length ? <div className="pd-card__body pd-visits">
       {events.map((item) => <div className="pd-visit-row" key={item.key}>
         <div><div className="ui-table__cell-title">{item.title}</div><div className="ui-table__cell-sub">{[item.kind.replaceAll('-', ' '), item.detail, item.status].filter(Boolean).join(' · ')}</div></div>
         <strong>{new Date(item.at).toLocaleString()}</strong>

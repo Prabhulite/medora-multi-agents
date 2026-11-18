@@ -9,6 +9,7 @@ import {
   Permission,
   RegistrationSource,
   Role,
+  ServiceCategory,
   Specialization,
   User,
   Ward,
@@ -34,6 +35,34 @@ const PERMISSIONS = [
   { code: 'departments.create', module: 'departments', action: 'create', description: 'Create departments' },
   { code: 'departments.update', module: 'departments', action: 'update', description: 'Update departments' },
   { code: 'departments.delete', module: 'departments', action: 'delete', description: 'Delete departments' },
+  {
+    code: 'service_categories.view',
+    module: 'service_categories',
+    action: 'view',
+    description: 'View service categories',
+  },
+  {
+    code: 'service_categories.create',
+    module: 'service_categories',
+    action: 'create',
+    description: 'Create service categories',
+  },
+  {
+    code: 'service_categories.update',
+    module: 'service_categories',
+    action: 'update',
+    description: 'Update service categories',
+  },
+  {
+    code: 'service_categories.delete',
+    module: 'service_categories',
+    action: 'delete',
+    description: 'Delete service categories',
+  },
+  { code: 'services.view', module: 'services', action: 'view', description: 'View service master' },
+  { code: 'services.create', module: 'services', action: 'create', description: 'Create services' },
+  { code: 'services.update', module: 'services', action: 'update', description: 'Update services' },
+  { code: 'services.delete', module: 'services', action: 'delete', description: 'Delete services' },
   {
     code: 'hospital_profile.view',
     module: 'hospital_profile',
@@ -310,6 +339,15 @@ const MENUS = [
     sortOrder: 27,
   },
   {
+    code: 'services',
+    label: 'Service Master',
+    route: '/services',
+    icon: 'departments',
+    permissionCode: 'services.view',
+    parentCode: 'master',
+    sortOrder: 29,
+  },
+  {
     code: 'front_office',
     label: 'Front Office',
     route: '/front-office',
@@ -406,6 +444,51 @@ const REGISTRATION_SOURCES = [
   { code: 'camp', name: 'Medical Camp' },
 ] as const;
 
+const SERVICE_CATEGORIES = [
+  {
+    code: 'consultation',
+    name: 'Consultation',
+    description: 'General Physician, Specialist Consultation',
+    sortOrder: 1,
+  },
+  {
+    code: 'procedure',
+    name: 'Procedure',
+    description: 'Dressing, Injection, Nebulization',
+    sortOrder: 2,
+  },
+  {
+    code: 'investigation',
+    name: 'Investigation',
+    description: 'ECG, X-Ray, Ultrasound',
+    sortOrder: 3,
+  },
+  {
+    code: 'nursing',
+    name: 'Nursing',
+    description: 'Nursing Care, Bedside Procedure',
+    sortOrder: 4,
+  },
+  {
+    code: 'room_charges',
+    name: 'Room Charges',
+    description: 'General Ward, Private Room',
+    sortOrder: 5,
+  },
+  {
+    code: 'emergency',
+    name: 'Emergency',
+    description: 'Emergency Consultation',
+    sortOrder: 6,
+  },
+  {
+    code: 'other_services',
+    name: 'Other Services',
+    description: 'Medical Certificate, Ambulance',
+    sortOrder: 7,
+  },
+] as const;
+
 async function seed(): Promise<void> {
   const dataSource = await initializeDataSource();
   const permissionRepo = dataSource.getRepository(Permission);
@@ -413,6 +496,7 @@ async function seed(): Promise<void> {
   const userRepo = dataSource.getRepository(User);
   const menuRepo = dataSource.getRepository(Menu);
   const departmentRepo = dataSource.getRepository(Department);
+  const serviceCategoryRepo = dataSource.getRepository(ServiceCategory);
   const specializationRepo = dataSource.getRepository(Specialization);
   const registrationSourceRepo = dataSource.getRepository(RegistrationSource);
   const medicationRepo = dataSource.getRepository(Medication);
@@ -447,6 +531,24 @@ async function seed(): Promise<void> {
       await departmentRepo.save(
         departmentRepo.create({
           ...department,
+          isActive: true,
+        }),
+      );
+    }
+  }
+
+  for (const category of SERVICE_CATEGORIES) {
+    const existing = await serviceCategoryRepo.findOne({ where: { code: category.code } });
+    if (existing) {
+      existing.name = category.name;
+      existing.description = category.description;
+      existing.sortOrder = category.sortOrder;
+      existing.isActive = true;
+      await serviceCategoryRepo.save(existing);
+    } else {
+      await serviceCategoryRepo.save(
+        serviceCategoryRepo.create({
+          ...category,
           isActive: true,
         }),
       );
@@ -585,6 +687,14 @@ async function seed(): Promise<void> {
     const parent = menu.parentCode ? menusByCode.get(menu.parentCode) : null;
     current.parentId = parent?.id ?? null;
     await menuRepo.save(current);
+  }
+
+  // Retire obsolete system menus that were replaced (keep a single Check-in entry).
+  const activeMenuCodes = new Set<string>(MENUS.map((menu) => menu.code));
+  for (const menu of await menuRepo.find()) {
+    if (!menu.isSystem || activeMenuCodes.has(menu.code) || !menu.isActive) continue;
+    menu.isActive = false;
+    await menuRepo.save(menu);
   }
 
   const allPermissions = await permissionRepo.find();

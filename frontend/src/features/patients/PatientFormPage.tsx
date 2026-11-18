@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { PageLoader } from '../../components/ui/Loader';
 import { Modal } from '../../components/ui/Modal';
 import { Select } from '../../components/ui/Select';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
@@ -424,7 +425,7 @@ export function PatientFormPage() {
   };
 
   if (loading) {
-    return <div className="patient-form-loading">Loading patient form…</div>;
+    return <PageLoader label="Loading patient form…" />;
   }
 
   if (error) {
