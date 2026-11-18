@@ -17,6 +17,7 @@ export class StockTransaction {
   @ManyToOne(() => Prescription, { onDelete: 'SET NULL', nullable: true }) @JoinColumn({ name: 'prescription_id' }) prescription!: Prescription | null;
   @Column({ type: 'varchar', length: 160, nullable: true }) reference!: string | null;
   @Column({ type: 'text', nullable: true }) notes!: string | null;
+  @Column({ name: 'fefo_override_reason', type: 'varchar', length: 500, nullable: true }) fefoOverrideReason!: string | null;
   @Column({ name: 'created_by_id', type: 'int', unsigned: true, nullable: true }) createdById!: number | null;
   @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true }) @JoinColumn({ name: 'created_by_id' }) createdBy!: User | null;
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' }) createdAt!: Date;

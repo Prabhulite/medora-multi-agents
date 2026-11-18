@@ -9,7 +9,7 @@ export const inventoryService = {
     const exists = await AppDataSource.getRepository(InventoryBatch).exist({ where: { id: batchId } });
     if (!exists) throw new NotFoundError('Inventory batch not found');
     const [rows, total] = await AppDataSource.getRepository(StockTransaction).findAndCount({ where: { batchId }, relations: { createdBy: true }, order: { createdAt: 'DESC', id: 'DESC' }, skip: (input.page - 1) * input.pageSize, take: input.pageSize });
-    return { items: rows.map((row) => ({ id: row.id, type: row.type, quantity: row.quantity, reference: row.type === 'receipt' ? row.reference : null, notes: row.type === 'adjustment' ? row.notes : null, createdAt: row.createdAt, createdByName: row.createdBy?.fullName ?? null })), total, page: input.page, pageSize: input.pageSize };
+    return { items: rows.map((row) => ({ id: row.id, type: row.type, quantity: row.quantity, reference: row.type === 'receipt' ? row.reference : null, notes: row.type === 'adjustment' ? row.notes : null, fefoOverrideReason: row.type === 'dispense' ? row.fefoOverrideReason : null, createdAt: row.createdAt, createdByName: row.createdBy?.fullName ?? null })), total, page: input.page, pageSize: input.pageSize };
   },
   async adjust(batchId: number, input: AdjustStockInput, userId: number) {
     return AppDataSource.transaction(async (manager) => {
@@ -75,11 +75,20 @@ export const inventoryService = {
         if (!prescription || prescription.status !== 'active' || prescription.patientId !== input.patientId || !prescription.medicationId || !prescription.quantityPrescribed) throw new ValidationError('Active catalog prescription with a prescribed quantity for this patient is required');
       }
       const repo = manager.getRepository(InventoryBatch);
+      const target = await repo.findOne({ where: { id: input.batchId }, select: { id: true, medicationId: true } });
+      if (!target) throw new NotFoundError('Inventory batch not found');
+      await manager.getRepository(Medication).createQueryBuilder('medication').setLock('pessimistic_write').where('medication.id = :id', { id: target.medicationId }).getOne();
       const batch = await repo.findOne({ where: { id: input.batchId, isActive: true }, relations: { medication: true }, lock: { mode: 'pessimistic_write' } });
       if (!batch) throw new NotFoundError('Inventory batch not found');
       const [clock] = await manager.query("SELECT DATE_FORMAT(CURRENT_DATE(), '%Y-%m-%d') AS today");
       if (batch.expiryDate < clock.today) throw new ValidationError('Cannot dispense an expired batch');
       if (batch.quantity < input.quantity) throw new ValidationError(`Insufficient stock. Available: ${batch.quantity}`);
+      const earliestEligible = await repo.createQueryBuilder('candidate')
+        .setLock('pessimistic_write')
+        .where('candidate.medication_id = :medicationId AND candidate.is_active = 1 AND candidate.quantity >= :quantity AND candidate.expiry_date >= :today', { medicationId: batch.medicationId, quantity: input.quantity, today: clock.today })
+        .orderBy('candidate.expiry_date', 'ASC').addOrderBy('candidate.id', 'ASC').getOne();
+      const needsFefoReason = !!earliestEligible && earliestEligible.expiryDate < batch.expiryDate;
+      if (needsFefoReason && !input.fefoOverrideReason) throw new ValidationError(`Earlier eligible batch ${earliestEligible.batchNumber} is available. Provide a FEFO override reason`);
       if (prescription) {
         if (batch.medicationId !== prescription.medicationId) throw new ValidationError('Batch medication does not match the prescription');
         const prescribedQuantity = prescription.quantityPrescribed;
@@ -92,7 +101,7 @@ export const inventoryService = {
         await assertNoRecordedAllergy(manager, input.patientId, [batch.medication.brandName, batch.medication.genericName, prescription?.medicineName]);
       }
       batch.quantity -= input.quantity; await repo.save(batch);
-      const transaction = await manager.getRepository(StockTransaction).save(manager.getRepository(StockTransaction).create({ batchId: batch.id, type: 'dispense', quantity: -input.quantity, patientId: input.patientId ?? null, prescriptionId: prescription?.id ?? null, reference: input.reference ?? null, notes: input.notes ?? null, createdById: userId }));
+      const transaction = await manager.getRepository(StockTransaction).save(manager.getRepository(StockTransaction).create({ batchId: batch.id, type: 'dispense', quantity: -input.quantity, patientId: input.patientId ?? null, prescriptionId: prescription?.id ?? null, reference: input.reference ?? null, notes: input.notes ?? null, fefoOverrideReason: needsFefoReason ? input.fefoOverrideReason ?? null : null, createdById: userId }));
       if (input.patientId) await manager.getRepository(PatientAuditLog).save({ patientId: input.patientId, action: 'pharmacy_dispensed', changedById: userId, changeSummary: `Medication dispensed: ${input.quantity} unit${input.quantity === 1 ? '' : 's'}`, beforeData: null, afterData: JSON.stringify({ transactionId: transaction.id, batchId: batch.id, prescriptionId: prescription?.id ?? null, medicationId: batch.medicationId, quantity: input.quantity }) });
       return repo.findOne({ where: { id: batch.id }, relations: { medication: true } });
     });

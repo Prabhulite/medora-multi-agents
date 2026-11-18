@@ -740,9 +740,16 @@ try {
   await dataSource.query("INSERT INTO inventory_batches (medication_id,batch_number,expiry_date,quantity,reorder_level,is_active) VALUES (1,'IT-EXPIRED',DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY),2,1,1)");
   const [expiredBatch] = await dataSource.query("SELECT id FROM inventory_batches WHERE batch_number = 'IT-EXPIRED'");
   assert.equal((await request('POST', '/api/pharmacy/inventory/dispense', { batchId: expiredBatch.id, quantity: 1 })).status, 422);
-  await dataSource.query("INSERT INTO inventory_batches (medication_id,batch_number,expiry_date,quantity,reorder_level,is_active) VALUES (1,'IT-EXPIRES-TODAY',CURRENT_DATE(),2,1,1)");
+  await dataSource.query("INSERT INTO inventory_batches (medication_id,batch_number,expiry_date,quantity,reorder_level,is_active) VALUES (1,'IT-EXPIRES-TODAY',CURRENT_DATE(),1,1,1)");
   const [todayBatch] = await dataSource.query("SELECT id FROM inventory_batches WHERE batch_number = 'IT-EXPIRES-TODAY'");
-  assert.equal((await ok('POST', '/api/pharmacy/inventory/dispense', { batchId: todayBatch.id, quantity: 1 })).quantity, 1);
+  assert.equal((await ok('POST', '/api/pharmacy/inventory/dispense', { batchId: todayBatch.id, quantity: 1 })).quantity, 0);
+  const laterBatch = await ok('POST', '/api/pharmacy/inventory/receipts', { medicationId: 1, batchNumber: 'IT-LATER', expiryDate: '2031-12-31', purchasePrice: 1, sellingPrice: 2, quantity: 2, reorderLevel: 1 }, 201);
+  assert.equal((await request('POST', '/api/pharmacy/inventory/dispense', { batchId: laterBatch.id, quantity: 1 })).status, 422);
+  assert.equal((await request('POST', '/api/pharmacy/inventory/dispense', { batchId: laterBatch.id, quantity: 1, fefoOverrideReason: 'bad' })).status, 422);
+  assert.equal((await ok('POST', '/api/pharmacy/inventory/dispense', { batchId: laterBatch.id, quantity: 1, fefoOverrideReason: 'Earlier batch container damaged' })).quantity, 1);
+  const laterMovements = await ok('GET', `/api/pharmacy/inventory/batches/${laterBatch.id}/movements?page=1&pageSize=10`);
+  assert.equal(laterMovements.items[0].fefoOverrideReason, 'Earlier batch container damaged');
+  assert.equal(laterMovements.items[0].notes, null);
   const laterAllergy = await ok('POST', '/api/clinical/patients/1/allergies', { allergen: 'Integration Medicine', severity: 'severe' }, 201);
   assert.equal((await request('POST', '/api/pharmacy/inventory/dispense', { batchId: stock.id, patientId: 1, prescriptionId: prescription.id, quantity: 1 })).status, 409);
   assert.equal((await request('POST', '/api/pharmacy/inventory/dispense', { batchId: stock.id, patientId: 1, quantity: 1 })).status, 409);
