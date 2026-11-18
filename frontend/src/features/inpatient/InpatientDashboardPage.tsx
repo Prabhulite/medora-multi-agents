@@ -40,6 +40,7 @@ export function InpatientDashboardPage() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const linkedHandoffId = searchParams.get('handoff');
+  const linkedTab = searchParams.get('tab');
   const canDischarge = ['inpatient.view', 'inpatient.update', 'clinical.view', 'clinical.update'].every((permission) => hasPermission(user, permission));
   const canReviewHomeMedications = ['inpatient.view', 'inpatient.update', 'clinical.view'].every((permission) => hasPermission(user, permission));
   const [tab, setTab] = useState<Tab>('overview');
@@ -69,6 +70,9 @@ export function InpatientDashboardPage() {
   const [handoffError, setHandoffError] = useState('');
   const [transfers, setTransfers] = useState<BedTransfer[]>([]);
   const [observations, setObservations] = useState<NursingObservation[]>([]);
+  useEffect(() => {
+    if (linkedTab === 'overview' || linkedTab === 'beds' || linkedTab === 'admissions') setTab(linkedTab);
+  }, [linkedTab]);
   useEffect(() => {
     if (!linkedHandoffId) return;
     const handoffId = Number(linkedHandoffId);
