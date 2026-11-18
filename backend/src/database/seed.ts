@@ -160,6 +160,7 @@ const PERMISSIONS = [
   { code: 'inpatient.handoff.escalate', module: 'inpatient', action: 'handoff_escalate', description: 'Escalate an overdue nursing handoff to another staff member' },
   { code: 'billing.view', module: 'billing', action: 'view', description: 'View invoices and balances' },
   { code: 'billing.closeout', module: 'billing', action: 'closeout', description: 'Close cashier cash drawer' },
+  { code: 'billing.deposit', module: 'billing', action: 'deposit', description: 'Record bank deposits against closed cash' },
   { code: 'billing.create', module: 'billing', action: 'create', description: 'Create invoices' },
   { code: 'billing.update', module: 'billing', action: 'update', description: 'Record invoice payments' },
   { code: 'billing.charges.manage', module: 'billing_charges', action: 'manage', description: 'Create and update billing charge prices' },

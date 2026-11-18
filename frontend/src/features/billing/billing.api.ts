@@ -36,6 +36,7 @@ export type ReceivablesBucket = 'undated' | 'current' | '1_30' | '31_60' | '61_9
 export interface ReceivablesReport { asOf: string; timezone: string; totalOutstanding: string; buckets: Array<{ bucket: ReceivablesBucket; count: number; amount: string }>; total: number; page: number; pageSize: number; items: Array<{ id: number; invoiceNumber: string; patientId: number; patientName: string; patientMrdNumber: string; dueDate: string | null; status: string; balanceAmount: string; daysOverdue: number | null }> }
 export interface PaymentReceipt { paymentId: number; invoiceId: number; invoiceNumber: string; patientName: string; patientMrdNumber: string; paidAt: string; amount: string; method: string; referenceNumber: string | null; refunds: Array<{ id: number; amount: string; refundedAt: string }>; totalRefunded: string; netPaid: string }
 export interface CashierCloseout { id: number; businessDate: string; cashierId: number; cashierName: string; cashReceived: string; cashRefunded: string; expectedCash: string; countedCash: string; variance: string; reason: string | null; closedAt: string }
+export interface CashDeposit { id: number; closeoutId: number; cashierName: string; businessDate: string; depositDate: string; amount: string; bankReference: string; note: string | null; recordedByName: string; recordedAt: string }
 export interface RecordRefundPayload { invoiceId: number; paymentId: number; amount: number; method: 'cash' | 'card' | 'upi' | 'bank_transfer'; referenceNumber?: string | null; reason: string }
 export interface InsuranceClaim { id: number; invoiceId: number; claimNumber: string; payerName: string; policyNumber: string; claimedAmount: string; approvedAmount: string | null; status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'settled'; notes: string | null; decisionNote: string | null; createdAt: string; submittedAt: string | null; decidedAt: string | null; settledAt: string | null }
 export interface CreateClaimPayload { invoiceId: number; payerName: string; policyNumber: string; claimedAmount: number; notes?: string | null }
@@ -73,6 +74,8 @@ function mapInvoice(row: any): BillingInvoice {
 }
 
 export const billingApi = {
+  async listDeposits(date: string): Promise<CashDeposit[]> { return unwrap((await api.get<ApiEnvelope<CashDeposit[]>>('/billing/deposits', { params: { date } })).data); },
+  async recordDeposit(closeoutId: number, depositDate: string, amount: number, bankReference: string, note: string | null): Promise<CashDeposit> { return unwrap((await api.post<ApiEnvelope<CashDeposit>>(`/billing/closeouts/${closeoutId}/deposits`, { depositDate, amount, bankReference, note })).data); },
   async listCloseouts(date: string): Promise<CashierCloseout[]> { return unwrap((await api.get<ApiEnvelope<CashierCloseout[]>>('/billing/closeouts', { params: { date } })).data); },
   async createCloseout(countedCash: number, reason: string | null): Promise<CashierCloseout> { return unwrap((await api.post<ApiEnvelope<CashierCloseout>>('/billing/closeouts', { countedCash, reason })).data); },
   async paymentReceipt(paymentId: number): Promise<PaymentReceipt> { return unwrap((await api.get<ApiEnvelope<PaymentReceipt>>(`/billing/payments/${paymentId}/receipt`)).data); },

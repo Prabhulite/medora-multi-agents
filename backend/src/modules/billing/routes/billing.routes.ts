@@ -4,12 +4,14 @@ import { authorize } from '../../../middleware/authorize.js';
 import { validate } from '../../../middleware/validate.js';
 import { asyncHandler } from '../../../shared/utils/asyncHandler.js';
 import { billingController } from '../controllers/billing.controller.js';
-import { cashierReportQuerySchema, closeoutQuerySchema, closeoutSchema, chargeIdParamSchema, chargeSchema, claimActionSchema, claimIdParamSchema, createClaimSchema, createInvoiceSchema, invoiceIdParamSchema, invoiceListQuerySchema, paymentSchema, receivablesReportQuerySchema, refundSchema, updateChargeSchema } from '../validators/billing.validators.js';
+import { cashierReportQuerySchema, closeoutQuerySchema, closeoutSchema, chargeIdParamSchema, chargeSchema, claimActionSchema, claimIdParamSchema, createClaimSchema, createInvoiceSchema, depositSchema, invoiceIdParamSchema, invoiceListQuerySchema, paymentSchema, receivablesReportQuerySchema, refundSchema, updateChargeSchema } from '../validators/billing.validators.js';
 import { z } from 'zod';
 
 const router = Router(); router.use(authenticate);
 router.get('/closeouts', authorize('billing.view'), validate(closeoutQuerySchema, 'query'), asyncHandler(billingController.closeouts));
 router.post('/closeouts', authorize('billing.closeout'), validate(closeoutSchema), asyncHandler(billingController.closeout));
+router.get('/deposits', authorize('billing.view'), validate(closeoutQuerySchema, 'query'), asyncHandler(billingController.deposits));
+router.post('/closeouts/:id/deposits', authorize('billing.deposit'), validate(invoiceIdParamSchema, 'params'), validate(depositSchema), asyncHandler(billingController.deposit));
 router.get('/payments/:id/receipt', authorize('billing.view'), validate(invoiceIdParamSchema, 'params'), asyncHandler(billingController.receipt));
 router.get('/reports/cashier', authorize('billing.view'), validate(cashierReportQuerySchema, 'query'), asyncHandler(billingController.cashierReport));
 router.get('/reports/cashier.csv', authorize('billing.view'), validate(cashierReportQuerySchema, 'query'), asyncHandler(billingController.cashierReportExport));

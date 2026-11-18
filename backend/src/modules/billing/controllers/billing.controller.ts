@@ -6,11 +6,14 @@ import { patientLedgerService } from '../services/patient-ledger.service.js';
 import { chargeMasterService } from '../services/charge-master.service.js';
 import { cashierReportService } from '../services/cashier-report.service.js';
 import { cashierReportCsv } from '../services/cashier-report-csv.js';
+import { cashDepositService } from '../services/cash-deposit.service.js';
 import { receivablesReportService } from '../services/receivables-report.service.js';
 
 export const billingController = {
   async closeouts(req: Request, res: Response) { return sendSuccess(res, await billingService.closeouts(String(req.query.date)), 'Cashier closeouts fetched'); },
   async closeout(req: Request, res: Response) { return sendCreated(res, await billingService.closeout(req.body, req.user?.id ?? null), 'Cashier day closed'); },
+  async deposits(req: Request, res: Response) { return sendSuccess(res, await cashDepositService.list(String(req.query.date)), 'Cash deposits fetched'); },
+  async deposit(req: Request, res: Response) { return sendCreated(res, await cashDepositService.create(Number(req.params.id), req.body, req.user!.id), 'Cash deposit recorded'); },
   async receipt(req: Request, res: Response) { return sendSuccess(res, await billingService.receipt(Number(req.params.id)), 'Payment receipt fetched'); },
   async cashierReport(req: Request, res: Response) { return sendSuccess(res, await cashierReportService.get(String(req.query.from), String(req.query.to)), 'Cashier report fetched'); },
   async cashierReportExport(req: Request, res: Response) {

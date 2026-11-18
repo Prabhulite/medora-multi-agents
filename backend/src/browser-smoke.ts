@@ -339,6 +339,7 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   assert.ok(closeoutsReady, 'Cash closeout review did not render');
+  assert.equal(await evaluate('document.querySelector("#cash-closeout-title")?.closest("[role=dialog]")?.innerText.includes("Recorded bank deposits")'), true, 'Cash deposit register did not render');
   const closeoutFetch = await evaluate('fetch(`/api/billing/closeouts?date=${document.querySelector("#cash-closeout-title").closest("[role=dialog]").querySelector("input[type=date]").value}`, { credentials: "include" }).then(async response => ({ status: response.status, rows: (await response.json()).data }))');
   assert.equal(closeoutFetch.status, 200, 'Cash closeout review API failed');
   assert.ok(Array.isArray(closeoutFetch.rows), 'Cash closeout review did not return rows');

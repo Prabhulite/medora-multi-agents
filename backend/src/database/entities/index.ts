@@ -16,6 +16,7 @@ export { Invoice } from './Invoice.js';
 export { InvoiceItem } from './InvoiceItem.js';
 export { Payment } from './Payment.js';
 export { CashierCloseout } from './CashierCloseout.js';
+export { CashDeposit } from './CashDeposit.js';
 export { InventoryBatch } from './InventoryBatch.js';
 export { StockTransaction } from './StockTransaction.js';
 export { Supplier } from './Supplier.js';
