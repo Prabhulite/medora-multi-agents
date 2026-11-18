@@ -115,6 +115,10 @@ Workflow:
 
 From `backend/`, run `npm run db:backup -- <backup.sql>` to create a SQL dump and checksum manifest. Run `npm run db:restore -- <backup.sql> <medora_restore_new_database>` to restore into a new database. `npm run db:backup-check` verifies a synthetic round trip. See [database backup and restore](docs/DB-BACKUP-RESTORE.md) for requirements and recovery steps.
 
+## Deployment health checks
+
+`GET /health` confirms the API process is alive. `GET /health/ready` also runs a minimal database probe and returns `503` when the database is unavailable. Docker Compose uses the readiness endpoint for backend health; do not expose its output as a substitute for monitoring, backups, or alerting.
+
 ## Theme
 
 Primary brand color from PDF: `#015b2d`  
