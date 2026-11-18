@@ -13,3 +13,7 @@ The limiter is intentionally dependency-free and process-local for the current s
 ## Auditability
 
 Mutating requests are recorded by the system audit log middleware without storing request bodies, passwords, tokens, or clinical payloads.
+
+## Dependency gate
+
+CI runs `npm audit --omit=dev --audit-level=high` for both frontend and backend dependencies. This blocks known high- and critical-severity production dependency findings. Moderate findings still require review before release; do not use `npm audit fix --force` without evaluating the proposed major-version changes and running the full verification suite.
