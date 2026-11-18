@@ -206,6 +206,13 @@ export const laboratoryApi = {
     const response = await api.get<ApiEnvelope<LaboratoryReportArchive>>(`/laboratory/orders/${orderId}/archive`);
     return response.data.data;
   },
+  async downloadFhirReport(orderId: number): Promise<void> {
+    const response = await api.get(`/fhir/r4/DiagnosticReport/laboratory/${orderId}`, { responseType: 'blob', headers: { Accept: 'application/fhir+json' } });
+    const url = URL.createObjectURL(response.data);
+    const link = document.createElement('a');
+    link.href = url; link.download = `laboratory-report-${orderId}.fhir.json`; link.click();
+    URL.revokeObjectURL(url);
+  },
   async addAddendum(orderId: number, payload: { reason: string; addendum: string }): Promise<LaboratoryAddendum> {
     const response = await api.post<ApiEnvelope<LaboratoryAddendum>>(`/laboratory/orders/${orderId}/addenda`, payload);
     return response.data.data;
