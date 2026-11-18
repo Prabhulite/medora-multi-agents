@@ -7,15 +7,15 @@
   --color-leaf: #628947;
   --color-leaf-light: #a7e879;
 
-  --color-bg: #f5faf7;
+  --color-bg: #f4f7f5;
   --color-surface: #ffffff;
   --color-selected: #e9f6ed;
   --color-hover: #f0f8f2;
-  --color-border: #e3eee8;
+  --color-border: #dce7df;
 
   --color-heading: #14251c;
   --color-text: #26352d;
-  --color-text-secondary: #64748b;
+  --color-text-secondary: #52675a;
   --color-text-muted: #94a3b8;
   --color-inverse: #ffffff;
 
@@ -37,7 +37,7 @@
   --gradient-login: linear-gradient(160deg, #013f1f 0%, #015b2d 42%, #0a7a3d 100%);
 
   --shadow-sm: 0 1px 2px rgba(1, 91, 45, 0.06);
-  --shadow-md: 0 8px 24px rgba(1, 91, 45, 0.1);
+  --shadow-md: 0 6px 20px rgba(20, 58, 35, 0.07);
   --shadow-lg: 0 18px 48px rgba(1, 91, 45, 0.16);
 
   --radius-sm: 8px;
@@ -115,6 +115,13 @@ a {
 button {
   cursor: pointer;
 }
+
+:where(button, a, input, select, textarea):focus-visible {
+  outline: 3px solid #72b882;
+  outline-offset: 2px;
+}
+
+::selection { background: #c9e7d0; color: #143c24; }
 
 img {
   max-width: 100%;

@@ -11,6 +11,14 @@ This checklist tracks verified delivery work for Medora. A box is checked only a
 - [x] Printable clinical patient summary
 - [x] Simplified clinical sidebar and responsive navigation
 
+## Corporate UI refresh
+
+- [x] Permission based dashboard with real workflow entry points
+- [x] Shared color, heading, spacing, and keyboard focus rules
+- [x] Small screen shell spacing
+- [ ] Visual review of every role and major workflow in a running browser
+- [ ] Hospital staff usability review and follow-up refinements
+
 ## Repository hygiene
 
 - [x] Audit generated, obsolete, and duplicate files
