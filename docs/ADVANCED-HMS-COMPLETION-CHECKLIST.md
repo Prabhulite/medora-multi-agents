@@ -23,7 +23,7 @@ Use this as the single release-tracking checklist for Medora. A box is checked o
 - [x] Database migrations, seed data, backup/restore utilities, and health/readiness endpoints
 - [x] Backend build, frontend build, database seed, integration suite, and browser smoke coverage
 - [x] CI workflow for builds, clean database setup, seed, and integration tests
-- [ ] Run and review the CI workflow on the remote Git provider
+- [x] Run and review the CI workflow on the remote Git provider
 - [ ] Configure production monitoring, alerting, log retention, and incident response ownership
 - [ ] Perform a restore drill from a production-like backup
 - [ ] Complete an independent security review and dependency vulnerability review
@@ -38,11 +38,11 @@ Use this as the single release-tracking checklist for Medora. A box is checked o
 
 ## Release-candidate finish line
 
-- [ ] Resolve every uncommitted change and leave a clean Git worktree
-- [ ] Apply every migration to a clean production-like database and seed required roles/data
-- [ ] Run backend and frontend production builds
-- [ ] Run the full integration suite
-- [ ] Run browser smoke tests against the release-candidate environment
+- [x] Resolve every uncommitted change and leave a clean Git worktree
+- [x] Apply every migration to a clean production-like database and seed required roles/data
+- [x] Run backend and frontend production builds
+- [x] Run the full integration suite
+- [x] Run browser smoke tests against the release-candidate environment
 - [ ] Review user roles and remove unnecessary permissions
 - [ ] Rotate all development/shared secrets before deployment
 - [ ] Set secure production environment variables, HTTPS URLs, database credentials, and backups
