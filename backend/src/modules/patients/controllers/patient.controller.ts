@@ -2,10 +2,17 @@ import type { Request, Response } from 'express';
 import { sendCreated, sendSuccess } from '../../../shared/utils/response.js';
 import { patientService } from '../services/patient.service.js';
 import { communicationService } from '../services/communication.service.js';
+import { registrationSourceService } from '../services/registration-source.service.js';
 
 export const patientController = {
   async registrationSources(_req: Request, res: Response) {
-    return sendSuccess(res, await patientService.registrationSources(), 'Registration sources fetched');
+    return sendSuccess(res, await registrationSourceService.list(), 'Registration sources fetched');
+  },
+  async createRegistrationSource(req: Request, res: Response) {
+    return sendCreated(res, await registrationSourceService.create(req.body), 'Registration source created');
+  },
+  async updateRegistrationSource(req: Request, res: Response) {
+    return sendSuccess(res, await registrationSourceService.update(Number(req.params.sourceId), req.body), 'Registration source updated');
   },
   async followUps(req: Request, res: Response) {
     return sendSuccess(res, await communicationService.followUps(req.query.status === 'overdue' ? 'overdue' : 'open'), 'Patient follow-ups fetched');

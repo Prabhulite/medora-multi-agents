@@ -23,6 +23,7 @@ const CheckinListPage = lazy(() => import('../features/checkin/CheckinListPage')
 const PatientDashboardPage = lazy(() => import('../features/patients/PatientDashboardPage').then((module) => ({ default: module.PatientDashboardPage })));
 const PatientFormPage = lazy(() => import('../features/patients/PatientFormPage').then((module) => ({ default: module.PatientFormPage })));
 const PatientsPage = lazy(() => import('../features/patients/PatientsPage').then((module) => ({ default: module.PatientsPage })));
+const RegistrationSourcesPage = lazy(() => import('../features/patients/RegistrationSourcesPage').then((module) => ({ default: module.RegistrationSourcesPage })));
 const SpecializationFormPage = lazy(() => import('../features/specializations/SpecializationFormPage').then((module) => ({ default: module.SpecializationFormPage })));
 const SpecializationsPage = lazy(() => import('../features/specializations/SpecializationsPage').then((module) => ({ default: module.SpecializationsPage })));
 const UserFormPage = lazy(() => import('../features/users/UserFormPage').then((module) => ({ default: module.UserFormPage })));
@@ -97,6 +98,9 @@ export default function App() {
               </Route>
               <Route element={<ProtectedRoute permission="patients.view" />}>
                 <Route path="patients" element={<PatientsPage />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="patients.registration_sources.manage" />}>
+                <Route path="patients/registration-sources" element={<RegistrationSourcesPage />} />
               </Route>
               <Route element={<ProtectedRoute permission="patients.create" />}>
                 <Route path="patients/new" element={<PatientFormPage />} />

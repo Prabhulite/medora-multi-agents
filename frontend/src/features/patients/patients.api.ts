@@ -4,12 +4,21 @@ import type {
   ApiResponse,
   Patient,
   PatientAuditLog,
+  RegistrationSource,
   UpsertPatientPayload,
 } from '../../types';
 
 export const patientsApi = {
   registrationSources: async () => {
-    const { data } = await api.get<ApiResponse<Array<{ id: number; code: string; name: string; isActive: boolean }>>>('/patients/registration-sources');
+    const { data } = await api.get<ApiResponse<RegistrationSource[]>>('/patients/registration-sources');
+    return data.data;
+  },
+  createRegistrationSource: async (payload: { code: string; name: string }) => {
+    const { data } = await api.post<ApiResponse<RegistrationSource>>('/patients/registration-sources', payload);
+    return data.data;
+  },
+  updateRegistrationSource: async (id: number, payload: { name?: string; isActive?: boolean }) => {
+    const { data } = await api.patch<ApiResponse<RegistrationSource>>(`/patients/registration-sources/${id}`, payload);
     return data.data;
   },
   downloadFhirR4: async (patientId: number) => {

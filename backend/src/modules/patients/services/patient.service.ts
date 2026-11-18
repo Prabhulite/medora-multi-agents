@@ -74,12 +74,6 @@ async function assertRegistrationSource(sourceId?: number | null) {
 }
 
 export const patientService = {
-  registrationSources() {
-    return AppDataSource.getRepository(RegistrationSource).find({
-      select: { id: true, code: true, name: true, isActive: true },
-      order: { name: 'ASC' },
-    });
-  },
   list(includeInactive = false) {
     return patientRepository.findAll(includeInactive);
   },
@@ -178,7 +172,7 @@ export const patientService = {
     if (input.referralDoctorId !== undefined) {
       await assertReferralDoctor(input.referralDoctorId);
     }
-    if (input.registrationSourceId !== undefined) {
+    if (input.registrationSourceId !== undefined && input.registrationSourceId !== existing.registrationSourceId) {
       await assertRegistrationSource(input.registrationSourceId);
     }
 

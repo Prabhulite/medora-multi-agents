@@ -78,6 +78,7 @@ const PERMISSIONS = [
   { code: 'patients.view', module: 'patients', action: 'view', description: 'View patients' },
   { code: 'patients.create', module: 'patients', action: 'create', description: 'Register patients' },
   { code: 'patients.update', module: 'patients', action: 'update', description: 'Update patients' },
+  { code: 'patients.registration_sources.manage', module: 'patients', action: 'registration_sources_manage', description: 'Manage patient registration sources' },
   { code: 'patients.delete', module: 'patients', action: 'delete', description: 'Deactivate patients' },
   { code: 'patients.merge', module: 'patients', action: 'merge', description: 'Merge duplicate patients' },
   { code: 'patients.export', module: 'patients', action: 'export', description: 'Export patient demographic record for interoperability' },
@@ -465,11 +466,7 @@ async function seed(): Promise<void> {
 
   for (const source of REGISTRATION_SOURCES) {
     const existing = await registrationSourceRepo.findOne({ where: { code: source.code } });
-    if (existing) {
-      existing.name = source.name;
-      existing.isActive = true;
-      await registrationSourceRepo.save(existing);
-    } else {
+    if (!existing) {
       await registrationSourceRepo.save(
         registrationSourceRepo.create({
           ...source,

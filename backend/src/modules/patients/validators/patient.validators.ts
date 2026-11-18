@@ -168,6 +168,16 @@ export const updatePatientSchema = patientBaseObjectSchema.partial().extend({
   address: addressSchema.optional(),
 });
 
+export const registrationSourceIdParamSchema = z.object({ sourceId: z.coerce.number().int().positive() });
+export const createRegistrationSourceSchema = z.object({
+  code: z.string().trim().regex(/^[a-z][a-z0-9_]{1,79}$/, 'Use lowercase letters, numbers, and underscores'),
+  name: z.string().trim().min(2).max(120),
+});
+export const updateRegistrationSourceSchema = z.object({
+  name: z.string().trim().min(2).max(120).optional(),
+  isActive: z.boolean().optional(),
+}).refine((value) => value.name !== undefined || value.isActive !== undefined, 'Provide a name or active status');
+
 export const patientIdParamSchema = z.object({
   id: z.coerce.number().int().positive(),
 });

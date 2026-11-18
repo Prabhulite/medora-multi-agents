@@ -663,6 +663,13 @@ export interface Appointment {
   statusHistory?: AppointmentStatusHistoryItem[];
 }
 
+export interface RegistrationSource {
+  id: number;
+  code: string;
+  name: string;
+  isActive: boolean;
+}
+
 export interface AppointmentSlot {
   time: string;
   available: boolean;

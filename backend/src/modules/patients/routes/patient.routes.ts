@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../../../middleware/authenticate.js';
-import { authorize } from '../../../middleware/authorize.js';
+import { authorize, authorizeAny } from '../../../middleware/authorize.js';
 import { validate } from '../../../middleware/validate.js';
 import { asyncHandler } from '../../../shared/utils/asyncHandler.js';
 import { patientController } from '../controllers/patient.controller.js';
@@ -12,6 +12,9 @@ import {
   patientIdParamSchema,
   patientSearchQuerySchema,
   updatePatientSchema,
+  createRegistrationSourceSchema,
+  registrationSourceIdParamSchema,
+  updateRegistrationSourceSchema,
 } from '../validators/patient.validators.js';
 
 const router = Router();
@@ -19,7 +22,9 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/', authorize('patients.view'), asyncHandler(patientController.list));
-router.get('/registration-sources', authorize('patients.view'), asyncHandler(patientController.registrationSources));
+router.get('/registration-sources', authorizeAny('patients.view', 'patients.registration_sources.manage'), asyncHandler(patientController.registrationSources));
+router.post('/registration-sources', authorize('patients.registration_sources.manage'), validate(createRegistrationSourceSchema), asyncHandler(patientController.createRegistrationSource));
+router.patch('/registration-sources/:sourceId', authorize('patients.registration_sources.manage'), validate(registrationSourceIdParamSchema, 'params'), validate(updateRegistrationSourceSchema), asyncHandler(patientController.updateRegistrationSource));
 
 router.get(
   '/search',

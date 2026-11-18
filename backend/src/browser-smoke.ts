@@ -243,6 +243,15 @@ try {
     }
     await evaluate('document.querySelector("[role=dialog] .ui-modal__close").click(); true');
   }
+  await evaluate('history.pushState({}, "", "/patients/registration-sources"); window.dispatchEvent(new PopStateEvent("popstate")); true');
+  let sourcePageReady = false;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    sourcePageReady = await evaluate('Boolean(document.querySelector(".registration-sources-page .registration-sources-form")) && document.body.innerText.includes("Registration Sources")');
+    if (sourcePageReady) break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.ok(sourcePageReady, 'Registration source management page did not render');
+  assert.equal(await evaluate('document.body.innerText.includes("Unable to load registration sources")'), false, 'Registration source catalog failed to load');
   await evaluate('history.pushState({}, "", "/billing"); window.dispatchEvent(new PopStateEvent("popstate")); true');
   let billingReady = false;
   for (let attempt = 0; attempt < 100; attempt++) {
@@ -279,7 +288,7 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   assert.ok(opdQueueReady, 'OPD consultation queue filters did not render');
-  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, communication queues, pharmacy patient forms${hasBatch ? ', stock movements and count form' : ''}, inpatient dashboard, patient registration${hasPatientRow ? ' and merge confirmation' : ''}${patientLookup.body.data?.length ? ', radiology patient selection' : ''}${finalOrderNumber ? ', finalized radiology report print output' : ''}, cashier report, cash closeout review, and OPD queue rendered in headless Chrome.`);
+  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, communication queues, pharmacy patient forms${hasBatch ? ', stock movements and count form' : ''}, inpatient dashboard, patient registration${hasPatientRow ? ' and merge confirmation' : ''}, registration source management${patientLookup.body.data?.length ? ', radiology patient selection' : ''}${finalOrderNumber ? ', finalized radiology report print output' : ''}, cashier report, cash closeout review, and OPD queue rendered in headless Chrome.`);
   await send('Browser.close').catch(() => undefined);
   socket.close();
 } finally {

@@ -85,6 +85,22 @@ try {
   assert.equal(sourcedPatient.registrationSourceName, 'Integration walk-in');
   assert.equal((await ok('GET', '/api/patients/1')).registrationSourceId, sourcedPatient.registrationSourceId);
   await ok('PUT', '/api/patients/1', { registrationSourceId: null });
+  assert.equal((await request('POST', '/api/patients/registration-sources', { code: 'BAD CODE', name: 'Bad source' })).status, 422);
+  const partnerSource = await ok('POST', '/api/patients/registration-sources', { code: 'it_partner', name: 'Partner referral' }, 201);
+  assert.equal((await request('POST', '/api/patients/registration-sources', { code: 'it_partner', name: 'Duplicate source' })).status, 409);
+  assert.equal((await ok('PATCH', `/api/patients/registration-sources/${partnerSource.id}`, { name: 'Community partner' })).name, 'Community partner');
+  await ok('PUT', '/api/patients/1', { registrationSourceId: partnerSource.id });
+  assert.equal((await ok('PATCH', `/api/patients/registration-sources/${partnerSource.id}`, { isActive: false })).isActive, false);
+  assert.equal((await ok('GET', '/api/patients/1')).registrationSourceName, 'Community partner');
+  assert.equal((await ok('PUT', '/api/patients/1', { registrationSourceId: partnerSource.id, specialRemarks: 'Reviewed retired source' })).specialRemarks, 'Reviewed retired source');
+  assert.equal((await request('PUT', '/api/patients/2', { registrationSourceId: partnerSource.id })).status, 422);
+  assert.equal((await ok('PATCH', `/api/patients/registration-sources/${partnerSource.id}`, { isActive: true })).isActive, true);
+  assert.equal((await ok('PUT', '/api/patients/2', { registrationSourceId: partnerSource.id })).registrationSourceId, partnerSource.id);
+  token = (await ok('POST', '/api/auth/login', { username: 'integration_driver', password: 'Temporary!Pass123' })).token;
+  assert.equal((await request('POST', '/api/patients/registration-sources', { code: 'unauthorized', name: 'Unauthorized' })).status, 403);
+  token = adminToken;
+  await ok('PUT', '/api/patients/1', { registrationSourceId: null, specialRemarks: null });
+  await ok('PUT', '/api/patients/2', { registrationSourceId: null });
 
   assert.equal((await ok('GET', '/api/doctors/account-candidates?search=IT-DOCTOR-LOGIN')).some((row: { username: string }) => row.username === 'integration_doctor'), true);
   assert.equal((await request('POST', '/api/doctors/1/account-link', { userId: 3, doctorCode: 'WRONG', reason: 'Verified staff identity against roster' })).status, 422);

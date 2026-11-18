@@ -68,6 +68,7 @@ export function PatientsPage() {
   const canUpdate = hasPermission(user, 'patients.update');
   const canDelete = hasPermission(user, 'patients.delete');
   const canMerge = hasPermission(user, 'patients.merge');
+  const canManageSources = hasPermission(user, 'patients.registration_sources.manage');
 
   const load = async () => {
     setLoading(true);
@@ -340,11 +341,10 @@ export function PatientsPage() {
         title="Patient Registration"
         subtitle="Register patients, generate lifetime MRD numbers, and maintain visit identity."
         actions={
-          canCreate ? (
-            <Button size="sm" onClick={() => navigate('/patients/new')}>
-              Register Patient
-            </Button>
-          ) : undefined
+          <>
+            {canManageSources ? <Button size="sm" variant="secondary" onClick={() => navigate('/patients/registration-sources')}>Registration Sources</Button> : null}
+            {canCreate ? <Button size="sm" onClick={() => navigate('/patients/new')}>Register Patient</Button> : null}
+          </>
         }
       />
       {error ? <Alert tone="error">{error}</Alert> : null}
