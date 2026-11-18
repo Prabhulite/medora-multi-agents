@@ -593,6 +593,15 @@ try {
   assert.equal(pendingHandoffs.items[0].recipientName, 'Integration Receiver');
   assert.ok(pendingHandoffs.items[0].acknowledgementDueAt);
   assert.equal('conditionSummary' in pendingHandoffs.items[0], false);
+  assert.equal((await request('GET', '/api/inpatient/handoffs/pending?scope=unknown')).status, 422);
+  assert.equal((await ok('GET', '/api/inpatient/handoffs/pending?scope=mine')).total, 0);
+  assert.equal((await ok('GET', '/api/inpatient/handoffs/pending?overdue=true')).total, 0);
+  token = (await (await import('./modules/auth/services/auth.service.js')).authService.login({ username: 'integration_receiver', password: 'Temporary!Pass123' })).token;
+  assert.equal((await ok('GET', '/api/inpatient/handoffs/pending?scope=mine')).items[0].id, handoff.id);
+  token = adminToken;
+  await dataSource.query('UPDATE nursing_handoffs SET acknowledgement_due_at = DATE_SUB(NOW(), INTERVAL 1 MINUTE) WHERE id = ?', [handoff.id]);
+  assert.equal((await ok('GET', '/api/inpatient/handoffs/pending?overdue=true')).items[0].id, handoff.id);
+  await dataSource.query('UPDATE nursing_handoffs SET acknowledgement_due_at = DATE_ADD(NOW(), INTERVAL 1 HOUR) WHERE id = ?', [handoff.id]);
   assert.equal((await request('POST', `/api/inpatient/admissions/${admission.id}/handoffs`, { recipientId: receiver.id, conditionSummary: 'Again', pendingTasks: 'Later', acknowledgementDueAt: handoffDue })).status, 409);
   assert.equal((await request('POST', `/api/inpatient/admissions/${admission.id}/handoffs/${handoff.id}/acknowledge`)).status, 409);
   await dataSource.query('INSERT INTO users (employee_id,username,full_name,password_hash,is_active,is_super_admin,session_version) VALUES (?,?,?,?,1,1,1)', ['IT-BYSTANDER', 'integration_bystander', 'Integration Bystander', hash]);

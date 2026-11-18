@@ -60,6 +60,8 @@ export function InpatientDashboardPage() {
   const [dueCarePlans, setDueCarePlans] = useState<DueCarePlanPage>({ items: [], total: 0, page: 1, pageSize: 10 });
   const [dueError, setDueError] = useState('');
   const [handoffPage, setHandoffPage] = useState(1);
+  const [handoffScope, setHandoffScope] = useState<'all' | 'mine'>('all');
+  const [handoffOverdue, setHandoffOverdue] = useState(false);
   const [pendingHandoffs, setPendingHandoffs] = useState<PendingNursingHandoffPage>({ items: [], total: 0, page: 1, pageSize: 10 });
   const [handoffError, setHandoffError] = useState('');
   const [transfers, setTransfers] = useState<BedTransfer[]>([]);
@@ -86,13 +88,13 @@ export function InpatientDashboardPage() {
   useEffect(() => { void loadDueCarePlans(); }, [duePage]);
   const loadPendingHandoffs = async () => {
     try {
-      const result = await inpatientApi.pendingNursingHandoffs(handoffPage);
+      const result = await inpatientApi.pendingNursingHandoffs(handoffPage, handoffScope, handoffOverdue);
       if (handoffPage > 1 && !result.items.length && result.total <= (handoffPage - 1) * result.pageSize) setHandoffPage((page) => page - 1);
       else setPendingHandoffs(result);
       setHandoffError('');
     } catch (err) { setHandoffError(getErrorMessage(err, 'Unable to load pending handoffs')); }
   };
-  useEffect(() => { void loadPendingHandoffs(); }, [handoffPage]);
+  useEffect(() => { void loadPendingHandoffs(); }, [handoffPage, handoffScope, handoffOverdue]);
 
   const availableBeds = beds.filter((bed) => bed.status === 'available');
   const occupiedBeds = beds.filter((bed) => bed.status === 'occupied');
@@ -158,6 +160,10 @@ export function InpatientDashboardPage() {
       {dueCarePlans.total > dueCarePlans.pageSize ? <div className="inpatient-due-plans__pager"><Button size="sm" variant="secondary" disabled={duePage <= 1} onClick={() => setDuePage((page) => page - 1)}>Previous</Button><span>Page {duePage} of {Math.ceil(dueCarePlans.total / dueCarePlans.pageSize)}</span><Button size="sm" variant="secondary" disabled={duePage * dueCarePlans.pageSize >= dueCarePlans.total} onClick={() => setDuePage((page) => page + 1)}>Next</Button></div> : null}
     </section> : null}
     {tab === 'overview' ? <section className="inpatient-section inpatient-due-plans" aria-label="Pending nursing handoffs">
+      <div className="inpatient-handoff-filters">
+        <Select label="Handoff assignment" value={handoffScope} onChange={(event) => { setHandoffPage(1); setHandoffScope(event.target.value as 'all' | 'mine'); }} options={[{ label: 'All assignments', value: 'all' }, { label: 'Assigned to me', value: 'mine' }]} />
+        <label><input type="checkbox" checked={handoffOverdue} onChange={(event) => { setHandoffPage(1); setHandoffOverdue(event.target.checked); }} /> Overdue only</label>
+      </div>
       <div className="inpatient-section-heading"><div><h2>Pending nursing handoffs</h2><p>{pendingHandoffs.total} handoff{pendingHandoffs.total === 1 ? '' : 's'} awaiting acknowledgement.</p></div><Button variant="secondary" size="sm" onClick={() => void loadPendingHandoffs()}>Refresh</Button></div>
       {handoffError && <Alert tone="error">{handoffError}</Alert>}
       {pendingHandoffs.items.length ? <div className="inpatient-due-plans__list">{pendingHandoffs.items.map((handoff) => <article key={handoff.id}><div><strong>{handoff.patientName} · {handoff.patientMrdNumber}</strong><span>{handoff.admissionNumber} · {handoff.wardName} / bed {handoff.bedNumber}</span><small>Handed off {new Date(handoff.createdAt).toLocaleString()} by {handoff.outgoingByName} · Assigned to {handoff.recipientName || 'unassigned staff'}</small>{handoff.acknowledgementDueAt ? <small className={new Date(handoff.acknowledgementDueAt).getTime() < Date.now() ? 'inpatient-overdue' : ''}>{new Date(handoff.acknowledgementDueAt).getTime() < Date.now() ? 'Overdue since' : 'Due'} {new Date(handoff.acknowledgementDueAt).toLocaleString()}</small> : <small>No acknowledgement deadline recorded</small>}</div><Button size="sm" variant="secondary" onClick={() => { const admission = admissions.find((item) => item.id === Number(handoff.admissionId)); if (admission) setHandoffTarget(admission); else { setTab('admissions'); setError('Refresh admissions to open this handoff.'); } }}>Open handoff</Button></article>)}</div> : !handoffError ? <p className="inpatient-empty">No handoffs are awaiting acknowledgement.</p> : null}

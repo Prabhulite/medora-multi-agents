@@ -147,7 +147,7 @@ export const inpatientApi = {
   continueCarePlan: async (id: number, planId: number, reviewNote: string, nextReviewAt: string) => (await api.post<ApiEnvelope<NursingCarePlanReview>>(`/inpatient/admissions/${id}/care-plans/${planId}/reviews`, { reviewNote, nextReviewAt })).data.data,
   listNursingHandoffs: async (id: number) => (await api.get<ApiEnvelope<NursingHandoff[]>>(`/inpatient/admissions/${id}/handoffs`)).data.data,
   handoffReceivers: async (search: string) => (await api.get<ApiEnvelope<HandoffReceiver[]>>('/inpatient/handoffs/receivers', { params: { search } })).data.data,
-  pendingNursingHandoffs: async (page: number) => (await api.get<ApiEnvelope<PendingNursingHandoffPage>>('/inpatient/handoffs/pending', { params: { page, pageSize: 10 } })).data.data,
+  pendingNursingHandoffs: async (page: number, scope: 'all' | 'mine' = 'all', overdue = false) => (await api.get<ApiEnvelope<PendingNursingHandoffPage>>('/inpatient/handoffs/pending', { params: { page, pageSize: 10, scope, overdue } })).data.data,
   createNursingHandoff: async (id: number, payload: { recipientId: number; acknowledgementDueAt: string; conditionSummary: string; pendingTasks: string; safetyConcerns?: string | null }) => (await api.post<ApiEnvelope<NursingHandoff>>(`/inpatient/admissions/${id}/handoffs`, payload)).data.data,
   acknowledgeNursingHandoff: async (id: number, handoffId: number) => (await api.post<ApiEnvelope<NursingHandoff>>(`/inpatient/admissions/${id}/handoffs/${handoffId}/acknowledge`)).data.data,
   listNursingHandoffAssignments: async (id: number, handoffId: number) => (await api.get<ApiEnvelope<NursingHandoffAssignment[]>>(`/inpatient/admissions/${id}/handoffs/${handoffId}/assignments`)).data.data,

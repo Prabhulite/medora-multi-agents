@@ -3,7 +3,10 @@ import { z } from 'zod';
 export const admissionIdParamSchema = z.object({ id: z.coerce.number().int().positive() });
 export const carePlanIdParamSchema = admissionIdParamSchema.extend({ planId: z.coerce.number().int().positive() });
 export const dueCarePlanQuerySchema = z.object({ page: z.coerce.number().int().min(1).max(100000).default(1), pageSize: z.coerce.number().int().min(1).max(100).default(10) });
-export const pendingHandoffQuerySchema = dueCarePlanQuerySchema;
+export const pendingHandoffQuerySchema = dueCarePlanQuerySchema.extend({
+  scope: z.enum(['all', 'mine']).default('all'),
+  overdue: z.enum(['true', 'false']).default('false').transform((value) => value === 'true'),
+});
 export const createCarePlanSchema = z.object({ problem: z.string().trim().min(2).max(500), goal: z.string().trim().min(2).max(1000), interventions: z.string().trim().min(2).max(10000), reviewAt: z.string().datetime({ offset: true }).nullable().optional() });
 export const closeCarePlanSchema = z.object({ status: z.enum(['completed', 'discontinued']), reviewNote: z.string().trim().min(2).max(2000) });
 export const continueCarePlanSchema = z.object({ reviewNote: z.string().trim().min(2).max(2000), nextReviewAt: z.string().datetime({ offset: true }) });

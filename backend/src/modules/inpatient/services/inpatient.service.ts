@@ -68,7 +68,7 @@ export const inpatientService = {
       .distinct(true).orderBy('staff.fullName', 'ASC').take(20).getMany();
     return users.map(({ id, fullName, employeeId, designation }) => ({ id, fullName, employeeId, designation }));
   },
-  async pendingNursingHandoffs(page: number, pageSize: number) {
+  async pendingNursingHandoffs(page: number, pageSize: number, recipientId: number | null = null, overdue = false) {
     const query = AppDataSource.getRepository(NursingHandoff).createQueryBuilder('handoff')
       .innerJoin('handoff.admission', 'admission')
       .innerJoin('admission.patient', 'patient')
@@ -78,6 +78,8 @@ export const inpatientService = {
       .leftJoin('handoff.recipient', 'recipient')
       .where('handoff.acknowledged_at IS NULL AND handoff.closed_on_discharge_at IS NULL')
       .andWhere('admission.status IN (:...statuses)', { statuses: ['admitted', 'transferred'] });
+    if (recipientId !== null) query.andWhere('handoff.recipient_id = :recipientId', { recipientId });
+    if (overdue) query.andWhere('handoff.acknowledgement_due_at < CURRENT_TIMESTAMP');
     const total = await query.clone().getCount();
     const items = await query.select('handoff.id', 'id').addSelect('handoff.admissionId', 'admissionId')
       .addSelect('handoff.createdAt', 'createdAt').addSelect('outgoing.id', 'outgoingById')
