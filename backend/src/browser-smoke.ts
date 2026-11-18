@@ -158,6 +158,7 @@ try {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
     assert.ok(archiveActionReady, 'Released laboratory report archive action did not become ready');
+    assert.equal(await evaluate('Boolean(Array.from(document.querySelectorAll(".laboratory-report__actions button")).find(button => button.textContent === "Export FHIR R4"))'), true, 'Released laboratory report did not expose the permitted FHIR export action');
     await evaluate('Array.from(document.querySelectorAll(".laboratory-report__actions button")).find(button => button.innerText === "View release archive").click(); true');
     let archiveVisible = false;
     for (let attempt = 0; attempt < 100; attempt++) {
@@ -447,7 +448,7 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   assert.ok(opdQueueReady, 'OPD consultation queue filters did not render');
-  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, Operations laboratory ${operationsLaboratoryLinkReady ? 'drill-through' : 'empty queue'}, communication queues, laboratory catalog history${releasedLaboratoryOrderNumber ? ', released laboratory archive action' : ''}, pharmacy patient forms${hasBatch ? ', stock movements and count form' : ''}, inpatient dashboard, patient registration${hasPatientRow ? ' and merge confirmation' : ''}, registration source management, history and report${patientLookup.body.data?.length ? ', radiology patient selection' : ''}${finalOrderNumber ? ', finalized radiology report print output' : ''}, cashier and receivables reports, cash closeout review, and OPD queue rendered in headless Chrome.`);
+  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, Operations laboratory ${operationsLaboratoryLinkReady ? 'drill-through' : 'empty queue'}, communication queues, laboratory catalog history${releasedLaboratoryOrderNumber ? ', released laboratory archive and FHIR export action' : ''}, pharmacy patient forms${hasBatch ? ', stock movements and count form' : ''}, inpatient dashboard, patient registration${hasPatientRow ? ' and merge confirmation' : ''}, registration source management, history and report${patientLookup.body.data?.length ? ', radiology patient selection' : ''}${finalOrderNumber ? ', finalized radiology report print output' : ''}, cashier and receivables reports, cash closeout review, and OPD queue rendered in headless Chrome.`);
   await send('Browser.close').catch(() => undefined);
   socket.close();
 } finally {
