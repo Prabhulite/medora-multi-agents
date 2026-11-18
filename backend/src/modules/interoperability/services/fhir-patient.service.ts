@@ -50,4 +50,15 @@ export const fhirPatientService = {
     });
     return resource;
   },
+  async searchByMrd(mrdNumber: string, userId: number | null) {
+    const patient = await AppDataSource.getRepository(Patient).findOne({ where: { mrdNumber }, select: { id: true } });
+    if (!patient) return { resourceType: 'Bundle', type: 'searchset', total: 0 };
+    const resource = await this.read(patient.id, userId);
+    return {
+      resourceType: 'Bundle',
+      type: 'searchset',
+      total: 1,
+      entry: [{ fullUrl: `${env.APP_URL.replace(/\/$/, '')}/api/fhir/r4/Patient/${patient.id}`, resource }],
+    };
+  },
 };

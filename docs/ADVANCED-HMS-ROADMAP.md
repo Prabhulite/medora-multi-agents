@@ -2,6 +2,8 @@
 
 > Release tracking: see [Advanced HMS Completion Checklist](ADVANCED-HMS-COMPLETION-CHECKLIST.md). Completed boxes require implementation, documentation, and verification.
 
+> Interoperability contract: [FHIR R4 Patient Identifier Search](FHIR-R4-PATIENT-SEARCH.md).
+
 ## Objective
 
 Evolve Medora from its current administration, patient-registration, doctor, and appointment foundation into a production-oriented hospital management system for Indian hospitals and clinics.
@@ -170,6 +172,7 @@ The local browser smoke check exercises the patient search and selection when an
 
 ### Phase 7: Operations and integrations
 
+- Exact-MRD FHIR Patient search is available at `GET /api/fhir/r4/Patient?identifier=<exact-MRD>` for users with `patients.export`. It returns a FHIR R4 `searchset` Bundle with zero or one result and does not provide broad patient listing; see [FHIR R4 Patient Identifier Search](FHIR-R4-PATIENT-SEARCH.md).
 - Operations dashboard KPI totals now use full database counts and billing balance aggregation; preview queues remain bounded. Waiting appointments count checked-in patients. The CSV export includes KPI and alert totals and escapes spreadsheet formula prefixes in patient-entered text. The isolated integration suite covers values beyond the preview limits.
 - A read-only FHIR R4 Patient export is available at `GET /api/fhir/r4/Patient/:id` and from the patient dashboard for users with `patients.export`. It maps MRD identifier, name, contact, address, administrative gender where directly representable, recorded birth date, active status, and merged-record replacement link. Medora's `transgender` value is exported as text in the R4 patient gender identity extension; it is not assigned an administrative gender code because that field does not establish one. Each access is audited in the patient log, and responses use `application/fhir+json` with `no-store`. The mapping follows the [HL7 FHIR R4 Patient resource](https://hl7.org/fhir/R4/patient.html), [R4 gender identity extension](https://hl7.org/fhir/R4/extension-patient-genderidentity.html), and [FHIR HTTP content type](https://hl7.org/fhir/R4/http.html). This is a single-resource export, not a complete FHIR server, profile validation, ABDM integration, or external data exchange. Set a stable HTTPS `APP_URL` before relying on the MRD identifier namespace outside development.
 - OT/surgery, emergency/triage, ambulance, blood bank. Blood bank now has unit receipt into quarantine, screened release, patient issue with a recorded crossmatch reference, discard, and append-only status events behind separate view/manage/issue permissions. A row lock prevents concurrent double issue; expired units cannot be released or issued. Staff can use the permission-aware Blood Bank page to filter units, inspect history, page through older units, and perform permitted actions. The issue workflow has a limited active-patient lookup under `blood_bank.issue`, returning only ID, MRD number, and name; it does not require full patient registry access. This is inventory traceability, not compatibility determination or transfusion documentation. Workflow boundaries and remaining clinical gates are in the [blood bank design](BLOOD-BANK-DESIGN.md).

@@ -31,7 +31,7 @@ Use this as the single release-tracking checklist for Medora. A box is checked o
 ## Interoperability and integration
 
 - [x] Read-only FHIR R4 Patient resource export with permission checks and audit logging
-- [ ] Finish and verify exact-MRD FHIR Patient search bundle; current local work is uncommitted
+- [x] Verify `GET /api/fhir/r4/Patient?identifier=<exact-MRD>` returns an authenticated, permission-checked FHIR R4 `searchset` Bundle: one Patient entry for a matching MRD, `total: 0` for no match, and validation rejection for missing or invalid identifiers; tick only after the full integration suite passes.
 - [ ] Define and implement FHIR resources beyond Patient where required by the hospital
 - [ ] Integrate ABDM only after approved credentials, consent flows, and regulatory review are available
 - [ ] Integrate LIS, PACS/RIS, payment gateways, SMS/email, and bank feeds only after credentials and vendor contracts are supplied
