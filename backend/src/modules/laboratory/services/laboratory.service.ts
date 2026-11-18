@@ -12,7 +12,7 @@ function orderResponse(order: LaboratoryOrder, canViewDraft = true) {
   return {
     ...fields,
     patient: { id: patient.id, mrdNumber: patient.mrdNumber, firstName: patient.firstName, middleName: patient.middleName, lastName: patient.lastName },
-    test: { id: test.id, testCode: test.testCode, testName: test.testName },
+    test: { id: test.id, testCode: order.testCodeSnapshot, testName: order.testNameSnapshot },
     doctor: doctor ? { id: doctor.id, name: doctor.name } : null,
     collectedBy: collectedBy ? { id: collectedBy.id, fullName: collectedBy.fullName } : null,
     ...(!canViewDraft && order.status !== 'completed' ? { resultValue: null, resultUnit: null, referenceRange: null, resultNotes: null, criticalReason: null } : {}),
@@ -22,7 +22,7 @@ function orderResponse(order: LaboratoryOrder, canViewDraft = true) {
 export const laboratoryService = {
   async communicationQueue({ page, pageSize, search }: LaboratoryCommunicationQueueInput) {
     const pending = AppDataSource.getRepository(LaboratoryOrder).createQueryBuilder('lab')
-      .innerJoin('lab.patient', 'patient').innerJoin('lab.test', 'test')
+      .innerJoin('lab.patient', 'patient')
       .where('lab.status IN (:...readyStatuses)', { readyStatuses: ['verified', 'completed'] })
       .andWhere("(lab.priority IN (:...priorities) OR lab.critical_result = 1 OR (lab.status = 'completed' AND EXISTS (SELECT 1 FROM laboratory_result_addenda correction WHERE correction.order_id = lab.id AND correction.approved_at IS NOT NULL)))", { priorities: ['urgent', 'stat'] })
       .andWhere("NOT EXISTS (SELECT 1 FROM laboratory_communications delivered WHERE delivered.order_id = lab.id AND delivered.outcome = 'delivered' AND (NOT EXISTS (SELECT 1 FROM laboratory_result_addenda correction WHERE correction.order_id = lab.id AND correction.approved_at IS NOT NULL) OR (delivered.created_at > (SELECT MAX(correction.created_at) FROM laboratory_result_addenda correction WHERE correction.order_id = lab.id AND correction.approved_at IS NOT NULL) AND delivered.occurred_at >= (SELECT MAX(correction.created_at) FROM laboratory_result_addenda correction WHERE correction.order_id = lab.id AND correction.approved_at IS NOT NULL))))");
@@ -32,7 +32,7 @@ export const laboratoryService = {
         terms.where('lab.orderNumber LIKE :term', { term })
           .orWhere('patient.mrdNumber LIKE :term', { term })
           .orWhere("CONCAT_WS(' ', patient.firstName, patient.middleName, patient.lastName) LIKE :term", { term })
-          .orWhere('test.testName LIKE :term', { term });
+          .orWhere('lab.testNameSnapshot LIKE :term', { term });
       }));
     }
     const total = await pending.clone().getCount();
@@ -40,7 +40,7 @@ export const laboratoryService = {
       .select('lab.id', 'id').addSelect('lab.orderNumber', 'orderNumber')
       .addSelect('lab.patientId', 'patientId').addSelect('patient.mrdNumber', 'patientMrdNumber')
       .addSelect('patient.firstName', 'firstName').addSelect('patient.middleName', 'middleName').addSelect('patient.lastName', 'lastName')
-      .addSelect('test.testName', 'testName').addSelect('lab.priority', 'priority').addSelect('lab.criticalResult', 'criticalResult').addSelect('lab.status', 'status').addSelect('lab.verifiedAt', 'verifiedAt').addSelect('lab.completedAt', 'completedAt')
+      .addSelect('lab.testNameSnapshot', 'testName').addSelect('lab.priority', 'priority').addSelect('lab.criticalResult', 'criticalResult').addSelect('lab.status', 'status').addSelect('lab.verifiedAt', 'verifiedAt').addSelect('lab.completedAt', 'completedAt')
       .addSelect('(SELECT MAX(correction.created_at) FROM laboratory_result_addenda correction WHERE correction.order_id = lab.id AND correction.approved_at IS NOT NULL)', 'latestAddendumAt')
       .orderBy('COALESCE((SELECT MAX(correction.created_at) FROM laboratory_result_addenda correction WHERE correction.order_id = lab.id AND correction.approved_at IS NOT NULL), lab.verifiedAt, lab.completedAt, lab.orderedAt)', 'ASC').addOrderBy('lab.id', 'ASC')
       .limit(pageSize).offset((page - 1) * pageSize).getRawMany<{
@@ -230,8 +230,8 @@ export const laboratoryService = {
         terms.where('lab.orderNumber LIKE :search', { search })
           .orWhere('patient.mrdNumber LIKE :search', { search })
           .orWhere("CONCAT_WS(' ', patient.firstName, patient.middleName, patient.lastName) LIKE :search", { search })
-          .orWhere('test.testCode LIKE :search', { search })
-          .orWhere('test.testName LIKE :search', { search });
+          .orWhere('lab.testCodeSnapshot LIKE :search', { search })
+          .orWhere('lab.testNameSnapshot LIKE :search', { search });
       }));
     }
     const [rows, total] = await query.orderBy('lab.orderedAt', 'DESC').addOrderBy('lab.id', 'DESC').skip((input.page - 1) * input.pageSize).take(input.pageSize).getManyAndCount();
@@ -256,7 +256,7 @@ export const laboratoryService = {
       ]);
       if (!test) throw new NotFoundError('Active laboratory test not found');
       if (input.doctorId && !doctor) throw new NotFoundError('Active doctor not found');
-      const order = await manager.getRepository(LaboratoryOrder).save(manager.getRepository(LaboratoryOrder).create({ orderNumber: await nextSequenceNumber(manager, 'LAB', 'LAB', 6), patientId: input.patientId, testId: input.testId, doctorId: input.doctorId ?? null, priority: input.priority, clinicalNotes: input.clinicalNotes ?? null, status: 'ordered', orderedAt: new Date(), createdById: userId, collectedAt: null, completedAt: null, resultValue: null, resultUnit: null, referenceRange: null, resultNotes: null, resultedById: null }));
+      const order = await manager.getRepository(LaboratoryOrder).save(manager.getRepository(LaboratoryOrder).create({ orderNumber: await nextSequenceNumber(manager, 'LAB', 'LAB', 6), patientId: input.patientId, testId: input.testId, testCodeSnapshot: test.testCode, testNameSnapshot: test.testName, doctorId: input.doctorId ?? null, priority: input.priority, clinicalNotes: input.clinicalNotes ?? null, status: 'ordered', orderedAt: new Date(), createdById: userId, collectedAt: null, completedAt: null, resultValue: null, resultUnit: null, referenceRange: null, resultNotes: null, resultedById: null }));
       await manager.getRepository(PatientAuditLog).save({ patientId: order.patientId, action: 'laboratory_order_created', changedById: userId, changeSummary: `Laboratory order created: ${order.orderNumber}`, beforeData: null, afterData: JSON.stringify({ orderId: order.id, testId: order.testId, priority: order.priority, doctorId: order.doctorId }) });
       return orderResponse((await manager.getRepository(LaboratoryOrder).findOneOrFail({ where: { id: order.id }, relations: orderRelations })));
     });
@@ -326,7 +326,7 @@ export const laboratoryService = {
         archivedAt: releasedAt.toISOString(),
         patient: { id: patient.id, mrdNumber: patient.mrdNumber, firstName: patient.firstName, middleName: patient.middleName, lastName: patient.lastName, dateOfBirth: patient.dateOfBirth, gender: patient.gender },
         order: { id: order.id, orderNumber: order.orderNumber, priority: order.priority, orderedAt: order.orderedAt.toISOString(), collectedAt: order.collectedAt?.toISOString() ?? null, specimenLabel: order.specimenLabel },
-        test: { id: test.id, testCode: test.testCode, testName: test.testName, category: test.category },
+        test: { id: test.id, testCode: order.testCodeSnapshot, testName: order.testNameSnapshot, category: test.category },
         result: { value: order.resultValue, unit: order.resultUnit, referenceRange: order.referenceRange, notes: order.resultNotes, critical: order.criticalResult, criticalReason: order.criticalReason },
         verification: { verifiedAt: order.verifiedAt.toISOString(), verifiedById: order.verifiedById, verifiedByName: verifiedBy?.fullName ?? null },
         release: { releasedAt: releasedAt.toISOString(), releasedById: userId, releasedByName: releasedBy?.fullName ?? null },

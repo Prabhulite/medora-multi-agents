@@ -1130,7 +1130,9 @@ try {
   assert.equal((await request('POST', `/api/laboratory/tests/${newLabTest.id}/retire`)).status, 409);
   assert.equal((await ok('GET', '/api/laboratory/tests')).some((row: { id: number }) => row.id === newLabTest.id), false);
   assert.equal((await ok('GET', '/api/laboratory/tests/all')).find((row: { id: number }) => row.id === newLabTest.id).isActive, false);
-  assert.equal((await ok('GET', '/api/laboratory/orders?patientId=2')).find((row: { id: number }) => row.id === existingTestOrder.id).test.id, newLabTest.id);
+  const orderAfterCatalogRevision = (await ok('GET', '/api/laboratory/orders?patientId=2')).find((row: { id: number }) => row.id === existingTestOrder.id);
+  assert.equal(orderAfterCatalogRevision.test.id, newLabTest.id);
+  assert.equal(orderAfterCatalogRevision.test.testName, 'New integration assay');
   assert.equal((await request('POST', '/api/laboratory/orders', { patientId: 1, testId: newLabTest.id })).status, 404);
   assert.equal((await ok('POST', `/api/laboratory/tests/${newLabTest.id}/reactivate`)).isActive, true);
   assert.equal((await request('POST', `/api/laboratory/tests/${newLabTest.id}/reactivate`)).status, 409);

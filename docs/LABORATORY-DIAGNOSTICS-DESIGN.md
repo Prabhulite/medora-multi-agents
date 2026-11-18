@@ -24,7 +24,7 @@ Provide a manageable laboratory test catalog, patient-linked investigation order
 - The workbench uses a bounded `GET /api/laboratory/worklist` with page, page size, status, and order/patient/test search. It returns exact matching totals and unfiltered status summary counts. The older patient-scoped order list remains available for chart history; unscoped legacy lists return at most 100 orders.
 - This is an internal authorization workflow. Staff must follow their laboratory's approved SOP, including actual QC review, urgent-result escalation, and any legal signature requirements. The system does not validate analyzer output, QC evidence, or accreditation compliance.
 - All endpoints require authentication and laboratory-specific permissions.
-- Staff with `laboratory.catalog.manage` can add validated catalog tests, retire them from future ordering, and reactivate retired tests. Existing orders keep their test reference and display name.
+- Staff with `laboratory.catalog.manage` can add validated catalog tests, retire them from future ordering, reactivate retired tests, and revise mutable catalog defaults with attributed field-level history. Test codes cannot be changed. Each order snapshots the selected test code and name at creation, so later catalog revisions cannot relabel existing orders or reports.
 
 ## API
 

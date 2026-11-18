@@ -137,7 +137,7 @@ Released laboratory results have a browser print view with patient, order, speci
 
 The laboratory order form now searches active, unmerged patients by name or MRD through a bounded, minimal lookup authorized by `laboratory.create`, and requires a patient selection before submission. It can also select an active referring doctor by name, code, or registration number, enabling result and correction notices when that doctor has a linked login.
 
-Laboratory catalog managers can add tests with code, name, category, default priority, turnaround time, and price, retire tests from future ordering, and reactivate them later. They can revise the mutable catalog fields through an immutable, attributed before/after history; test codes are permanent in this workflow. Existing orders retain their test reference and operational data, while released-report archives preserve the report-time investigation detail.
+Laboratory catalog managers can add tests with code, name, category, default priority, turnaround time, and price, retire tests from future ordering, and reactivate them later. They can revise the mutable catalog fields through an immutable, attributed before/after history; test codes are permanent in this workflow. Each order snapshots its selected test code and name so catalog revisions cannot relabel historical orders, while released-report archives preserve the report-time investigation detail.
 
 Staff with `laboratory.cancel` can cancel an uncollected order with a recorded reason, actor, and time. Collected or later orders reject cancellation, and cancelled orders cannot progress through specimen collection or results.
 

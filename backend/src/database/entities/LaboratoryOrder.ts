@@ -15,6 +15,8 @@ export class LaboratoryOrder {
   @ManyToOne(() => Patient, { onDelete: 'CASCADE' }) @JoinColumn({ name: 'patient_id' }) patient!: Patient;
   @Column({ name: 'test_id', type: 'int', unsigned: true }) testId!: number;
   @ManyToOne(() => LaboratoryTest, { onDelete: 'RESTRICT' }) @JoinColumn({ name: 'test_id' }) test!: LaboratoryTest;
+  @Column({ name: 'test_code_snapshot', type: 'varchar', length: 40 }) testCodeSnapshot!: string;
+  @Column({ name: 'test_name_snapshot', type: 'varchar', length: 180 }) testNameSnapshot!: string;
   @Column({ name: 'doctor_id', type: 'int', unsigned: true, nullable: true }) doctorId!: number | null;
   @ManyToOne(() => Doctor, { onDelete: 'SET NULL', nullable: true }) @JoinColumn({ name: 'doctor_id' }) doctor!: Doctor | null;
   @Column({ type: 'varchar', length: 30, default: 'ordered' }) status!: 'ordered' | 'collected' | 'processing' | 'verified' | 'completed' | 'cancelled';
