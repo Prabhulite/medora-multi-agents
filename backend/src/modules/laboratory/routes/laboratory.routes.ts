@@ -23,6 +23,7 @@ router.patch('/orders/:id/result', authorize('laboratory.update'), validate(labo
 router.post('/orders/:id/verify', authorize('laboratory.verify'), validate(laboratoryOrderIdParamSchema, 'params'), validate(verifyLaboratoryResultSchema), asyncHandler(laboratoryController.verifyResult));
 router.post('/orders/:id/release', authorize('laboratory.release'), validate(laboratoryOrderIdParamSchema, 'params'), asyncHandler(laboratoryController.releaseResult));
 router.get('/orders/:id/addenda', authorize('laboratory.view'), validate(laboratoryOrderIdParamSchema, 'params'), asyncHandler(laboratoryController.listAddenda));
+router.get('/orders/:id/archive', authorize('laboratory.view'), validate(laboratoryOrderIdParamSchema, 'params'), asyncHandler(laboratoryController.reportArchive));
 router.post('/orders/:id/addenda', authorize('laboratory.amend'), validate(laboratoryOrderIdParamSchema, 'params'), validate(createLaboratoryAddendumSchema), asyncHandler(laboratoryController.addAddendum));
 router.post('/addenda/:id/approve', authorize('laboratory.amend.approve'), validate(laboratoryOrderIdParamSchema, 'params'), asyncHandler(laboratoryController.approveAddendum));
 router.get('/orders/:id/communications', authorize('laboratory.view'), validate(laboratoryOrderIdParamSchema, 'params'), asyncHandler(laboratoryController.listCommunications));

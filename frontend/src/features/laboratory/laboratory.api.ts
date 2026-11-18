@@ -19,6 +19,21 @@ export interface LaboratoryCommunicationQueueItem { id: number; orderNumber: str
 export interface LaboratoryCommunicationQueue { items: LaboratoryCommunicationQueueItem[]; total: number; page: number; pageSize: number; }
 
 export interface LaboratoryAddendum { id: number; reason: string; addendum: string; createdAt: string; createdById: number | null; authorName: string | null; approvedById: number | null; approvedAt: string | null; approverName: string | null; }
+export interface LaboratoryReportArchive {
+  id: number;
+  orderId: number;
+  checksum: string;
+  releasedAt: string;
+  archivedAt: string;
+  archivedById: number | null;
+  snapshot: {
+    version: number;
+    result: { value: string | null; unit: string | null; referenceRange: string | null; notes: string | null; critical: boolean; criticalReason: string | null };
+    verification: { verifiedAt: string; verifiedById: number | null; verifiedByName: string | null };
+    release: { releasedAt: string; releasedById: number | null; releasedByName: string | null };
+    addenda: Array<{ id: number }>;
+  };
+}
 export interface LaboratoryCommunication { id: number; outcome: 'attempted' | 'delivered'; method: 'phone' | 'in_person' | 'secure_message' | 'other'; recipientName: string; resultSummary: string | null; note: string | null; occurredAt: string; recordedById: number | null; recorderName: string | null; createdAt: string; }
 export type CreateLaboratoryCommunicationPayload = Pick<LaboratoryCommunication, 'outcome' | 'method' | 'recipientName' | 'occurredAt'> & { resultSummary: string; note?: string | null };
 export interface LaboratoryPatientCandidate { id: number; mrdNumber: string; fullName: string; }
@@ -173,6 +188,10 @@ export const laboratoryApi = {
   },
   async listAddenda(orderId: number): Promise<LaboratoryAddendum[]> {
     const response = await api.get<ApiEnvelope<LaboratoryAddendum[]>>(`/laboratory/orders/${orderId}/addenda`);
+    return response.data.data;
+  },
+  async getReportArchive(orderId: number): Promise<LaboratoryReportArchive> {
+    const response = await api.get<ApiEnvelope<LaboratoryReportArchive>>(`/laboratory/orders/${orderId}/archive`);
     return response.data.data;
   },
   async addAddendum(orderId: number, payload: { reason: string; addendum: string }): Promise<LaboratoryAddendum> {

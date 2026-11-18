@@ -59,7 +59,7 @@ if (order.status !== 'verified') throw new ConflictError('Only verified results 
 - Integration tests prove unauthorized, unknown, and unreleased archive requests fail appropriately.
 - Integration tests prove released addenda and archives cannot be duplicated under repeated or concurrent release attempts.
 - Backend and frontend production builds validate TypeScript contracts.
-- Browser smoke verifies the released-report archive action renders for an authenticated authorized user.
+- Browser smoke verifies the released-report archive action renders for an authenticated authorized user when the local environment contains an archived released result.
 
 ## Boundaries
 
@@ -77,7 +77,7 @@ if (order.status !== 'verified') throw new ConflictError('Only verified results 
 - Authorized users can open the archived snapshot from the laboratory report UI; unauthorized users receive `403` and unreleased orders receive `409`/`404` without data leakage.
 - Patient audit records the archive creation without copying report text.
 
-## Open Questions
+## Follow-up Scope
 
-- Should a later approved correction create a separately versioned amended archive, or is an immutable original plus visible approved addenda sufficient for the first slice?
-- Is a JSON snapshot acceptable for your operational archive, or do you require a generated PDF and external storage before relying on it?
+- This slice deliberately uses a MySQL JSON snapshot with a SHA-256 checksum. It does not generate or retain a PDF, use external storage, or provide a legally regulated signature or timestamp.
+- A later approved correction does not revise the original archive. A separately versioned amended-report archive remains future work.

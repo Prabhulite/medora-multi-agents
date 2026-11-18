@@ -1,6 +1,7 @@
+import { createHash } from 'node:crypto';
 import { AppDataSource } from '../../../config/data-source.js';
 import { Brackets } from 'typeorm';
-import { Doctor, LaboratoryCommunication, LaboratoryOrder, LaboratoryResultAddendum, LaboratoryTest, Patient, PatientAuditLog, User, UserNotification } from '../../../database/entities/index.js';
+import { Doctor, LaboratoryCommunication, LaboratoryOrder, LaboratoryReportArchive, LaboratoryResultAddendum, LaboratoryTest, Patient, PatientAuditLog, User, UserNotification } from '../../../database/entities/index.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { nextSequenceNumber } from '../../patients/services/number-sequence.service.js';
 import type { CollectLaboratorySampleInput, CreateLaboratoryAddendumInput, CreateLaboratoryCommunicationInput, CreateLaboratoryOrderInput, CreateLaboratoryTestInput, LaboratoryCommunicationQueueInput, LaboratoryWorklistInput, UpdateLaboratoryResultInput, VerifyLaboratoryResultInput } from '../validators/laboratory.validators.js';
@@ -126,6 +127,14 @@ export const laboratoryService = {
     if (order.status !== 'completed') throw new ConflictError('Addenda are available after result release');
     const rows = await AppDataSource.getRepository(LaboratoryResultAddendum).find({ where: { orderId }, relations: { createdBy: true, approvedBy: true }, order: { id: 'ASC' } });
     return rows.map(({ id, reason, addendum, createdById, createdAt, createdBy, approvedById, approvedAt, approvedBy }) => ({ id, reason, addendum, createdById, createdAt, authorName: createdBy?.fullName ?? null, approvedById, approvedAt, approverName: approvedBy?.fullName ?? null }));
+  },
+  async reportArchive(orderId: number) {
+    const order = await AppDataSource.getRepository(LaboratoryOrder).findOne({ where: { id: orderId } });
+    if (!order) throw new NotFoundError('Laboratory order not found');
+    if (order.status !== 'completed') throw new ConflictError('A released result is required before its archive can be viewed');
+    const archive = await AppDataSource.getRepository(LaboratoryReportArchive).findOne({ where: { orderId } });
+    if (!archive) throw new NotFoundError('Laboratory report archive not found');
+    return { id: archive.id, orderId: archive.orderId, snapshot: archive.snapshot, checksum: archive.checksum, releasedAt: archive.releasedAt, archivedAt: archive.createdAt, archivedById: archive.archivedById };
   },
   async addAddendum(orderId: number, input: CreateLaboratoryAddendumInput, userId: number) {
     return AppDataSource.transaction(async (manager) => {
@@ -271,9 +280,31 @@ export const laboratoryService = {
       const order = await repo.createQueryBuilder('order').setLock('pessimistic_write').where('order.id = :id', { id: orderId }).getOne();
       if (!order) throw new NotFoundError('Laboratory order not found');
       if (order.status !== 'verified' || !order.verifiedAt) throw new ConflictError('Verify the result before release');
-      order.status = 'completed'; order.completedAt = new Date(); order.releasedById = userId;
+      const releasedAt = new Date();
+      const [patient, test, verifiedBy, releasedBy, addenda] = await Promise.all([
+        manager.getRepository(Patient).findOneByOrFail({ id: order.patientId }),
+        manager.getRepository(LaboratoryTest).findOneByOrFail({ id: order.testId }),
+        order.verifiedById ? manager.getRepository(User).findOneBy({ id: order.verifiedById }) : Promise.resolve(null),
+        manager.getRepository(User).findOneBy({ id: userId }),
+        manager.getRepository(LaboratoryResultAddendum).find({ where: { orderId }, relations: { createdBy: true, approvedBy: true }, order: { id: 'ASC' } }),
+      ]);
+      const snapshot = {
+        version: 1,
+        archivedAt: releasedAt.toISOString(),
+        patient: { id: patient.id, mrdNumber: patient.mrdNumber, firstName: patient.firstName, middleName: patient.middleName, lastName: patient.lastName, dateOfBirth: patient.dateOfBirth, gender: patient.gender },
+        order: { id: order.id, orderNumber: order.orderNumber, priority: order.priority, orderedAt: order.orderedAt.toISOString(), collectedAt: order.collectedAt?.toISOString() ?? null, specimenLabel: order.specimenLabel },
+        test: { id: test.id, testCode: test.testCode, testName: test.testName, category: test.category },
+        result: { value: order.resultValue, unit: order.resultUnit, referenceRange: order.referenceRange, notes: order.resultNotes, critical: order.criticalResult, criticalReason: order.criticalReason },
+        verification: { verifiedAt: order.verifiedAt.toISOString(), verifiedById: order.verifiedById, verifiedByName: verifiedBy?.fullName ?? null },
+        release: { releasedAt: releasedAt.toISOString(), releasedById: userId, releasedByName: releasedBy?.fullName ?? null },
+        addenda: addenda.map((addendum) => ({ id: addendum.id, reason: addendum.reason, addendum: addendum.addendum, createdAt: addendum.createdAt.toISOString(), createdById: addendum.createdById, authorName: addendum.createdBy?.fullName ?? null, approvedAt: addendum.approvedAt?.toISOString() ?? null, approvedById: addendum.approvedById, approverName: addendum.approvedBy?.fullName ?? null })),
+      };
+      const checksum = createHash('sha256').update(JSON.stringify(snapshot)).digest('hex');
+      await manager.getRepository(LaboratoryReportArchive).save(manager.getRepository(LaboratoryReportArchive).create({ orderId, snapshot, checksum, releasedAt, archivedById: userId }));
+      order.status = 'completed'; order.completedAt = releasedAt; order.releasedById = userId;
       await repo.save(order);
       await manager.getRepository(PatientAuditLog).save({ patientId: order.patientId, action: 'laboratory_result_released', changedById: userId, changeSummary: `Laboratory result released: ${order.orderNumber}`, beforeData: JSON.stringify({ orderId, status: 'verified' }), afterData: JSON.stringify({ orderId, status: 'completed' }) });
+      await manager.getRepository(PatientAuditLog).save({ patientId: order.patientId, action: 'laboratory_report_archived', changedById: userId, changeSummary: `Laboratory report archived: ${order.orderNumber}`, beforeData: null, afterData: JSON.stringify({ orderId, checksum }) });
       if (order.doctorId) {
         const doctor = await manager.getRepository(Doctor).findOne({ where: { id: order.doctorId, isActive: true } });
         if (doctor?.accountUserId && await manager.getRepository(User).exist({ where: { id: doctor.accountUserId, isActive: true } })) {

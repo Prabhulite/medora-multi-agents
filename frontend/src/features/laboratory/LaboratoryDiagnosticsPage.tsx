@@ -10,7 +10,7 @@ import { Table, type TableColumn } from '../../components/ui/Table';
 import { getErrorMessage } from '../../lib/api';
 import { hasPermission } from '../../lib/permissions';
 import { useAuth } from '../auth/AuthContext';
-import { laboratoryApi, type CreateLaboratoryOrderPayload, type CreateLaboratoryTestPayload, type LaboratoryAddendum, type LaboratoryCommunication, type LaboratoryCommunicationQueueItem, type LaboratoryDoctorCandidate, type LaboratoryOrder, type LaboratoryOrderStatus, type LaboratoryPatientCandidate, type LaboratoryTest, type UpdateLaboratoryResultPayload } from './laboratory.api';
+import { laboratoryApi, type CreateLaboratoryOrderPayload, type CreateLaboratoryTestPayload, type LaboratoryAddendum, type LaboratoryCommunication, type LaboratoryCommunicationQueueItem, type LaboratoryDoctorCandidate, type LaboratoryOrder, type LaboratoryOrderStatus, type LaboratoryPatientCandidate, type LaboratoryReportArchive, type LaboratoryTest, type UpdateLaboratoryResultPayload } from './laboratory.api';
 import './LaboratoryDiagnosticsPage.css';
 
 type Modal = 'order' | 'catalog' | 'collect' | 'result' | 'verify' | 'view' | 'communications' | null;
@@ -310,6 +310,9 @@ function ResultView({ order, canAmend, canApproveAmendment, currentUserId, onClo
   const [addendum, setAddendum] = useState('');
   const [error, setError] = useState('');
   const [approvingId, setApprovingId] = useState<number | null>(null);
+  const [archive, setArchive] = useState<LaboratoryReportArchive | null>(null);
+  const [loadingArchive, setLoadingArchive] = useState(false);
+  const [archiveError, setArchiveError] = useState('');
   useEffect(() => {
     if (!released) return;
     let active = true;
@@ -323,17 +326,20 @@ function ResultView({ order, canAmend, canApproveAmendment, currentUserId, onClo
     finally { setSavingAddendum(false); }
   };
   const approve = async (id: number) => { setApprovingId(id); setError(''); try { const row = await laboratoryApi.approveAddendum(id); setAddenda((current) => current.map((item) => item.id === id ? row : item)); } catch (err) { setError(getErrorMessage(err, 'Unable to approve result correction')); } finally { setApprovingId(null); } };
+  const loadArchive = async () => { setLoadingArchive(true); setArchiveError(''); try { setArchive(await laboratoryApi.getReportArchive(order.id)); } catch (err) { setArchiveError(getErrorMessage(err, 'Unable to load released report archive')); } finally { setLoadingArchive(false); } };
   return <ModalShell title={`${released ? 'Laboratory report' : 'Verified draft'} · ${order.testName}`} eyebrow={order.orderNumber} onClose={onClose} className={released ? 'laboratory-report' : ''}><div className="laboratory-form">
     <div className="laboratory-result-context"><strong>{order.patientName || `Patient #${order.patientId}`}</strong><span>{order.patientMrdNumber || `Patient ID ${order.patientId}`} · {released ? 'Released result' : 'Awaiting release'}</span></div>
     <dl className="laboratory-report__details"><div><dt>Investigation</dt><dd>{order.testName} {order.testCode && `(${order.testCode})`}</dd></div><div><dt>Priority</dt><dd>{order.priority || 'routine'}</dd></div><div><dt>Ordered</dt><dd>{dateLabel(order.orderedAt)}</dd></div><div><dt>Collected</dt><dd>{dateLabel(order.collectedAt)}</dd></div><div><dt>Specimen label</dt><dd>{order.specimenLabel || 'Not recorded'}</dd></div><div><dt>Referring doctor</dt><dd>{order.doctorName || 'Not assigned'}</dd></div><div><dt>Order number</dt><dd>{order.orderNumber}</dd></div></dl>
     <section className="laboratory-report__result"><h3>Result</h3><p>{order.result || 'No result recorded.'} {order.resultUnit || ''}</p>{order.referenceRange && <p>Reference range: {order.referenceRange}</p>}{order.remarks && <p>{order.remarks}</p>}</section>
+    {archive && <section className="laboratory-report__result"><h3>Released report archive</h3><p>This immutable snapshot was archived {dateLabel(archive.archivedAt)}. Checksum: <code>{archive.checksum}</code></p><p>{archive.snapshot.result.value || 'No result recorded.'} {archive.snapshot.result.unit || ''}</p>{archive.snapshot.result.referenceRange && <p>Reference range: {archive.snapshot.result.referenceRange}</p>}{archive.snapshot.result.notes && <p>{archive.snapshot.result.notes}</p>}<small>Verified by {archive.snapshot.verification.verifiedByName || `staff #${archive.snapshot.verification.verifiedById || 'unknown'}`} · Released by {archive.snapshot.release.releasedByName || `staff #${archive.snapshot.release.releasedById || 'unknown'}`}</small></section>}
     {order.criticalResult && <Alert tone="warning">Marked critical at verification. {order.criticalReason || 'Direct communication required.'}</Alert>}
     {order.verifiedAt && <p>Verified {dateLabel(order.verifiedAt)} · staff #{order.verifiedById || 'unknown'}</p>}
     {order.completedAt && <p>Released {dateLabel(order.completedAt)} · staff #{order.releasedById || 'unknown'}</p>}
     {released && !order.verifiedAt && <p>Historical result: verification details were not recorded in the earlier workflow.</p>}
     {released && <section className="laboratory-report__addenda"><h3>Addenda</h3>{loadingAddenda ? <p>Loading corrections…</p> : addenda.length ? addenda.map((row) => <article key={row.id}><strong>{dateLabel(row.createdAt)} · {row.authorName || 'Former user'}</strong><p>Reason: {row.reason}</p><p>{row.addendum}</p><p>{row.approvedAt ? `Approved ${dateLabel(row.approvedAt)} · ${row.approverName || 'Former user'}` : 'Pending independent approval'}</p>{canApproveAmendment && !row.approvedAt && row.createdById !== currentUserId && <Button type="button" size="sm" loading={approvingId === row.id} disabled={approvingId !== null} onClick={() => void approve(row.id)}>Approve correction</Button>}</article>) : <p>No corrections recorded.</p>}</section>}
     {error && <Alert tone="error">{error}</Alert>}
-    <div className="laboratory-modal__footer laboratory-report__actions"><Button type="button" variant="secondary" onClick={onClose}>Close</Button>{released && <Button type="button" disabled={loadingAddenda || Boolean(error)} onClick={() => window.print()}>Print report</Button>}</div>
+    {archiveError && <Alert tone="error">{archiveError}</Alert>}
+    <div className="laboratory-modal__footer laboratory-report__actions"><Button type="button" variant="secondary" onClick={onClose}>Close</Button>{released && !archive && <Button type="button" variant="secondary" loading={loadingArchive} onClick={() => void loadArchive()}>View release archive</Button>}{released && <Button type="button" disabled={loadingAddenda || Boolean(error)} onClick={() => window.print()}>Print report</Button>}</div>
   </div>{released && canAmend && <form className="laboratory-form laboratory-report__correction" onSubmit={(event) => void saveAddendum(event)}><h3>Add a correction</h3><Input label="Reason" required minLength={5} maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} /><label className="laboratory-textarea"><span>Addendum</span><textarea required rows={4} maxLength={10000} value={addendum} onChange={(event) => setAddendum(event.target.value)} /></label><Button type="submit" loading={savingAddendum} disabled={savingAddendum || reason.trim().length < 5 || !addendum.trim()}>Save addendum</Button></form>}</ModalShell>;
 }
 

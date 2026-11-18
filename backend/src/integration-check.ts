@@ -72,6 +72,7 @@ try {
   token = (await ok('POST', '/api/auth/login', { username: 'integration_admin', password: 'Temporary!Pass123' })).token;
   assert.ok(token);
   const adminToken = token;
+  let driverToken = '';
   token = '';
   assert.equal((await request('GET', '/api/fhir/r4/Patient/1')).status, 401);
   token = adminToken;
@@ -106,6 +107,7 @@ try {
   assert.equal(sourceHistory[3].beforeName, null);
   assert.equal((await ok('PUT', '/api/patients/2', { registrationSourceId: partnerSource.id })).registrationSourceId, partnerSource.id);
   token = (await ok('POST', '/api/auth/login', { username: 'integration_driver', password: 'Temporary!Pass123' })).token;
+  driverToken = token;
   assert.equal((await request('POST', '/api/patients/registration-sources', { code: 'unauthorized', name: 'Unauthorized' })).status, 403);
   assert.equal((await request('GET', `/api/patients/registration-sources/${partnerSource.id}/history`)).status, 403);
   token = adminToken;
@@ -371,7 +373,6 @@ try {
   const otherTrip = await ok('POST', '/api/ambulance/trips', { ...tripPayload, vehicleId: ambulanceTwo.id, driverId: 2 }, 201);
   const adminAmbulanceNotice = (await ok('GET', '/api/notifications')).items.find((item: { kind: string; sourceId: number }) => item.kind === 'ambulance_assigned' && item.sourceId === trip.id);
   assert.ok(adminAmbulanceNotice);
-  const driverToken = (await ok('POST', '/api/auth/login', { username: 'integration_driver', password: 'Temporary!Pass123' })).token;
   token = driverToken;
   const driverNotices = await ok('GET', '/api/notifications');
   assert.equal(driverNotices.items.some((item: { kind: string; sourceId: number }) => item.kind === 'ambulance_assigned' && item.sourceId === otherTrip.id), true);
@@ -1194,7 +1195,13 @@ try {
   assert.equal(maskedPreReleaseContact.resultSummary, null);
   assert.equal(maskedPreReleaseContact.note, null);
   token = adminToken;
+  assert.equal((await request('GET', `/api/laboratory/orders/${laboratory.id}/archive`)).status, 409);
   assert.equal((await ok('POST', `/api/laboratory/orders/${laboratory.id}/release`)).status, 'completed');
+  const laboratoryArchive = await ok('GET', `/api/laboratory/orders/${laboratory.id}/archive`);
+  assert.equal(laboratoryArchive.orderId, laboratory.id);
+  assert.equal(laboratoryArchive.snapshot.result.value, 'Normal');
+  assert.equal(laboratoryArchive.snapshot.verification.verifiedById, verifiedLab.verifiedById);
+  assert.match(laboratoryArchive.checksum, /^[a-f0-9]{64}$/);
   assert.equal((await request('GET', '/api/laboratory/communication-queue?page=0')).status, 422);
   assert.equal((await request('GET', '/api/laboratory/communication-queue?pageSize=101')).status, 422);
   assert.equal((await request('GET', '/api/laboratory/communication-queue?search=x')).status, 422);
@@ -1248,6 +1255,9 @@ try {
   assert.equal(labAddendum.reason, 'Corrected interpretation');
   assert.equal((await ok('GET', `/api/laboratory/orders/${laboratory.id}/addenda`))[0].addendum, 'Interpret as within expected limits');
   assert.ok((await ok('GET', `/api/laboratory/orders/${laboratory.id}/addenda`))[0].approvedAt);
+  const archivedAfterCorrection = await ok('GET', `/api/laboratory/orders/${laboratory.id}/archive`);
+  assert.equal(archivedAfterCorrection.checksum, laboratoryArchive.checksum);
+  assert.equal(archivedAfterCorrection.snapshot.addenda.length, 0);
   assert.equal((await ok('GET', '/api/laboratory/orders?patientId=1')).find((row: { id: number }) => row.id === laboratory.id).resultValue, 'Normal');
   token = (await ok('POST', '/api/auth/login', { username: 'integration_doctor', password: 'Temporary!Pass123' })).token;
   const doctorNotifications = await ok('GET', '/api/notifications');
@@ -1255,6 +1265,10 @@ try {
   assert.equal(doctorNotifications.items.some((item: { kind: string; sourceId: number; message: string }) => item.kind === 'lab_result_amended' && item.sourceId === labAddendum.id && !item.message.includes('Interpret')), true);
   token = (await ok('POST', '/api/auth/login', { username: 'integration_clinician', password: 'Temporary!Pass123' })).token;
   assert.equal((await ok('GET', '/api/laboratory/orders?patientId=1')).find((row: { id: number }) => row.id === laboratory.id).resultValue, 'Normal');
+  assert.equal((await ok('GET', `/api/laboratory/orders/${laboratory.id}/archive`)).checksum, laboratoryArchive.checksum);
+  token = driverToken;
+  assert.equal((await request('GET', `/api/laboratory/orders/${laboratory.id}/archive`)).status, 403);
+  token = (await ok('POST', '/api/auth/login', { username: 'integration_clinician', password: 'Temporary!Pass123' })).token;
   assert.equal((await request('POST', `/api/laboratory/orders/${laboratory.id}/addenda`, { reason: 'Unauthorized edit', addendum: 'No' })).status, 403);
   assert.equal((await request('POST', `/api/laboratory/addenda/${labAddendum.id}/approve`)).status, 403);
   assert.equal((await ok('GET', `/api/laboratory/orders/${laboratory.id}/addenda`)).length, 1);

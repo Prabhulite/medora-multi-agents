@@ -83,6 +83,40 @@ try {
   assert.ok(worklistReady, 'Laboratory orders did not finish loading');
   assert.equal(await evaluate('Boolean(document.querySelector(".laboratory-section .ui-table-search input")) && Boolean(document.querySelector(".laboratory-section .ui-table-toolbar__entries select"))'), true, 'Worklist search and paging controls did not render');
   assert.equal(await evaluate('document.body.innerText.includes("Unable to load laboratory diagnostics")'), false, 'Laboratory workbench showed a load error');
+  const releasedLaboratoryLookup = await evaluate('fetch("/api/laboratory/worklist?status=completed&page=1&pageSize=10", { credentials: "include" }).then(async response => ({ status: response.status, body: await response.json() }))') as { status: number; body: { data?: { items?: Array<{ id: number; orderNumber: string }> } } };
+  assert.equal(releasedLaboratoryLookup.status, 200, `Released laboratory worklist returned ${releasedLaboratoryLookup.status}`);
+  let releasedLaboratoryOrderNumber: string | null = null;
+  for (const laboratoryOrder of releasedLaboratoryLookup.body.data?.items ?? []) {
+    const archiveStatus = await evaluate(`fetch(${JSON.stringify(`/api/laboratory/orders/${laboratoryOrder.id}/archive`)}, { credentials: 'include' }).then(response => response.status)`);
+    if (archiveStatus === 200) { releasedLaboratoryOrderNumber = laboratoryOrder.orderNumber; break; }
+  }
+  if (releasedLaboratoryOrderNumber) {
+    await evaluate(`(() => { const input = document.querySelector('.laboratory-section .ui-table-search input'); const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; setter.call(input, ${JSON.stringify(releasedLaboratoryOrderNumber)}); input.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+    let releasedLaboratoryRowReady = false;
+    for (let attempt = 0; attempt < 100; attempt++) {
+      releasedLaboratoryRowReady = await evaluate(`Array.from(document.querySelectorAll('.laboratory-section tbody tr')).some(row => row.innerText.includes(${JSON.stringify(releasedLaboratoryOrderNumber)}) && row.innerText.includes('View result'))`);
+      if (releasedLaboratoryRowReady) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.ok(releasedLaboratoryRowReady, 'Released laboratory result was absent from the worklist');
+    await evaluate(`(() => { const row = Array.from(document.querySelectorAll('.laboratory-section tbody tr')).find(item => item.innerText.includes(${JSON.stringify(releasedLaboratoryOrderNumber)})); Array.from(row.querySelectorAll('button')).find(button => button.innerText.includes('View result')).click(); return true; })()`);
+    let archiveActionReady = false;
+    for (let attempt = 0; attempt < 100; attempt++) {
+      archiveActionReady = await evaluate('Boolean(Array.from(document.querySelectorAll(".laboratory-report__actions button")).find(button => button.innerText === "View release archive" && !button.disabled))');
+      if (archiveActionReady) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.ok(archiveActionReady, 'Released laboratory report archive action did not become ready');
+    await evaluate('Array.from(document.querySelectorAll(".laboratory-report__actions button")).find(button => button.innerText === "View release archive").click(); true');
+    let archiveVisible = false;
+    for (let attempt = 0; attempt < 100; attempt++) {
+      archiveVisible = await evaluate('document.querySelector(".laboratory-report")?.innerText.includes("Released report archive") && /Checksum: [a-f0-9]{64}/.test(document.querySelector(".laboratory-report")?.innerText || "")');
+      if (archiveVisible) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.ok(archiveVisible, 'Released laboratory report archive did not render');
+    await evaluate('document.querySelector(".laboratory-report__actions button")?.click(); true');
+  }
   let communicationQueueReady = false;
   for (let attempt = 0; attempt < 100; attempt++) {
     try { communicationQueueReady = await evaluate('Boolean(document.querySelector(".laboratory-communication-queue table")) || document.body.innerText.includes("No verified urgent, STAT, or corrected results awaiting communication.")'); } catch { /* navigation resets the execution context */ }
@@ -351,7 +385,7 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   assert.ok(opdQueueReady, 'OPD consultation queue filters did not render');
-  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, communication queues, pharmacy patient forms${hasBatch ? ', stock movements and count form' : ''}, inpatient dashboard, patient registration${hasPatientRow ? ' and merge confirmation' : ''}, registration source management, history and report${patientLookup.body.data?.length ? ', radiology patient selection' : ''}${finalOrderNumber ? ', finalized radiology report print output' : ''}, cashier and receivables reports, cash closeout review, and OPD queue rendered in headless Chrome.`);
+  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, communication queues${releasedLaboratoryOrderNumber ? ', released laboratory archive action' : ''}, pharmacy patient forms${hasBatch ? ', stock movements and count form' : ''}, inpatient dashboard, patient registration${hasPatientRow ? ' and merge confirmation' : ''}, registration source management, history and report${patientLookup.body.data?.length ? ', radiology patient selection' : ''}${finalOrderNumber ? ', finalized radiology report print output' : ''}, cashier and receivables reports, cash closeout review, and OPD queue rendered in headless Chrome.`);
   await send('Browser.close').catch(() => undefined);
   socket.close();
 } finally {
