@@ -121,6 +121,8 @@ From `backend/`, run `npm run db:backup -- <backup.sql>` to create a SQL dump an
 
 For release, recovery, first-line support, and sign-off procedures, use the [operator runbook](docs/OPERATOR-RUNBOOK.md).
 
+For the read-only released laboratory-report export contract and interoperability limits, see [FHIR R4 Laboratory DiagnosticReport export](docs/FHIR-R4-LABORATORY-DIAGNOSTIC-REPORT.md).
+
 ## Theme
 
 Primary brand color from PDF: `#015b2d`  
