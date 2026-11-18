@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -25,6 +26,7 @@ function dateLabel(value?: string | null) {
 
 export function RadiologyDiagnosticsPage() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const canCreate = hasPermission(user, 'radiology.create');
   const canUpdate = hasPermission(user, 'radiology.update');
   const canCancel = hasPermission(user, 'radiology.cancel');
@@ -35,7 +37,7 @@ export function RadiologyDiagnosticsPage() {
   const [summary, setSummary] = useState({ total: 0, pending: 0, inProgress: 0, reported: 0 });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => searchParams.get('search')?.slice(0, 80) ?? '');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [status, setStatus] = useState<RadiologyOrderStatus | ''>('');
   const worklistRequestId = useRef(0);

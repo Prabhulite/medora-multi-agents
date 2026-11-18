@@ -27,11 +27,15 @@ function pharmacyAlertPath(id: string | number) {
   return ['low-stock', 'expired-stock', 'expiring-stock', 'quarantined-stock'].includes(String(id)) ? `/pharmacy?alert=${id}` : null;
 }
 
-function Queue({ items }: { items: OperationsQueueItem[] }) {
+function diagnosticQueuePath(destination: 'laboratory' | 'radiology', item: OperationsQueueItem) {
+  return `/${destination}?search=${encodeURIComponent(item.label)}`;
+}
+
+function Queue({ items, itemPath }: { items: OperationsQueueItem[]; itemPath?: (item: OperationsQueueItem) => string }) {
   if (!items.length) return <div className="operations-empty">Nothing is waiting right now.</div>;
   return <ul className="operations-queue" aria-label="Operational queue">
     {items.slice(0, 5).map((item) => <li key={item.id} className="operations-queue__item">
-      <div><strong>{item.label}</strong><span>{item.detail || item.status || 'Requires attention'}</span></div>
+      <div>{itemPath ? <Link className="operations-queue__link" to={itemPath(item)}>{item.label}</Link> : <strong>{item.label}</strong>}<span>{item.detail || item.status || 'Requires attention'}</span></div>
       <div className="operations-queue__meta">{item.priority && <em className={`operations-priority operations-priority--${item.priority.toLowerCase()}`}>{item.priority}</em>}{item.timestamp && <time>{formatTime(item.timestamp)}</time>}{item.count != null && <b>{item.count}</b>}</div>
     </li>)}
   </ul>;
@@ -78,8 +82,8 @@ export function OperationsDashboardPage() {
           <article className="operations-panel"><header><div><small>Front office</small><h2>Appointments</h2></div><b>{k.appointmentsWaiting} waiting</b></header><Queue items={dashboard.queues.appointments} /></article>
           <article className="operations-panel"><header><div><small>Inpatient</small><h2>Admissions</h2></div><b>{k.admissionsActive} active</b></header><Queue items={dashboard.queues.admissions} /></article>
           <article className="operations-panel"><header><div><small>Finance</small><h2>Billing balances</h2></div><b>{formatCurrency(k.billingOutstanding)}</b></header><Queue items={dashboard.queues.billing} /></article>
-          <article className="operations-panel"><header><div><small>Diagnostics</small><h2>Laboratory</h2></div><b>{k.labPending} pending</b></header><Queue items={dashboard.queues.laboratory} /></article>
-          <article className="operations-panel"><header><div><small>Diagnostics</small><h2>Radiology</h2></div><b>{k.radiologyPending} pending</b></header><Queue items={dashboard.queues.radiology} /></article>
+          <article className="operations-panel"><header><div><small>Diagnostics</small><h2>Laboratory</h2></div><b>{k.labPending} pending</b></header><Queue items={dashboard.queues.laboratory} itemPath={hasPermission(user, 'laboratory.view') ? (item) => diagnosticQueuePath('laboratory', item) : undefined} /></article>
+          <article className="operations-panel"><header><div><small>Diagnostics</small><h2>Radiology</h2></div><b>{k.radiologyPending} pending</b></header><Queue items={dashboard.queues.radiology} itemPath={hasPermission(user, 'radiology.view') ? (item) => diagnosticQueuePath('radiology', item) : undefined} /></article>
         </div>
         <aside className="operations-alerts" aria-labelledby="operations-alerts-title"><header><div><small>Attention needed</small><h2 id="operations-alerts-title">Alerts</h2></div><b>{dashboard.alerts.length}</b></header>{dashboard.alerts.length ? <ul>{dashboard.alerts.map((alert) => <li key={alert.id} className={`operations-alert operations-alert--${alert.severity}`}><span className="operations-alert__marker" aria-hidden="true">!</span><div><strong>{alert.title}{alert.count != null && ` · ${alert.count}`}</strong><span>{alert.detail || 'Review this item when possible.'}</span>{hasPermission(user, 'pharmacy.inventory.view') && pharmacyAlertPath(alert.id) && <Link className="operations-alert__link" to={pharmacyAlertPath(alert.id)!}>View affected batches</Link>}</div></li>)}</ul> : <div className="operations-empty">No active alerts. Your teams are on track.</div>}</aside>
       </section>

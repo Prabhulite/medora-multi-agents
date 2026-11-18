@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -34,6 +35,7 @@ function dateLabel(value?: string | null) {
 
 export function LaboratoryDiagnosticsPage() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const canCreate = hasPermission(user, 'laboratory.create');
   const canUpdate = hasPermission(user, 'laboratory.update');
   const canVerify = hasPermission(user, 'laboratory.verify');
@@ -59,7 +61,7 @@ export function LaboratoryDiagnosticsPage() {
   const [summary, setSummary] = useState({ total: 0, pending: 0, processing: 0, completed: 0 });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => searchParams.get('search')?.slice(0, 80) ?? '');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [status, setStatus] = useState<LaboratoryOrderStatus | ''>('');
   const requestId = useRef(0);
