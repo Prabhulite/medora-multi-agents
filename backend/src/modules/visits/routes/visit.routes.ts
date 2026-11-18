@@ -35,6 +35,13 @@ router.post(
   asyncHandler(visitController.checkin),
 );
 
+router.post(
+  '/:id/start-consultation',
+  authorize('visits.consult'),
+  validate(visitIdSchema, 'params'),
+  asyncHandler(visitController.startConsultation),
+);
+
 router.patch(
   '/:id/checkout',
   authorize('visits.checkout'),

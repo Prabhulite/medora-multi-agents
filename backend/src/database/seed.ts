@@ -117,6 +117,7 @@ const PERMISSIONS = [
     action: 'checkin',
     description: 'Perform OP check-in',
   },
+  { code: 'visits.consult', module: 'visits', action: 'consult', description: 'Start OP consultation' },
   {
     code: 'visits.checkout',
     module: 'visits',

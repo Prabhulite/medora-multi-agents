@@ -5,6 +5,7 @@ import {
   Invoice,
   Patient,
   PatientVisit,
+  PatientAuditLog,
 } from '../../../database/entities/index.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { nextSequenceNumber } from '../../patients/services/number-sequence.service.js';
@@ -19,9 +20,11 @@ function patientFullName(patient: Patient | null | undefined) {
 }
 
 function dayBounds(dateIso: string) {
+  const end = new Date(`${dateIso}T00:00:00Z`);
+  end.setUTCDate(end.getUTCDate() + 1);
   return {
     dayStart: `${dateIso} 00:00:00`,
-    dayEnd: `${dateIso} 23:59:59`,
+    dayEnd: `${end.toISOString().slice(0, 10)} 00:00:00`,
   };
 }
 
@@ -51,8 +54,9 @@ async function nextTokenForDoctor(
     .getRepository(PatientVisit)
     .createQueryBuilder('visit')
     .select('MAX(visit.tokenNumber)', 'maxToken')
+    .setLock('pessimistic_write')
     .where('visit.doctorId = :doctorId', { doctorId })
-    .andWhere('visit.visitAt BETWEEN :dayStart AND :dayEnd', { dayStart, dayEnd })
+    .andWhere('visit.visitAt >= :dayStart AND visit.visitAt < :dayEnd', { dayStart, dayEnd })
     .getRawOne<{ maxToken: number | string | null }>();
   return Number(row?.maxToken || 0) + 1;
 }
@@ -92,6 +96,8 @@ function toCheckinView(
     checkedInAt: visit.visitAt,
     checkedInByName: visit.createdBy?.fullName ?? null,
     checkedOutAt: visit.checkedOutAt,
+    consultationStartedAt: visit.consultationStartedAt,
+    consultationStartedByName: visit.consultationStartedBy?.fullName ?? null,
     checkedOutByName: visit.checkedOutBy?.fullName ?? null,
     visitDuration: durationLabel(visit.visitAt, visit.checkedOutAt),
     visitState: inside ? 'inside' : 'done',
@@ -113,6 +119,7 @@ export const visitService = {
       .leftJoinAndSelect('visit.department', 'department')
       .leftJoinAndSelect('visit.createdBy', 'createdBy')
       .leftJoinAndSelect('visit.checkedOutBy', 'checkedOutBy')
+      .leftJoinAndSelect('visit.consultationStartedBy', 'consultationStartedBy')
       .where('visit.visitType = :visitType', { visitType: 'OP' })
       .orderBy('visit.visitAt', 'DESC')
       .take(500);
@@ -123,7 +130,7 @@ export const visitService = {
       qb.andWhere('visit.visitAt >= :fromAt', { fromAt: `${fromDate} 00:00:00` });
     }
     if (toDate) {
-      qb.andWhere('visit.visitAt <= :toAt', { toAt: `${toDate} 23:59:59` });
+      qb.andWhere('visit.visitAt < :toAt', { toAt: dayBounds(toDate).dayEnd });
     }
     if (filters.doctorId) {
       qb.andWhere('visit.doctorId = :doctorId', { doctorId: filters.doctorId });
@@ -131,9 +138,13 @@ export const visitService = {
     if (filters.patientId) {
       qb.andWhere('visit.patientId = :patientId', { patientId: filters.patientId });
     }
-    if (filters.status === 'inside') {
-      qb.andWhere('visit.checkedOutAt IS NULL').andWhere('visit.status != :cancelled', {
-        cancelled: 'cancelled',
+    if (filters.status === 'waiting' || filters.status === 'consulting') {
+      qb.andWhere('visit.checkedOutAt IS NULL')
+        .andWhere('visit.status = :queueStatus', { queueStatus: filters.status === 'waiting' ? 'in_progress' : 'consulting' });
+      qb.orderBy('visit.doctorId', 'ASC').addOrderBy('visit.tokenNumber', 'ASC').addOrderBy('visit.id', 'ASC');
+    } else if (filters.status === 'inside') {
+      qb.andWhere('visit.checkedOutAt IS NULL').andWhere('visit.status NOT IN (:...closed)', {
+        closed: ['cancelled', 'completed'],
       });
     } else if (filters.status === 'done') {
       qb.andWhere('(visit.checkedOutAt IS NOT NULL OR visit.status = :completed)', {
@@ -278,7 +289,7 @@ export const visitService = {
         .andWhere('visit.visitType = :visitType', { visitType: 'OP' })
         .andWhere('visit.checkedOutAt IS NULL')
         .andWhere('visit.status NOT IN (:...closed)', { closed: ['cancelled', 'completed'] })
-        .andWhere('visit.visitAt BETWEEN :dayStart AND :dayEnd', { dayStart, dayEnd })
+        .andWhere('visit.visitAt >= :dayStart AND visit.visitAt < :dayEnd', { dayStart, dayEnd })
         .orderBy('visit.visitAt', 'DESC')
         .getOne();
 
@@ -293,6 +304,9 @@ export const visitService = {
         await manager.save(patient);
       }
 
+      // Patient lock is acquired first in every check-in; the doctor lock serializes number and token allocation.
+      await manager.getRepository(Doctor).createQueryBuilder('doctor')
+        .setLock('pessimistic_write').where('doctor.id = :id', { id: doctor.id }).getOneOrFail();
       const visitNumber = await nextSequenceNumber(manager, 'VIS', 'VIS', 6);
       const opNumber = await nextSequenceNumber(manager, 'OP', 'OP', 6);
       const tokenNumber = await nextTokenForDoctor(manager, doctor.id, today);
@@ -339,9 +353,37 @@ export const visitService = {
           department: true,
           createdBy: true,
           checkedOutBy: true,
+          consultationStartedBy: true,
         },
       });
 
+      return toCheckinView(saved!);
+    });
+  },
+
+  async startConsultation(id: number, userId: number | null) {
+    return AppDataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(PatientVisit);
+      const visit = await repo.createQueryBuilder('visit').setLock('pessimistic_write')
+        .where('visit.id = :id', { id }).getOne();
+      if (!visit) throw new NotFoundError('Check-in visit not found');
+      if (visit.visitType !== 'OP') throw new ConflictError('Only OP visits can start consultation');
+      if (visit.checkedOutAt || visit.status !== 'in_progress') {
+        throw new ConflictError('Visit is not waiting for consultation');
+      }
+      visit.status = 'consulting';
+      visit.consultationStartedAt = new Date();
+      visit.consultationStartedById = userId;
+      await repo.save(visit);
+      await manager.getRepository(PatientAuditLog).save(manager.create(PatientAuditLog, {
+        patientId: visit.patientId, action: 'consultation_started', changedById: userId,
+        changeSummary: `OP consultation started for visit ${visit.visitNumber}`,
+        beforeData: null, afterData: null,
+      }));
+      const saved = await repo.findOne({ where: { id }, relations: {
+        patient: { contact: true }, doctor: true, department: true, createdBy: true,
+        checkedOutBy: true, consultationStartedBy: true,
+      } });
       return toCheckinView(saved!);
     });
   },
@@ -374,6 +416,7 @@ export const visitService = {
           department: true,
           createdBy: true,
           checkedOutBy: true,
+          consultationStartedBy: true,
         },
       });
       return toCheckinView(saved!);

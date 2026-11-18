@@ -54,12 +54,13 @@ export function CheckinListPage() {
   const [error, setError] = useState('');
   const [date, setDate] = useState(todayIso());
   const [doctorId, setDoctorId] = useState('');
-  const [status, setStatus] = useState<'all' | 'inside' | 'done'>('all');
+  const [status, setStatus] = useState<'all' | 'inside' | 'waiting' | 'consulting' | 'done'>('all');
   const [busyId, setBusyId] = useState<number | null>(null);
   const [checkoutTarget, setCheckoutTarget] = useState<OpCheckinVisit | null>(null);
 
   const canCheckin = hasPermission(user, 'visits.checkin');
   const canCheckout = hasPermission(user, 'visits.checkout');
+  const canConsult = hasPermission(user, 'visits.consult');
 
   const load = async () => {
     setLoading(true);
@@ -105,6 +106,13 @@ export function CheckinListPage() {
     } finally {
       setBusyId(null);
     }
+  };
+
+  const startConsultation = async (row: OpCheckinVisit) => {
+    setBusyId(row.id); setError('');
+    try { await checkinApi.startConsultation(row.id); await load(); }
+    catch (err) { setError(getErrorMessage(err, 'Unable to start consultation')); }
+    finally { setBusyId(null); }
   };
 
   const columns = useMemo(
@@ -166,8 +174,9 @@ export function CheckinListPage() {
           <div>
             <div className="ui-table__cell-title">{row.visitDuration}</div>
             <span className={`checkin-state checkin-state--${row.visitState}`}>
-              {row.visitState === 'inside' ? 'Inside' : 'Done'}
+              {row.visitState === 'done' ? 'Done' : row.status === 'consulting' ? 'Consulting' : 'Waiting'}
             </span>
+            {row.consultationStartedAt && <div className="ui-table__cell-sub">Called {formatDateTime(row.consultationStartedAt)}{row.consultationStartedByName ? ` by ${row.consultationStartedByName}` : ''}</div>}
           </div>
         ),
       },
@@ -222,24 +231,25 @@ export function CheckinListPage() {
         key: 'actions',
         header: 'Actions',
         render: (row: OpCheckinVisit) => {
-          if (!(canCheckout && row.visitState === 'inside' && busyId !== row.id)) {
-            return <span className="checkin-actions-empty">—</span>;
-          }
+          const canStart = canConsult && row.status === 'in_progress' && row.visitState === 'inside' && busyId !== row.id;
+          const canFinish = canCheckout && row.visitState === 'inside' && busyId !== row.id;
+          if (!canStart && !canFinish) return <span className="checkin-actions-empty">—</span>;
           return (
             <div className="checkin-actions-cell">
-              <button
+              {canStart && <button type="button" className="checkin-consult-btn" onClick={() => void startConsultation(row)}>Start consultation</button>}
+              {canFinish && <button
                 type="button"
                 className="checkin-checkout-btn"
                 onClick={() => requestCheckout(row)}
               >
                 Check Out
-              </button>
+              </button>}
             </div>
           );
         },
       },
     ],
-    [busyId, canCheckout],
+    [busyId, canCheckout, canConsult, date, doctorId, status],
   );
 
   return (
@@ -272,10 +282,12 @@ export function CheckinListPage() {
         <Select
           label="Status"
           value={status}
-          onChange={(e) => setStatus(e.target.value as 'all' | 'inside' | 'done')}
+          onChange={(e) => setStatus(e.target.value as 'all' | 'inside' | 'waiting' | 'consulting' | 'done')}
           options={[
             { value: 'all', label: 'All' },
             { value: 'inside', label: 'Inside' },
+            { value: 'waiting', label: 'Waiting by token' },
+            { value: 'consulting', label: 'In consultation' },
             { value: 'done', label: 'Done' },
           ]}
         />

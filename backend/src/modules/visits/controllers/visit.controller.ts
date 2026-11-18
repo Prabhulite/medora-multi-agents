@@ -14,7 +14,7 @@ export const visitController = {
         patientId: req.query.patientId ? Number(req.query.patientId) : undefined,
         status:
           typeof req.query.status === 'string'
-            ? (req.query.status as 'inside' | 'done' | 'all')
+            ? (req.query.status as 'inside' | 'done' | 'all' | 'waiting' | 'consulting')
             : undefined,
       }),
       'Check-in list fetched',
@@ -35,6 +35,10 @@ export const visitController = {
       await visitService.checkin(req.body, req.user?.id ?? null),
       'Patient checked in',
     );
+  },
+
+  async startConsultation(req: Request, res: Response) {
+    return sendSuccess(res, await visitService.startConsultation(Number(req.params.id), req.user?.id ?? null), 'Consultation started');
   },
 
   async checkout(req: Request, res: Response) {

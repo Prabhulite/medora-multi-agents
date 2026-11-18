@@ -13,7 +13,7 @@ export const checkinApi = {
     toDate?: string;
     doctorId?: number;
     patientId?: number;
-    status?: 'inside' | 'done' | 'all';
+    status?: 'inside' | 'done' | 'waiting' | 'consulting' | 'all';
   }) => {
     const { data } = await api.get<ApiResponse<OpCheckinVisit[]>>('/visits', { params });
     return data.data;
@@ -30,6 +30,10 @@ export const checkinApi = {
   },
   checkout: async (id: number) => {
     const { data } = await api.patch<ApiResponse<OpCheckinVisit>>(`/visits/${id}/checkout`);
+    return data.data;
+  },
+  startConsultation: async (id: number) => {
+    const { data } = await api.post<ApiResponse<OpCheckinVisit>>(`/visits/${id}/start-consultation`);
     return data.data;
   },
 };

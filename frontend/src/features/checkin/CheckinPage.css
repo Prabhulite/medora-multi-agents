@@ -357,7 +357,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
+
+.checkin-consult-btn { min-height: 34px; padding: 8px 14px; border: 1px solid #0c7a55; border-radius: 4px; background: #fff; color: #0c7a55; font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer; }
+.checkin-consult-btn:hover { background: #e7f5ee; }
 
 .checkin-actions-empty {
   color: #94a3b8;

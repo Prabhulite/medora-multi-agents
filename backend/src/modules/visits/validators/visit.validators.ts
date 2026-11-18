@@ -5,20 +5,11 @@ export const visitIdSchema = z.object({
 });
 
 export const visitListSchema = z.object({
-  date: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional(),
-  fromDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional(),
-  toDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional(),
+  date: z.string().date().optional(),
+  fromDate: z.string().date().optional(),
+  toDate: z.string().date().optional(),
   doctorId: z.coerce.number().int().positive().optional(),
-  status: z.enum(['inside', 'done', 'all']).optional(),
+  status: z.enum(['inside', 'done', 'all', 'waiting', 'consulting']).optional(),
   patientId: z.coerce.number().int().positive().optional(),
 });
 

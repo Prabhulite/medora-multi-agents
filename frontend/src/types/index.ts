@@ -729,9 +729,11 @@ export interface OpCheckinVisit {
   checkedInByName: string | null;
   checkedOutAt: string | null;
   checkedOutByName: string | null;
+  consultationStartedAt: string | null;
+  consultationStartedByName: string | null;
   visitDuration: string;
   visitState: 'inside' | 'done';
-  status: string;
+  status: 'registered' | 'in_progress' | 'consulting' | 'completed' | 'cancelled';
   billAmount: number | null;
   nextAppointmentAt: string | null;
   createdAt: string;

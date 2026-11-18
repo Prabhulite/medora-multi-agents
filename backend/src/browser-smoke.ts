@@ -271,7 +271,15 @@ try {
   const closeoutFetch = await evaluate('fetch(`/api/billing/closeouts?date=${document.querySelector("#cash-closeout-title").closest("[role=dialog]").querySelector("input[type=date]").value}`, { credentials: "include" }).then(async response => ({ status: response.status, rows: (await response.json()).data }))');
   assert.equal(closeoutFetch.status, 200, 'Cash closeout review API failed');
   assert.ok(Array.isArray(closeoutFetch.rows), 'Cash closeout review did not return rows');
-  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, communication queues, pharmacy patient forms${hasBatch ? ', stock movements and count form' : ''}, inpatient dashboard, patient registration${hasPatientRow ? ' and merge confirmation' : ''}${patientLookup.body.data?.length ? ', radiology patient selection' : ''}${finalOrderNumber ? ', finalized radiology report print output' : ''}, cashier report, and cash closeout review rendered in headless Chrome.`);
+  await evaluate('history.pushState({}, "", "/checkin"); window.dispatchEvent(new PopStateEvent("popstate")); true');
+  let opdQueueReady = false;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    opdQueueReady = await evaluate('document.body.innerText.includes("Track today\'s OP check-ins") && [...document.querySelectorAll("option")].some(option => option.value === "waiting") && [...document.querySelectorAll("option")].some(option => option.value === "consulting")');
+    if (opdQueueReady) break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.ok(opdQueueReady, 'OPD consultation queue filters did not render');
+  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, communication queues, pharmacy patient forms${hasBatch ? ', stock movements and count form' : ''}, inpatient dashboard, patient registration${hasPatientRow ? ' and merge confirmation' : ''}${patientLookup.body.data?.length ? ', radiology patient selection' : ''}${finalOrderNumber ? ', finalized radiology report print output' : ''}, cashier report, cash closeout review, and OPD queue rendered in headless Chrome.`);
   await send('Browser.close').catch(() => undefined);
   socket.close();
 } finally {

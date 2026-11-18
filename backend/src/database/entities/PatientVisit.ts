@@ -16,6 +16,7 @@ export type PatientVisitType = 'OP' | 'IP' | 'EMERGENCY';
 export type PatientVisitStatus =
   | 'registered'
   | 'in_progress'
+  | 'consulting'
   | 'completed'
   | 'cancelled';
 
@@ -55,6 +56,16 @@ export class PatientVisit {
   @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'checked_out_by_id' })
   checkedOutBy!: User | null;
+
+  @Column({ name: 'consultation_started_at', type: 'timestamp', nullable: true })
+  consultationStartedAt!: Date | null;
+
+  @Column({ name: 'consultation_started_by_id', type: 'int', unsigned: true, nullable: true })
+  consultationStartedById!: number | null;
+
+  @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'consultation_started_by_id' })
+  consultationStartedBy!: User | null;
 
   @Column({ name: 'department_id', type: 'int', unsigned: true, nullable: true })
   departmentId!: number | null;

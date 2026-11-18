@@ -21,6 +21,7 @@ The implementation will be delivered as tested vertical slices. Existing authent
 - Patient registration, search, duplicate detection, MRD numbering
 - Appointment booking, doctor schedules, check-in, cancellation, rescheduling
 - OPD visits, queue/status tracking, consultation handoff
+- OP check-in now separates waiting patients from those called into consultation. Staff with `visits.consult` can start an open OP consultation once; the visit records the actor and time and writes a patient audit event. The Check-in list filters waiting and consulting patients, orders each doctor's waiting queue by token, and still allows checkout. Doctor token allocation and the shared visit/OP number sequences are serialized across concurrent check-ins. This is a staff-operated status transition, not an automated appointment handoff or a clinical encounter signature.
 - Registration sources and patient communication history
 
 Patient merge now moves visit, clinical, pharmacy, billing, and operational records to the surviving chart in one transaction while retaining the source identity and audit trail. It rejects merges when both records have active admissions or both have active emergency cases; staff must resolve those workflows first. The merge audit stores the source and target IDs and counts of moved records. Unique contact and identification details remain attached to the inactive source record for manual review.
