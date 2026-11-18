@@ -119,6 +119,8 @@ From `backend/`, run `npm run db:backup -- <backup.sql>` to create a SQL dump an
 
 `GET /health` confirms the API process is alive. `GET /health/ready` also runs a minimal database probe and returns `503` when the database is unavailable. Docker Compose uses the readiness endpoint for backend health; do not expose its output as a substitute for monitoring, backups, or alerting.
 
+For release, recovery, first-line support, and sign-off procedures, use the [operator runbook](docs/OPERATOR-RUNBOOK.md).
+
 ## Theme
 
 Primary brand color from PDF: `#015b2d`  
