@@ -7,11 +7,11 @@ import {
   DoctorSchedule,
   DoctorTimeSlot,
   Patient,
-  PatientVisit,
   type AppointmentStatus,
 } from '../../../database/entities/index.js';
 import { AppError, ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { nextSequenceNumber } from '../../patients/services/number-sequence.service.js';
+import { visitService } from '../../visits/services/visit.service.js';
 import {
   appointmentRepository,
   toAppointmentView,
@@ -505,58 +505,16 @@ export const appointmentService = {
       if (!['booked', 'confirmed', 'rescheduled'].includes(fromStatus)) {
         throw new ValidationError('Only booked/confirmed appointments can be checked in');
       }
-
-      await AppDataSource.transaction(async (manager) => {
-        if (appointment.visitId) {
-          throw new ConflictError('OP visit already exists for this appointment');
-        }
-
-        const dayStart = `${appointment.appointmentDate} 00:00:00`;
-        const dayEnd = `${appointment.appointmentDate} 23:59:59`;
-
-        const existingVisit = await manager
-          .getRepository(PatientVisit)
-          .createQueryBuilder('visit')
-          .where('visit.patient_id = :patientId', { patientId: appointment.patientId })
-          .andWhere('visit.visit_type = :visitType', { visitType: 'OP' })
-          .andWhere('visit.status != :cancelled', { cancelled: 'cancelled' })
-          .andWhere('visit.visit_at BETWEEN :dayStart AND :dayEnd', { dayStart, dayEnd })
-          .orderBy('visit.visit_at', 'DESC')
-          .getOne();
-
-        let visit = existingVisit;
-        if (!visit) {
-          const visitNumber = await nextSequenceNumber(manager, 'VIS', 'VIS', 6);
-          const opNumber = await nextSequenceNumber(manager, 'OP', 'OP', 6);
-          visit = await manager.save(
-            manager.create(PatientVisit, {
-              patientId: appointment.patientId,
-              visitNumber,
-              opNumber,
-              visitType: 'OP',
-              visitAt: new Date(),
-              departmentId: appointment.departmentId,
-              doctorId: appointment.doctorId,
-              status: 'registered',
-              notes: `Created from appointment ${appointment.appointmentNumber}`,
-              createdById: userId,
-            }),
-          );
-        }
-
-        appointment.visitId = visit!.id;
-        appointment.status = 'checked_in';
-        appointment.updatedById = userId;
-        await manager.save(appointment);
-        await appendHistory(
-          manager,
-          appointment.id,
-          fromStatus,
-          'checked_in',
-          userId,
-          input.notes ?? `Checked in — OP ${visit!.opNumber}`,
-        );
-      });
+      await visitService.checkin({
+        patientId: appointment.patientId,
+        doctorId: appointment.doctorId,
+        appointmentId: appointment.id,
+        natureOfVisit: appointment.appointmentType,
+        purposeOfVisit: appointment.reason?.trim() || 'Consultation',
+        makeNewCheckin: true,
+        isMlc: false,
+        hadFood: false,
+      }, userId, input.notes);
 
       return this.getById(id);
     }

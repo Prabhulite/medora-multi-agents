@@ -1,6 +1,7 @@
 import { AppDataSource } from '../../../config/data-source.js';
 import {
   Appointment,
+  AppointmentStatusHistory,
   Doctor,
   Invoice,
   Patient,
@@ -249,7 +250,7 @@ export const visitService = {
     }));
   },
 
-  async checkin(input: CreateOpCheckinInput, userId: number | null) {
+  async checkin(input: CreateOpCheckinInput, userId: number | null, appointmentHistoryNotes?: string | null) {
     if (!input.makeNewCheckin) {
       throw new ValidationError('Enable Make a New Checkin to continue');
     }
@@ -278,6 +279,8 @@ export const visitService = {
         if (!['booked', 'confirmed', 'rescheduled'].includes(appointment.status)) {
           throw new ConflictError('Selected appointment cannot be checked in');
         }
+        if (appointment.visitId) throw new ConflictError('OP visit already exists for this appointment');
+        if (appointment.doctorId !== doctor.id) throw new ValidationError('Consultant does not match the appointment');
       }
 
       const today = todayIso();
@@ -338,11 +341,19 @@ export const visitService = {
       );
 
       if (appointment) {
+        const fromStatus = appointment.status;
         appointment.visitId = visit.id;
         appointment.status = 'checked_in';
         appointment.updatedById = userId;
         if (!appointment.doctorId) appointment.doctorId = doctor.id;
         await manager.save(appointment);
+        await manager.save(manager.create(AppointmentStatusHistory, {
+          appointmentId: appointment.id,
+          fromStatus,
+          toStatus: 'checked_in',
+          notes: appointmentHistoryNotes ?? `Checked in — OP ${visit.opNumber}`,
+          changedById: userId,
+        }));
       }
 
       const saved = await manager.getRepository(PatientVisit).findOne({

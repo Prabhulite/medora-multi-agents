@@ -61,7 +61,7 @@ export function CheckinListPage() {
   const canCheckin = hasPermission(user, 'visits.checkin');
   const canCheckout = hasPermission(user, 'visits.checkout');
   const canConsult = hasPermission(user, 'visits.consult');
-  const canOpenChart = hasPermission(user, 'clinical.view');
+  const canOpenChart = hasPermission(user, 'clinical.view') && hasPermission(user, 'patients.view');
 
   const load = async () => {
     setLoading(true);
