@@ -233,6 +233,58 @@
   margin-bottom: 12px;
 }
 
+.rx-print {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  z-index: 1000;
+  display: grid;
+  align-items: start;
+  justify-items: center;
+  overflow: auto;
+  padding: clamp(12px, 4vw, 40px);
+  background: #10291c99;
+}
+
+.rx-print__sheet {
+  width: min(100%, 42rem);
+  padding: clamp(16px, 5vw, 32px);
+  border-radius: 12px;
+  background: white;
+  overflow-wrap: anywhere;
+}
+
+.rx-print__sheet dl {
+  display: grid;
+  grid-template-columns: minmax(6rem, 1fr) 2fr;
+  gap: 10px;
+}
+
+.rx-print__sheet dt { font-weight: 700; }
+.rx-print__sheet dd { margin: 0; white-space: pre-wrap; }
+.rx-print__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+@media screen and (max-width: 1024px) {
+  .clinical-prescription-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .clinical-prescription-form .ui-field { min-width: 0; }
+  .clinical-prescription-form :is(input, select, button),
+  .rx-print__actions button { min-height: 44px; }
+  .pd-visit-row, .pd-card__head { flex-wrap: wrap; overflow-wrap: anywhere; }
+}
+
+@media print {
+  body:has(> .rx-print) > :not(.rx-print) { display: none !important; }
+  .rx-print { position: static; display: block; height: auto; overflow: visible; padding: 0; background: white; }
+  .rx-print::backdrop { display: none; }
+  .rx-print__sheet { width: 100%; padding: 8mm; color: black; }
+  .rx-print__actions { display: none; }
+}
+
 @media (max-width: 760px) {
   .clinical-encounter-form {
     grid-template-columns: 1fr;

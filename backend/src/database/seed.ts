@@ -593,70 +593,72 @@ async function seed(): Promise<void> {
     }
   }
 
-  for (const medication of MEDICATIONS) {
-    const existing = await medicationRepo.findOne({ where: { medicineCode: medication.medicineCode } });
-    if (existing) {
-      Object.assign(existing, medication, { isActive: true });
-      await medicationRepo.save(existing);
-    } else {
-      await medicationRepo.save(medicationRepo.create({ ...medication, isActive: true }));
+  if (env.NODE_ENV !== 'production') {
+    for (const medication of MEDICATIONS) {
+      const existing = await medicationRepo.findOne({ where: { medicineCode: medication.medicineCode } });
+      if (existing) {
+        Object.assign(existing, medication, { isActive: true });
+        await medicationRepo.save(existing);
+      } else {
+        await medicationRepo.save(medicationRepo.create({ ...medication, isActive: true }));
+      }
     }
-  }
 
-  const medicationByCode = new Map((await medicationRepo.find()).map((medication) => [medication.medicineCode, medication] as const));
-  const STOCK = [
-    { code: 'PARA-500', batchNumber: 'PARA-2026-A', expiryDate: '2027-12-31', purchasePrice: '1.20', sellingPrice: '2.00', quantity: 100, reorderLevel: 20, storageLocation: 'Shelf A1' },
-    { code: 'AMOX-500', batchNumber: 'AMOX-2026-A', expiryDate: '2027-10-31', purchasePrice: '4.00', sellingPrice: '6.50', quantity: 60, reorderLevel: 15, storageLocation: 'Shelf A2' },
-    { code: 'OMEP-20', batchNumber: 'OMEP-2026-A', expiryDate: '2028-03-31', purchasePrice: '2.50', sellingPrice: '4.00', quantity: 80, reorderLevel: 15, storageLocation: 'Shelf A3' },
-  ] as const;
-  for (const stock of STOCK) {
-    const medication = medicationByCode.get(stock.code);
-    if (!medication) continue;
-    let batch = await inventoryRepo.findOne({ where: { medicationId: medication.id, batchNumber: stock.batchNumber } });
-    if (!batch) {
-      batch = await inventoryRepo.save(inventoryRepo.create({ medicationId: medication.id, batchNumber: stock.batchNumber, expiryDate: stock.expiryDate, purchasePrice: stock.purchasePrice, sellingPrice: stock.sellingPrice, quantity: stock.quantity, reorderLevel: stock.reorderLevel, storageLocation: stock.storageLocation, isActive: true }));
-      await stockTransactionRepo.save(stockTransactionRepo.create({ batchId: batch.id, type: 'receipt', quantity: stock.quantity, reference: 'SEED-OPENING-STOCK', notes: 'Opening stock supplied with demo environment', createdById: null }));
+    const medicationByCode = new Map((await medicationRepo.find()).map((medication) => [medication.medicineCode, medication] as const));
+    const STOCK = [
+      { code: 'PARA-500', batchNumber: 'PARA-2026-A', expiryDate: '2027-12-31', purchasePrice: '1.20', sellingPrice: '2.00', quantity: 100, reorderLevel: 20, storageLocation: 'Shelf A1' },
+      { code: 'AMOX-500', batchNumber: 'AMOX-2026-A', expiryDate: '2027-10-31', purchasePrice: '4.00', sellingPrice: '6.50', quantity: 60, reorderLevel: 15, storageLocation: 'Shelf A2' },
+      { code: 'OMEP-20', batchNumber: 'OMEP-2026-A', expiryDate: '2028-03-31', purchasePrice: '2.50', sellingPrice: '4.00', quantity: 80, reorderLevel: 15, storageLocation: 'Shelf A3' },
+    ] as const;
+    for (const stock of STOCK) {
+      const medication = medicationByCode.get(stock.code);
+      if (!medication) continue;
+      let batch = await inventoryRepo.findOne({ where: { medicationId: medication.id, batchNumber: stock.batchNumber } });
+      if (!batch) {
+        batch = await inventoryRepo.save(inventoryRepo.create({ medicationId: medication.id, batchNumber: stock.batchNumber, expiryDate: stock.expiryDate, purchasePrice: stock.purchasePrice, sellingPrice: stock.sellingPrice, quantity: stock.quantity, reorderLevel: stock.reorderLevel, storageLocation: stock.storageLocation, isActive: true }));
+        await stockTransactionRepo.save(stockTransactionRepo.create({ batchId: batch.id, type: 'receipt', quantity: stock.quantity, reference: 'SEED-OPENING-STOCK', notes: 'Opening stock supplied with demo environment', createdById: null }));
+      }
     }
-  }
 
-  const openingSupplier = await supplierRepo.findOne({ where: { code: 'MED-SUP-001' } });
-  if (!openingSupplier) await supplierRepo.save(supplierRepo.create({ code: 'MED-SUP-001', name: 'Medora Medical Distributors', contactPerson: 'Procurement Desk', phone: '+91 90000 00000', email: 'procurement@medora.local', address: 'Medora Hospital campus', isActive: true }));
+    const openingSupplier = await supplierRepo.findOne({ where: { code: 'MED-SUP-001' } });
+    if (!openingSupplier) await supplierRepo.save(supplierRepo.create({ code: 'MED-SUP-001', name: 'Medora Medical Distributors', contactPerson: 'Procurement Desk', phone: '+91 90000 00000', email: 'procurement@medora.local', address: 'Medora Hospital campus', isActive: true }));
 
-  const LAB_TESTS = [
-    { testCode: 'CBC', testName: 'Complete Blood Count', category: 'Hematology', priority: 'routine' as const, turnaroundHours: 6, price: '450.00' },
-    { testCode: 'RFT', testName: 'Renal Function Test', category: 'Biochemistry', priority: 'routine' as const, turnaroundHours: 12, price: '650.00' },
-    { testCode: 'LFT', testName: 'Liver Function Test', category: 'Biochemistry', priority: 'routine' as const, turnaroundHours: 12, price: '700.00' },
-    { testCode: 'TROP-I', testName: 'Troponin I', category: 'Cardiac', priority: 'urgent' as const, turnaroundHours: 2, price: '900.00' },
-  ] as const;
-  for (const test of LAB_TESTS) {
-    const existing = await laboratoryTestRepo.findOne({ where: { testCode: test.testCode } });
-    if (existing) { Object.assign(existing, test, { isActive: true }); await laboratoryTestRepo.save(existing); }
-    else await laboratoryTestRepo.save(laboratoryTestRepo.create({ ...test, isActive: true }));
-  }
-  const MODALITIES = [
-    { modalityCode: 'XRAY', modalityName: 'Digital X-Ray', category: 'X-Ray', turnaroundHours: 4, price: '500.00' },
-    { modalityCode: 'USG', modalityName: 'Ultrasound Abdomen', category: 'Ultrasound', turnaroundHours: 8, price: '1200.00' },
-    { modalityCode: 'CT', modalityName: 'CT Scan', category: 'CT', turnaroundHours: 24, price: '3500.00' },
-    { modalityCode: 'MRI', modalityName: 'MRI Brain', category: 'MRI', turnaroundHours: 48, price: '6500.00' },
-  ] as const;
-  for (const modality of MODALITIES) {
-    const existing = await radiologyModalityRepo.findOne({ where: { modalityCode: modality.modalityCode } });
-    if (existing) { Object.assign(existing, modality, { isActive: true }); await radiologyModalityRepo.save(existing); }
-    else await radiologyModalityRepo.save(radiologyModalityRepo.create({ ...modality, isActive: true }));
-  }
-
-  for (const wardSeed of WARDS) {
-    let ward = await wardRepo.findOne({ where: { code: wardSeed.code } });
-    if (!ward) ward = await wardRepo.save(wardRepo.create({ code: wardSeed.code, name: wardSeed.name, wardType: wardSeed.wardType, floor: wardSeed.floor, isActive: true }));
-    for (const number of wardSeed.beds) {
-      const existing = await bedRepo.findOne({ where: { wardId: ward.id, number } });
-      if (!existing) await bedRepo.save(bedRepo.create({ wardId: ward.id, number, status: 'available', isActive: true }));
+    const LAB_TESTS = [
+      { testCode: 'CBC', testName: 'Complete Blood Count', category: 'Hematology', priority: 'routine' as const, turnaroundHours: 6, price: '450.00' },
+      { testCode: 'RFT', testName: 'Renal Function Test', category: 'Biochemistry', priority: 'routine' as const, turnaroundHours: 12, price: '650.00' },
+      { testCode: 'LFT', testName: 'Liver Function Test', category: 'Biochemistry', priority: 'routine' as const, turnaroundHours: 12, price: '700.00' },
+      { testCode: 'TROP-I', testName: 'Troponin I', category: 'Cardiac', priority: 'urgent' as const, turnaroundHours: 2, price: '900.00' },
+    ] as const;
+    for (const test of LAB_TESTS) {
+      const existing = await laboratoryTestRepo.findOne({ where: { testCode: test.testCode } });
+      if (existing) { Object.assign(existing, test, { isActive: true }); await laboratoryTestRepo.save(existing); }
+      else await laboratoryTestRepo.save(laboratoryTestRepo.create({ ...test, isActive: true }));
     }
-  }
+    const MODALITIES = [
+      { modalityCode: 'XRAY', modalityName: 'Digital X-Ray', category: 'X-Ray', turnaroundHours: 4, price: '500.00' },
+      { modalityCode: 'USG', modalityName: 'Ultrasound Abdomen', category: 'Ultrasound', turnaroundHours: 8, price: '1200.00' },
+      { modalityCode: 'CT', modalityName: 'CT Scan', category: 'CT', turnaroundHours: 24, price: '3500.00' },
+      { modalityCode: 'MRI', modalityName: 'MRI Brain', category: 'MRI', turnaroundHours: 48, price: '6500.00' },
+    ] as const;
+    for (const modality of MODALITIES) {
+      const existing = await radiologyModalityRepo.findOne({ where: { modalityCode: modality.modalityCode } });
+      if (existing) { Object.assign(existing, modality, { isActive: true }); await radiologyModalityRepo.save(existing); }
+      else await radiologyModalityRepo.save(radiologyModalityRepo.create({ ...modality, isActive: true }));
+    }
 
-  for (const roomSeed of OPERATING_ROOMS) {
-    const existing = await operatingRoomRepo.findOne({ where: { code: roomSeed.code } });
-    if (!existing) await operatingRoomRepo.save(operatingRoomRepo.create({ ...roomSeed, isActive: true }));
+    for (const wardSeed of WARDS) {
+      let ward = await wardRepo.findOne({ where: { code: wardSeed.code } });
+      if (!ward) ward = await wardRepo.save(wardRepo.create({ code: wardSeed.code, name: wardSeed.name, wardType: wardSeed.wardType, floor: wardSeed.floor, isActive: true }));
+      for (const number of wardSeed.beds) {
+        const existing = await bedRepo.findOne({ where: { wardId: ward.id, number } });
+        if (!existing) await bedRepo.save(bedRepo.create({ wardId: ward.id, number, status: 'available', isActive: true }));
+      }
+    }
+
+    for (const roomSeed of OPERATING_ROOMS) {
+      const existing = await operatingRoomRepo.findOne({ where: { code: roomSeed.code } });
+      if (!existing) await operatingRoomRepo.save(operatingRoomRepo.create({ ...roomSeed, isActive: true }));
+    }
   }
 
   for (const menu of MENUS) {
@@ -738,6 +740,9 @@ async function seed(): Promise<void> {
     where: { username: env.SUPER_ADMIN_USERNAME },
     relations: { roles: true },
   });
+
+  // A production restart must preserve an operator's account and access decisions.
+  if (superAdminUser && env.NODE_ENV === 'production') return;
 
   if (!superAdminUser) {
     const passwordHash = await bcrypt.hash(env.SUPER_ADMIN_PASSWORD, 12);

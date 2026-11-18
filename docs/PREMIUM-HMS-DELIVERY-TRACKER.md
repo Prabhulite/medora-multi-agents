@@ -74,3 +74,13 @@ This checklist tracks verified delivery work for Medora. A box is checked only a
 - [ ] Backup restore drill successful
 - [ ] Pilot users trained and feedback resolved
 - [ ] Production rollout and rollback plan approved
+
+## Production release verification
+
+- [x] Build frontend and backend and review production dependency audits.
+- [x] Run the isolated clinical API integration suite.
+- [x] Exercise compiled migrations, seed, readiness and administrator login with a database-scoped account.
+- [ ] Obtain a passing production Compose run for the release revision.
+- [ ] Verify public HTTPS, protected access and monitoring on the destination host.
+- [ ] Verify scheduled encrypted backups and restore a copy on the target infrastructure.
+- [ ] Record role, device, load and clinical workflow acceptance before enabling live use.

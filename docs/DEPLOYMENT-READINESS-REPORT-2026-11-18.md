@@ -66,3 +66,9 @@ This audit is a release candidate check, not a certification of clinical safety 
 ## Decision
 
 Ready for controlled acceptance testing tomorrow. Do not open production to real patients until site-specific deployment, security, recovery, and clinical sign-off gates above pass.
+
+## Production startup verification
+
+Both packages built successfully. The fresh-database integration suite passed. On an isolated local MySQL database, the compiled production migration and seed ran with a database-scoped account. Sample stock, beds, operating rooms and suppliers were absent. The compiled API reported database readiness, authenticated the bootstrap administrator and issued a Secure cookie. The frontend audit reported zero findings. The backend audit reported three moderate findings and zero high or critical findings.
+
+A production Compose CI job now builds the images and checks the proxied frontend, database readiness, authentication boundary and fresh seed. Docker was unavailable on the verification workstation. A passing container run, destination HTTPS, site backup and recovery, and hospital acceptance remain open release gates.

@@ -147,3 +147,41 @@ jobs:
           done
           curl --fail --silent --show-error http://127.0.0.1:4000/health
           cd backend && npm run browser:smoke:ci
+
+  production-compose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      APP_URL: https://medora.test
+      FRONTEND_URL: https://medora.test
+      DB_NAME: medora_ci_release
+      MYSQL_APP_USER: medora_app
+      COMPOSE_PROJECT_NAME: medora_release_ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create disposable release credentials
+        shell: bash
+        run: |
+          for key in MYSQL_ROOT_PASSWORD DB_PASSWORD JWT_SECRET SUPER_ADMIN_PASSWORD; do
+            value=$(openssl rand -hex 32)
+            echo "::add-mask::$value"
+            echo "$key=$value" >> "$GITHUB_ENV"
+          done
+      - name: Build and start the production stack
+        run: docker compose up --build --detach --wait --wait-timeout 240
+      - name: Check the production frontend, readiness and authentication boundary
+        shell: bash
+        run: |
+          curl --retry 5 --retry-connrefused -fsS http://127.0.0.1/login | grep -q 'id="root"'
+          curl -fsS http://127.0.0.1/health/ready | jq -e '.success and .data.database == "ready"'
+          test "$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1/api/patients)" = 401
+      - name: Verify production seed excludes sample stock and beds
+        run: |
+          counts=$(docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_PASSWORD" mysql -u"$MYSQL_USER" "$MYSQL_DATABASE" -Nse "SELECT (SELECT COUNT(*) FROM inventory_batches) + (SELECT COUNT(*) FROM beds)"')
+          test "$counts" = 0
+      - name: Show container status
+        if: failure()
+        run: docker compose ps -a
+      - name: Stop disposable release stack
+        if: always()
+        run: docker compose down --volumes

@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Loader } from '../../components/ui/Loader';
 import { getErrorMessage } from '../../lib/api';
 import { hasPermission } from '../../lib/permissions';
-import type { Patient } from '../../types';
+import type { Patient, Prescription } from '../../types';
 import { appointmentsApi } from '../appointments/appointments.api';
 import { useAuth } from '../auth/AuthContext';
 import { billingApi } from '../billing/billing.api';
@@ -14,7 +15,7 @@ import { laboratoryApi } from '../laboratory/laboratory.api';
 import { radiologyApi } from '../radiology/radiology.api';
 
 export type PatientRecordsMode = 'Visit' | 'Bills' | 'Tests' | 'Rx' | 'Appointment';
-type Row = { key: string; title: string; detail: string; at?: string | null; status?: string | null };
+type Row = { key: string; title: string; detail: string; at?: string | null; status?: string | null; prescription?: Prescription };
 
 function asDate(value?: string | null) {
   if (!value) return '';
@@ -27,6 +28,7 @@ export function PatientRecordsTab({ patient, mode }: { patient: Patient; mode: P
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [preview, setPreview] = useState<Prescription | null>(null);
 
   const permitted = mode === 'Visit' ? hasPermission(user, 'patients.view')
     : mode === 'Bills' ? hasPermission(user, 'billing.view')
@@ -35,6 +37,7 @@ export function PatientRecordsTab({ patient, mode }: { patient: Patient; mode: P
     : hasPermission(user, 'laboratory.view') || hasPermission(user, 'radiology.view');
 
   useEffect(() => {
+    setPreview(null);
     if (!permitted) { setLoading(false); setRows([]); return; }
     let active = true;
     setLoading(true); setError('');
@@ -42,7 +45,7 @@ export function PatientRecordsTab({ patient, mode }: { patient: Patient; mode: P
       if (mode === 'Visit') return (patient.visits || []).map((row) => ({ key: `visit-${row.id}`, title: row.visitNumber, detail: row.opNumber || row.visitType, at: row.visitAt, status: row.status }));
       if (mode === 'Appointment') return (await appointmentsApi.list({ patientId: patient.id })).map((row) => ({ key: `appointment-${row.id}`, title: row.appointmentNumber, detail: [row.doctorName, row.departmentName, row.appointmentType.replaceAll('_', ' ')].filter(Boolean).join(' · '), at: `${row.appointmentDate}T${row.appointmentTime || '00:00:00'}`, status: row.status }));
       if (mode === 'Bills') return (await billingApi.listInvoices(patient.id)).map((row) => ({ key: `bill-${row.id}`, title: row.invoiceNumber, detail: `Total ₹${Number(row.totalAmount || 0).toFixed(2)} · Balance ₹${Number(row.balanceAmount || 0).toFixed(2)}`, at: row.invoiceDate, status: row.status }));
-      if (mode === 'Rx') return (await prescriptionsApi.listByPatient(patient.id)).map((row) => ({ key: `rx-${row.id}`, title: row.medicineName, detail: [row.dosage, row.frequency, row.durationDays ? `${row.durationDays} days` : null].filter(Boolean).join(' · '), at: row.createdAt, status: row.status }));
+      if (mode === 'Rx') return (await prescriptionsApi.listByPatient(patient.id)).map((row) => ({ key: `rx-${row.id}`, title: row.medicineName, detail: [row.dosage, row.frequency, row.durationDays ? `${row.durationDays} days` : null].filter(Boolean).join(' · '), at: row.createdAt, status: row.status, prescription: row }));
       const [labs, imaging] = await Promise.all([
         hasPermission(user, 'laboratory.view') ? laboratoryApi.listOrders(patient.id) : Promise.resolve([]),
         hasPermission(user, 'radiology.view') ? radiologyApi.listOrders(patient.id) : Promise.resolve([]),
@@ -59,7 +62,35 @@ export function PatientRecordsTab({ patient, mode }: { patient: Patient; mode: P
   return <section className="pd-card pd-card--wide">
     <div className="pd-card__head"><h3>{mode === 'Rx' ? 'Prescriptions' : mode === 'Tests' ? 'Diagnostic tests' : mode === 'Visit' ? 'Visits' : mode === 'Bills' ? 'Patient bills' : 'Appointments'}</h3><div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>{mode === 'Rx' && rows.length ? <Button size="sm" variant="secondary" onClick={() => window.print()}>Print medication list</Button> : null}<Badge tone="info">{rows.length} records</Badge></div></div>
     {!permitted ? <Alert tone="error">You do not have permission to view these records.</Alert> : error ? <Alert tone="error">{error}</Alert> : loading ? <Loader size="sm" variant="block" label="Loading records…" /> : rows.length ? <div className="pd-card__body pd-visits">
-      {rows.map((row) => <div className="pd-visit-row" key={row.key}><div><div className="ui-table__cell-title">{row.title}</div><div className="ui-table__cell-sub">{[row.detail, row.status].filter(Boolean).join(' · ')}</div></div><strong>{asDate(row.at)}</strong></div>)}
+      {rows.map((row) => <div className="pd-visit-row" key={row.key}>
+        <div><div className="ui-table__cell-title">{row.title}</div><div className="ui-table__cell-sub">{[row.detail, row.status].filter(Boolean).join(' · ')}</div></div>
+        <strong>{asDate(row.at)}</strong>
+        {row.prescription ? <Button variant="secondary" onClick={() => setPreview(row.prescription!)}>Preview prescription</Button> : null}
+      </div>)}
     </div> : <p className="pd-empty">No {mode.toLowerCase()} records found for this patient.</p>}
+    {permitted && mode === 'Rx' && preview?.patientId === patient.id ? createPortal(
+      <dialog className="rx-print" aria-label="Prescription preview"
+        ref={(dialog) => { if (dialog && !dialog.open) dialog.showModal(); }}
+        onClose={() => setPreview(null)}>
+        <section className="rx-print__sheet" aria-label="Prescription preview">
+          <h2>Medication prescription</h2>
+          <p>{patient.fullName} · MRD {patient.mrdNumber}</p>
+          <p>Prescription #{preview.id} · {asDate(preview.createdAt)}</p>
+          <h3>{preview.medicineName}</h3>
+          <dl>
+            <dt>Status</dt><dd>{preview.status}</dd>
+            <dt>Dosage</dt><dd>{preview.dosage || 'Not recorded'}</dd>
+            <dt>Frequency</dt><dd>{preview.frequency || 'Not recorded'}</dd>
+            <dt>Route</dt><dd>{preview.route || 'Not recorded'}</dd>
+            <dt>Duration</dt><dd>{preview.durationDays == null ? 'Not recorded' : `${preview.durationDays} days`}</dd>
+            <dt>Quantity</dt><dd>{preview.quantityPrescribed ?? 'Not recorded'}</dd>
+            <dt>Instructions</dt><dd>{preview.instructions || 'None recorded'}</dd>
+          </dl>
+          <div className="rx-print__actions">
+            <Button onClick={() => window.print()}>Print prescription</Button>
+            <Button variant="secondary" onClick={() => setPreview(null)}>Close preview</Button>
+          </div>
+        </section>
+      </dialog>, document.body) : null}
   </section>;
 }
