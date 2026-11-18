@@ -77,6 +77,14 @@ export const billingApi = {
   async createCloseout(countedCash: number, reason: string | null): Promise<CashierCloseout> { return unwrap((await api.post<ApiEnvelope<CashierCloseout>>('/billing/closeouts', { countedCash, reason })).data); },
   async paymentReceipt(paymentId: number): Promise<PaymentReceipt> { return unwrap((await api.get<ApiEnvelope<PaymentReceipt>>(`/billing/payments/${paymentId}/receipt`)).data); },
   async cashierReport(from: string, to: string): Promise<CashierReport> { return unwrap((await api.get<ApiEnvelope<CashierReport>>('/billing/reports/cashier', { params: { from, to } })).data); },
+  async downloadCashierReport(from: string, to: string): Promise<void> {
+    const response = await api.get<Blob>('/billing/reports/cashier.csv', { params: { from, to }, responseType: 'blob' });
+    const url = URL.createObjectURL(response.data);
+    const link = document.createElement('a');
+    link.href = url; link.download = `medora-cashier-${from}-${to}.csv`;
+    document.body.append(link); link.click(); link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  },
   async receivablesReport(page: number, bucket?: ReceivablesBucket): Promise<ReceivablesReport> { return unwrap((await api.get<ApiEnvelope<ReceivablesReport>>('/billing/reports/receivables', { params: { page, pageSize: 20, bucket } })).data); },
   async listCharges(): Promise<BillingCharge[]> { return unwrap((await api.get<ApiEnvelope<BillingCharge[]>>('/billing/charges')).data); },
   async createCharge(payload: ChargePayload): Promise<BillingCharge> { return unwrap((await api.post<ApiEnvelope<BillingCharge>>('/billing/charges', payload)).data); },

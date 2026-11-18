@@ -5,6 +5,7 @@ import { insuranceClaimService } from '../services/insurance-claim.service.js';
 import { patientLedgerService } from '../services/patient-ledger.service.js';
 import { chargeMasterService } from '../services/charge-master.service.js';
 import { cashierReportService } from '../services/cashier-report.service.js';
+import { cashierReportCsv } from '../services/cashier-report-csv.js';
 import { receivablesReportService } from '../services/receivables-report.service.js';
 
 export const billingController = {
@@ -12,6 +13,10 @@ export const billingController = {
   async closeout(req: Request, res: Response) { return sendCreated(res, await billingService.closeout(req.body, req.user?.id ?? null), 'Cashier day closed'); },
   async receipt(req: Request, res: Response) { return sendSuccess(res, await billingService.receipt(Number(req.params.id)), 'Payment receipt fetched'); },
   async cashierReport(req: Request, res: Response) { return sendSuccess(res, await cashierReportService.get(String(req.query.from), String(req.query.to)), 'Cashier report fetched'); },
+  async cashierReportExport(req: Request, res: Response) {
+    const report = await cashierReportService.get(String(req.query.from), String(req.query.to));
+    return res.status(200).type('text/csv; charset=utf-8').set('Cache-Control', 'no-store').set('Content-Disposition', `attachment; filename="medora-cashier-${report.from}-${report.to}.csv"`).send(cashierReportCsv(report));
+  },
   async receivablesReport(req: Request, res: Response) { return sendSuccess(res, await receivablesReportService.get(Number(req.query.page), Number(req.query.pageSize), req.query.bucket as 'undated' | 'current' | '1_30' | '31_60' | '61_90' | '91_plus' | undefined), 'Receivables report fetched'); },
   async charges(_req: Request, res: Response) { return sendSuccess(res, await chargeMasterService.list(), 'Charges fetched'); },
   async createCharge(req: Request, res: Response) { return sendCreated(res, await chargeMasterService.create(req.body), 'Charge created'); },

@@ -322,6 +322,7 @@ try {
   }
   const cashierState = await evaluate('({ dialog: document.querySelector("[role=dialog]")?.innerText.slice(0, 600), path: location.pathname })');
   assert.ok(cashierReady, `Cashier operator breakdown did not render: ${JSON.stringify(cashierState)}`);
+  assert.equal(await evaluate('Boolean(Array.from(document.querySelectorAll("#cashier-report-title ~ * button, #cashier-report-title + * button, .billing-modal button")).find(button => button.textContent?.includes("Export CSV")))'), true, 'Cashier report export action did not render');
   await evaluate('document.querySelector("#cashier-report-title").closest("[role=dialog]").querySelector("button[aria-label]").click(); [...document.querySelectorAll("button")].find(button => button.textContent?.includes("Receivables")).click(); true');
   let receivablesReady = false;
   for (let attempt = 0; attempt < 100; attempt++) {

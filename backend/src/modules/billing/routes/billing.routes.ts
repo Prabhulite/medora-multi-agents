@@ -12,6 +12,7 @@ router.get('/closeouts', authorize('billing.view'), validate(closeoutQuerySchema
 router.post('/closeouts', authorize('billing.closeout'), validate(closeoutSchema), asyncHandler(billingController.closeout));
 router.get('/payments/:id/receipt', authorize('billing.view'), validate(invoiceIdParamSchema, 'params'), asyncHandler(billingController.receipt));
 router.get('/reports/cashier', authorize('billing.view'), validate(cashierReportQuerySchema, 'query'), asyncHandler(billingController.cashierReport));
+router.get('/reports/cashier.csv', authorize('billing.view'), validate(cashierReportQuerySchema, 'query'), asyncHandler(billingController.cashierReportExport));
 router.get('/reports/receivables', authorize('billing.view'), validate(receivablesReportQuerySchema, 'query'), asyncHandler(billingController.receivablesReport));
 router.get('/charges', authorize('billing.view'), asyncHandler(billingController.charges));
 router.post('/charges', authorize('billing.charges.manage'), validate(chargeSchema), asyncHandler(billingController.createCharge));
