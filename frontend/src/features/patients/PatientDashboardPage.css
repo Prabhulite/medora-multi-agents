@@ -5,6 +5,15 @@
   font-family: var(--font);
 }
 
+@media print {
+  .app-shell { display: block; height: auto; overflow: visible; background: #fff; }
+  .app-shell__sidebar, .app-shell__header, .pd-topbar, .pd-tabs { display: none !important; }
+  .app-shell__main, .app-shell__content { height: auto; overflow: visible; padding: 0; }
+  .pd-card { box-shadow: none; border: 0; }
+  .pd-card__head .ui-btn, .pd-card__head .ui-badge { display: none; }
+  .pd-visit-row { break-inside: avoid; }
+}
+
 .pd-loading {
   padding: 48px 16px;
   text-align: center;

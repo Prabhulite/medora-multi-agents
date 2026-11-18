@@ -25,8 +25,8 @@
   width: var(--sidebar-current-width);
   height: 100vh;
   max-height: 100vh;
-  background: var(--gradient-brand);
-  border-right: 1px solid rgba(1, 91, 45, 0.35);
+  background: linear-gradient(180deg, #f8fcf8 0%, #edf7ef 100%);
+  border-right: 1px solid #d8e9dc;
   padding: 1rem 0.75rem;
   display: flex;
   flex-direction: column;
@@ -69,7 +69,7 @@
   top: 50%;
   left: 10px;
   transform: translateY(-50%);
-  color: rgba(255, 255, 255, 0.72);
+  color: #558063;
   display: grid;
   place-items: center;
   pointer-events: none;
@@ -79,10 +79,10 @@
   width: 100%;
   min-height: 38px;
   padding: 0 10px 0 32px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  border: 1px solid #d2e4d6;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
+  background: #fff;
+  color: #254a31;
   font: inherit;
   font-size: 13px;
   font-weight: 500;
@@ -90,12 +90,12 @@
 }
 
 .app-shell__menu-search input::placeholder {
-  color: rgba(255, 255, 255, 0.62);
+  color: #74927d;
 }
 
 .app-shell__menu-search input:focus {
-  border-color: rgba(255, 255, 255, 0.45);
-  background: rgba(255, 255, 255, 0.18);
+  border-color: #6cb47a;
+  box-shadow: 0 0 0 3px rgba(66, 159, 84, 0.12);
 }
 
 .app-shell__menu-search-btn {
@@ -103,16 +103,16 @@
   height: 42px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  border: 1px solid #d2e4d6;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.9);
+  background: #fff;
+  color: #315b3d;
   cursor: pointer;
 }
 
 .app-shell__menu-empty {
   margin: 8px 4px 0;
-  color: rgba(255, 255, 255, 0.7);
+  color: #6b8673;
   font-size: 12px;
   font-weight: 600;
   text-align: center;
@@ -132,7 +132,7 @@
   overflow-y: auto;
   padding-right: 2px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(167, 232, 121, 0.55) rgba(1, 91, 45, 0.28);
+  scrollbar-color: #9bcaa5 #e5f0e7;
 }
 
 .app-shell__nav::-webkit-scrollbar {
@@ -141,12 +141,12 @@
 
 .app-shell__nav::-webkit-scrollbar-track {
   margin: 4px 0;
-  background: rgba(1, 91, 45, 0.28);
+  background: #e5f0e7;
   border-radius: 999px;
 }
 
 .app-shell__nav::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(167, 232, 121, 0.75), rgba(22, 132, 71, 0.85));
+  background: linear-gradient(180deg, #9dcea8, #539f66);
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
@@ -179,9 +179,9 @@
   gap: 0.85rem;
   padding: 0.7rem 0.85rem;
   border: none;
-  border-radius: 4px;
+  border-radius: 10px;
   background: transparent;
-  color: rgba(255, 255, 255, 0.82);
+  color: #355b40;
   font: inherit;
   font-weight: 600;
   text-align: left;
@@ -215,7 +215,7 @@
   min-height: 42px;
   padding: 0.55rem 0.75rem;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.78);
+  color: #55745d;
 }
 
 .app-shell.is-sidebar-collapsed .app-shell__nav-children {
@@ -253,19 +253,19 @@
 }
 
 .app-shell__nav-link:hover {
-  background: rgba(255, 255, 255, 0.14);
-  color: var(--color-inverse);
+  background: #e0f1e4;
+  color: #155e2c;
 }
 
 .app-shell__nav-link.is-active {
-  background: rgba(255, 255, 255, 0.22);
-  color: var(--color-inverse);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+  background: #267440;
+  color: #fff;
+  box-shadow: 0 7px 16px rgba(28, 102, 50, 0.18);
 }
 
 .app-shell.is-sidebar-collapsed .app-shell__nav-link.is-active {
-  background: rgba(255, 255, 255, 0.22);
-  color: var(--color-inverse);
+  background: #267440;
+  color: #fff;
   box-shadow: none;
 }
 
@@ -452,7 +452,7 @@
 .app-shell__sidebar-footer {
   margin-top: auto;
   padding-top: 0.85rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  border-top: 1px solid #d8e9dc;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -476,13 +476,13 @@
 
 .app-shell__user-meta strong {
   font-size: 0.9rem;
-  color: #fff;
+  color: #1e4b2d;
   line-height: 1.25;
 }
 
 .app-shell__user-meta span {
   font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.72);
+  color: #6c8874;
   line-height: 1.25;
 }
 
@@ -494,9 +494,9 @@
   width: 100%;
   min-height: 42px;
   border: none;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.16);
-  color: #fff;
+  border-radius: 10px;
+  background: #dff0e3;
+  color: #1d6233;
   font-weight: 600;
   font-size: 0.9rem;
   cursor: pointer;
@@ -504,7 +504,7 @@
 }
 
 .app-shell__logout-btn:hover {
-  background: rgba(255, 255, 255, 0.26);
+  background: #cce9d2;
 }
 
 .app-shell.is-sidebar-collapsed .app-shell__sidebar-footer {
