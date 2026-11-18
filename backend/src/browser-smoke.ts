@@ -92,6 +92,7 @@ try {
   }
   assert.ok(operationsDashboardReady, 'Operations dashboard did not render its laboratory queue');
   const operationsLaboratoryLinkReady = await evaluate(`Boolean(Array.from(document.querySelectorAll('.operations-panel')).find(panel => panel.querySelector('h2')?.textContent === 'Laboratory')?.querySelector('.operations-queue__link[href^=\"/laboratory?search=\"]'))`);
+  assert.ok(process.env.BROWSER_SMOKE_REQUIRE_LAB_QUEUE !== '1' || operationsLaboratoryLinkReady, 'CI browser smoke fixture did not render its required Operations laboratory drill-through link');
   const operationsLaboratoryLink = await evaluate(`(() => { const panel = Array.from(document.querySelectorAll('.operations-panel')).find(item => item.querySelector('h2')?.textContent === 'Laboratory'); const link = panel?.querySelector('.operations-queue__link'); return { href: link?.getAttribute('href'), label: link?.textContent?.trim() }; })()` ) as { href?: string; label?: string };
   if (operationsLaboratoryLinkReady) {
     assert.ok(operationsLaboratoryLink.href && operationsLaboratoryLink.label, 'Operations laboratory queue link was missing its target or order number');

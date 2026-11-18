@@ -24,6 +24,7 @@
     "db:backup-check": "npm run build && tsx src/database/backup-restore-check.ts",
     "smoke": "tsx src/smoke.ts",
     "browser:smoke": "tsx src/browser-smoke.ts",
+    "browser:smoke:ci": "tsx src/browser-smoke-ci.ts",
     "test:integration": "tsx src/integration-check.ts"
   },
   "dependencies": {
