@@ -77,9 +77,8 @@ export const inventoryService = {
       const repo = manager.getRepository(InventoryBatch);
       const batch = await repo.findOne({ where: { id: input.batchId, isActive: true }, relations: { medication: true }, lock: { mode: 'pessimistic_write' } });
       if (!batch) throw new NotFoundError('Inventory batch not found');
-      const today = new Date();
-      const localDate = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, '0'), String(today.getDate()).padStart(2, '0')].join('-');
-      if (batch.expiryDate < localDate) throw new ValidationError('Cannot dispense an expired batch');
+      const [clock] = await manager.query("SELECT DATE_FORMAT(CURRENT_DATE(), '%Y-%m-%d') AS today");
+      if (batch.expiryDate < clock.today) throw new ValidationError('Cannot dispense an expired batch');
       if (batch.quantity < input.quantity) throw new ValidationError(`Insufficient stock. Available: ${batch.quantity}`);
       if (prescription) {
         if (batch.medicationId !== prescription.medicationId) throw new ValidationError('Batch medication does not match the prescription');

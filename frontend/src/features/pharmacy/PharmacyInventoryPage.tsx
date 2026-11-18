@@ -18,14 +18,17 @@ const currency = new Intl.NumberFormat('en-IN', { style: 'currency', currency: '
 
 function dateLabel(value: string) {
   if (!value) return '—';
-  return new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium' }).format(new Date(value));
+  return new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${value.slice(0, 10)}T00:00:00Z`));
 }
 
 function daysToExpiry(value: string) {
-  return Math.ceil((new Date(value).getTime() - Date.now()) / 86400000);
+  const today = new Date();
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+  return Math.round((Date.UTC(year, month - 1, day) - Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())) / 86400000);
 }
 
 function stockTone(row: InventoryBatch): 'success' | 'warning' | 'danger' {
+  if (daysToExpiry(row.expiryDate) < 0 || row.quantity === 0) return 'danger';
   if (row.quantity <= row.reorderLevel) return 'danger';
   if (daysToExpiry(row.expiryDate) <= 90) return 'warning';
   return 'success';
@@ -62,7 +65,7 @@ export function PharmacyInventoryPage() {
     units: inventory.reduce((total, row) => total + row.quantity, 0),
     batches: inventory.length,
     lowStock: inventory.filter((row) => row.quantity <= row.reorderLevel).length,
-    expiring: inventory.filter((row) => daysToExpiry(row.expiryDate) <= 90).length,
+    expiring: inventory.filter((row) => row.quantity > 0 && daysToExpiry(row.expiryDate) <= 90).length,
   }), [inventory]);
 
   const columns = useMemo<TableColumn<InventoryBatch>[]>(() => [
@@ -71,7 +74,7 @@ export function PharmacyInventoryPage() {
     { key: 'quantity', header: 'On hand', render: (row) => <div><strong>{row.quantity}</strong><div className="ui-table__cell-sub">Reorder at {row.reorderLevel}</div></div> },
     { key: 'pricing', header: 'Price', render: (row) => <div><div>{currency.format(row.sellingPrice)}</div><div className="ui-table__cell-sub">Cost {currency.format(row.purchasePrice)}</div></div> },
     { key: 'location', header: 'Location', render: (row) => row.storageLocation || 'Not assigned' },
-    { key: 'status', header: 'Status', render: (row) => <Badge tone={stockTone(row)}>{row.quantity <= row.reorderLevel ? 'Low stock' : daysToExpiry(row.expiryDate) <= 90 ? 'Review soon' : 'In stock'}</Badge> },
+    { key: 'status', header: 'Status', render: (row) => <Badge tone={stockTone(row)}>{daysToExpiry(row.expiryDate) < 0 ? 'Expired' : row.quantity === 0 ? 'Out of stock' : row.quantity <= row.reorderLevel ? 'Low stock' : daysToExpiry(row.expiryDate) <= 90 ? 'Review soon' : 'In stock'}</Badge> },
     { key: 'actions', header: 'Actions', render: (row) => <div className="pharmacy-actions"><Button size="sm" variant="secondary" onClick={() => { setSelectedBatch(row); setModal('movements'); }}>Movements</Button>{canAdjust && <Button size="sm" variant="secondary" onClick={() => { setSelectedBatch(row); setModal('adjust'); }}>Adjust count</Button>}</div> },
   ], [canAdjust]);
 
@@ -110,7 +113,7 @@ export function PharmacyInventoryPage() {
       <article><span>Units on hand</span><strong>{summary.units.toLocaleString('en-IN')}</strong><small>Across {summary.batches} batches</small></article>
       <article className="pharmacy-kpi--green"><span>Active batches</span><strong>{summary.batches}</strong><small>Tracked inventory lots</small></article>
       <article className="pharmacy-kpi--amber"><span>Low stock</span><strong>{summary.lowStock}</strong><small>At or below reorder level</small></article>
-      <article className="pharmacy-kpi--red"><span>Expiry watch</span><strong>{summary.expiring}</strong><small>Expiring within 90 days</small></article>
+      <article className="pharmacy-kpi--red"><span>Expiry watch</span><strong>{summary.expiring}</strong><small>Stock expired or within 90 days</small></article>
     </div>
     <section className="pharmacy-section">
       <div className="pharmacy-section__heading"><div><span className="pharmacy-eyebrow">STOCK CONTROL</span><h2>Inventory batches</h2><p>Use FEFO handling: issue medicines with the nearest expiry first.</p></div></div>
@@ -183,10 +186,11 @@ function DispenseStockForm({ inventory, saving, onClose, onSubmit }: { inventory
     return () => { active = false; };
   }, [form.patientId]);
   const selectedPrescription = prescriptions.find((row) => String(row.id) === form.prescriptionId);
-  const sortedInventory = [...inventory].filter((row) => !selectedPrescription || row.medicationId === selectedPrescription.medicationId).sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime());
-  const selected = inventory.find((row) => String(row.id) === form.batchId);
+  const sortedInventory = [...inventory].filter((row) => row.quantity > 0 && daysToExpiry(row.expiryDate) >= 0 && (!selectedPrescription || row.medicationId === selectedPrescription.medicationId)).sort((a, b) => a.expiryDate.localeCompare(b.expiryDate) || a.id - b.id);
+  const selected = sortedInventory.find((row) => String(row.id) === form.batchId);
+  const suggested = selected ? sortedInventory.find((row) => row.medicationId === selected.medicationId && row.quantity >= Math.max(1, Number(form.quantity) || 1)) : null;
   const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value, ...(key === 'patientId' ? { prescriptionId: '', batchId: '' } : {}), ...(key === 'prescriptionId' ? { batchId: '' } : {}) }));
-  return <ModalShell title="Dispense stock" eyebrow="PHARMACY ISSUE" onClose={onClose}>{lookupError && <Alert tone="error">{lookupError}</Alert>}<form className="pharmacy-form" onSubmit={(event) => { event.preventDefault(); onSubmit({ batchId: Number(form.batchId), quantity: Number(form.quantity), patientId: form.patientId ? Number(form.patientId) : null, prescriptionId: form.prescriptionId ? Number(form.prescriptionId) : null, reference: form.reference || null }); }}><div className="pharmacy-form__grid"><PharmacyPatientPicker patientId={form.patientId} onSelect={(id) => update('patientId', id)} optional /><Select label="Active catalog prescription" value={form.prescriptionId} onChange={(event) => update('prescriptionId', event.target.value)} options={[{ value: '', label: 'General stock issue' }, ...prescriptions.map((row) => ({ value: row.id, label: `${row.medicineName} · ${row.quantityPrescribed} units prescribed` }))]} /></div><Select label="Batch (FEFO order)" required value={form.batchId} onChange={(event) => update('batchId', event.target.value)} options={[{ value: '', label: sortedInventory.length ? 'Select a batch' : 'No matching stock available' }, ...sortedInventory.map((row) => ({ value: String(row.id), label: `${row.medicationName} · ${row.batchNumber} · ${row.quantity} units` }))]} /><div className="pharmacy-fefo-note" role="status"><strong>FEFO suggestion:</strong> {selected ? `Issue batch ${selected.batchNumber} first (${dateLabel(selected.expiryDate)} expiry, ${selected.quantity} units available).` : 'Select a batch to see its availability.'}</div><div className="pharmacy-form__grid"><Input label="Quantity to dispense" type="number" min="1" max={selected?.quantity || undefined} required value={form.quantity} onChange={(event) => update('quantity', event.target.value)} /><Input label="Reference" value={form.reference} onChange={(event) => update('reference', event.target.value)} placeholder="Dispensing note or issue number" /></div><FormFooter saving={saving} onClose={onClose} submitLabel="Dispense stock" disabled={!sortedInventory.length} /></form></ModalShell>;
+  return <ModalShell title="Dispense stock" eyebrow="PHARMACY ISSUE" onClose={onClose}>{lookupError && <Alert tone="error">{lookupError}</Alert>}<form className="pharmacy-form" onSubmit={(event) => { event.preventDefault(); onSubmit({ batchId: Number(form.batchId), quantity: Number(form.quantity), patientId: form.patientId ? Number(form.patientId) : null, prescriptionId: form.prescriptionId ? Number(form.prescriptionId) : null, reference: form.reference || null }); }}><div className="pharmacy-form__grid"><PharmacyPatientPicker patientId={form.patientId} onSelect={(id) => update('patientId', id)} optional /><Select label="Active catalog prescription" value={form.prescriptionId} onChange={(event) => update('prescriptionId', event.target.value)} options={[{ value: '', label: 'General stock issue' }, ...prescriptions.map((row) => ({ value: row.id, label: `${row.medicineName} · ${row.quantityPrescribed} units prescribed` }))]} /></div><Select label="Batch (FEFO order)" required value={form.batchId} onChange={(event) => update('batchId', event.target.value)} options={[{ value: '', label: sortedInventory.length ? 'Select a batch' : 'No matching stock available' }, ...sortedInventory.map((row) => ({ value: String(row.id), label: `${row.medicationName} · ${row.batchNumber} · ${row.quantity} units` }))]} /><div className="pharmacy-fefo-note" role="status"><strong>FEFO suggestion:</strong> {selected ? Number(form.quantity) > selected.quantity ? `Selected batch has only ${selected.quantity} units. Reduce the quantity or choose another batch.` : suggested && suggested.id !== selected.id ? `Earlier eligible batch ${suggested.batchNumber} expires ${dateLabel(suggested.expiryDate)}. Review your batch choice.` : `Selected batch ${selected.batchNumber} is the earliest eligible batch for this quantity (${dateLabel(selected.expiryDate)} expiry).` : 'Select a usable batch to see the earliest eligible stock.'}</div><div className="pharmacy-form__grid"><Input label="Quantity to dispense" type="number" min="1" max={selected?.quantity || undefined} required value={form.quantity} onChange={(event) => update('quantity', event.target.value)} /><Input label="Reference" value={form.reference} onChange={(event) => update('reference', event.target.value)} placeholder="Dispensing note or issue number" /></div><FormFooter saving={saving} onClose={onClose} submitLabel="Dispense stock" disabled={!sortedInventory.length} /></form></ModalShell>;
 }
 
 function ModalShell({ title, eyebrow, onClose, children }: { title: string; eyebrow: string; onClose: () => void; children: React.ReactNode }) {
