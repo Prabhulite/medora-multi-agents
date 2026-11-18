@@ -46,7 +46,7 @@ Use this as the single release-tracking checklist for Medora. A box is checked o
 - [ ] Review user roles and remove unnecessary permissions
 - [ ] Rotate all development/shared secrets before deployment
 - [ ] Set secure production environment variables, HTTPS URLs, database credentials, and backups
-- [ ] Publish operator setup, deployment, recovery, and support instructions
+- [x] Publish operator setup, deployment, recovery, and support instructions
 - [ ] Obtain hospital-owner acceptance after representative OPD, IPD, billing, pharmacy, laboratory, and radiology walkthroughs
 
 ## Not included in “finished”
