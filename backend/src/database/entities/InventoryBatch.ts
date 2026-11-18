@@ -14,6 +14,7 @@ export class InventoryBatch {
   @Column({ name: 'reorder_level', type: 'int', unsigned: true, default: 0 }) reorderLevel!: number;
   @Column({ name: 'storage_location', type: 'varchar', length: 120, nullable: true }) storageLocation!: string | null;
   @Column({ name: 'is_active', type: 'boolean', default: true }) isActive!: boolean;
+  @Column({ name: 'is_quarantined', type: 'boolean', default: false }) isQuarantined!: boolean;
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' }) createdAt!: Date;
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamp' }) updatedAt!: Date;
 }

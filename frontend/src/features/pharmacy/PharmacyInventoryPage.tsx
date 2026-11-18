@@ -29,6 +29,7 @@ function daysToExpiry(value: string) {
 }
 
 function stockTone(row: InventoryBatch): 'success' | 'warning' | 'danger' {
+  if (row.isQuarantined) return 'danger';
   if (daysToExpiry(row.expiryDate) < 0 || row.quantity === 0) return 'danger';
   if (row.quantity <= row.reorderLevel) return 'danger';
   if (daysToExpiry(row.expiryDate) <= 90) return 'warning';
@@ -37,7 +38,7 @@ function stockTone(row: InventoryBatch): 'success' | 'warning' | 'danger' {
 
 export function PharmacyInventoryPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const alertFilter = ['low-stock', 'expired-stock', 'expiring-stock'].includes(searchParams.get('alert') ?? '') ? searchParams.get('alert') : null;
+  const alertFilter = ['low-stock', 'expired-stock', 'expiring-stock', 'quarantined-stock'].includes(searchParams.get('alert') ?? '') ? searchParams.get('alert') : null;
   const { user } = useAuth();
   const canReceive = hasPermission(user, 'pharmacy.inventory.create');
   const canDispense = hasPermission(user, 'pharmacy.inventory.update');
@@ -47,7 +48,7 @@ export function PharmacyInventoryPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [modal, setModal] = useState<'receive' | 'dispense' | 'history' | 'adjust' | 'movements' | null>(null);
+  const [modal, setModal] = useState<'receive' | 'dispense' | 'history' | 'adjust' | 'movements' | 'hold' | null>(null);
   const [selectedBatch, setSelectedBatch] = useState<InventoryBatch | null>(null);
 
   const load = async () => {
@@ -67,15 +68,17 @@ export function PharmacyInventoryPage() {
   const summary = useMemo(() => ({
     units: inventory.reduce((total, row) => total + row.quantity, 0),
     batches: inventory.length,
-    lowStock: inventory.filter((row) => daysToExpiry(row.expiryDate) >= 0 && row.quantity <= row.reorderLevel).length,
+    lowStock: inventory.filter((row) => !row.isQuarantined && daysToExpiry(row.expiryDate) >= 0 && row.quantity <= row.reorderLevel).length,
     expired: inventory.filter((row) => row.quantity > 0 && daysToExpiry(row.expiryDate) < 0).length,
-    expiring: inventory.filter((row) => row.quantity > 0 && daysToExpiry(row.expiryDate) >= 0 && daysToExpiry(row.expiryDate) <= 90).length,
+    expiring: inventory.filter((row) => !row.isQuarantined && row.quantity > 0 && daysToExpiry(row.expiryDate) >= 0 && daysToExpiry(row.expiryDate) <= 90).length,
+    quarantined: inventory.filter((row) => row.isQuarantined).length,
   }), [inventory]);
   const visibleInventory = useMemo(() => inventory.filter((row) => {
     const remaining = daysToExpiry(row.expiryDate);
-    if (alertFilter === 'low-stock') return remaining >= 0 && row.quantity <= row.reorderLevel;
+    if (alertFilter === 'low-stock') return !row.isQuarantined && remaining >= 0 && row.quantity <= row.reorderLevel;
     if (alertFilter === 'expired-stock') return remaining < 0 && row.quantity > 0;
-    if (alertFilter === 'expiring-stock') return remaining >= 0 && remaining <= 90 && row.quantity > 0;
+    if (alertFilter === 'expiring-stock') return !row.isQuarantined && remaining >= 0 && remaining <= 90 && row.quantity > 0;
+    if (alertFilter === 'quarantined-stock') return row.isQuarantined;
     return true;
   }), [inventory, alertFilter]);
   const chooseAlert = (alert: string | null) => setSearchParams(alert ? { alert } : {});
@@ -86,8 +89,8 @@ export function PharmacyInventoryPage() {
     { key: 'quantity', header: 'On hand', render: (row) => <div><strong>{row.quantity}</strong><div className="ui-table__cell-sub">Reorder at {row.reorderLevel}</div></div> },
     { key: 'pricing', header: 'Price', render: (row) => <div><div>{currency.format(row.sellingPrice)}</div><div className="ui-table__cell-sub">Cost {currency.format(row.purchasePrice)}</div></div> },
     { key: 'location', header: 'Location', render: (row) => row.storageLocation || 'Not assigned' },
-    { key: 'status', header: 'Status', render: (row) => <Badge tone={stockTone(row)}>{daysToExpiry(row.expiryDate) < 0 ? 'Expired' : row.quantity === 0 ? 'Out of stock' : row.quantity <= row.reorderLevel ? 'Low stock' : daysToExpiry(row.expiryDate) <= 90 ? 'Review soon' : 'In stock'}</Badge> },
-    { key: 'actions', header: 'Actions', render: (row) => <div className="pharmacy-actions"><Button size="sm" variant="secondary" onClick={() => { setSelectedBatch(row); setModal('movements'); }}>Movements</Button>{canAdjust && <Button size="sm" variant="secondary" onClick={() => { setSelectedBatch(row); setModal('adjust'); }}>Adjust count</Button>}</div> },
+    { key: 'status', header: 'Status', render: (row) => <Badge tone={stockTone(row)}>{row.isQuarantined ? 'Quarantined' : daysToExpiry(row.expiryDate) < 0 ? 'Expired' : row.quantity === 0 ? 'Out of stock' : row.quantity <= row.reorderLevel ? 'Low stock' : daysToExpiry(row.expiryDate) <= 90 ? 'Review soon' : 'In stock'}</Badge> },
+    { key: 'actions', header: 'Actions', render: (row) => <div className="pharmacy-actions"><Button size="sm" variant="secondary" onClick={() => { setSelectedBatch(row); setModal('movements'); }}>Movements</Button>{canAdjust && <><Button size="sm" variant="secondary" onClick={() => { setSelectedBatch(row); setModal('adjust'); }}>Adjust count</Button><Button size="sm" variant="secondary" onClick={() => { setSelectedBatch(row); setModal('hold'); }}>{row.isQuarantined ? 'Release' : 'Quarantine'}</Button></>}</div> },
   ], [canAdjust]);
 
   const saveReceipt = async (payload: ReceiveStockPayload) => {
@@ -116,6 +119,15 @@ export function PharmacyInventoryPage() {
     } catch (err) { setError(getErrorMessage(err, 'Unable to adjust stock count')); }
     finally { setSaving(false); }
   };
+  const saveHold = async (reason: string) => {
+    if (!selectedBatch) return;
+    setSaving(true); setError(''); setNotice('');
+    try {
+      await pharmacyApi.setBatchQuarantine(selectedBatch.id, !selectedBatch.isQuarantined, reason);
+      setModal(null); setSelectedBatch(null); setNotice(selectedBatch.isQuarantined ? 'Batch released from quarantine.' : 'Batch quarantined and blocked from dispensing.'); await load();
+    } catch (err) { setError(getErrorMessage(err, 'Unable to update batch quarantine')); }
+    finally { setSaving(false); }
+  };
 
   return <div className="pharmacy-page">
     <PageHeader title="Pharmacy inventory" subtitle="Monitor medicine availability, expiry risk, and stock movements." actions={<div className="pharmacy-actions"><Button variant="secondary" size="sm" onClick={() => setModal('history')}>Dispense history</Button>{canDispense && <Button variant="secondary" size="sm" onClick={() => setModal('dispense')}>Dispense stock</Button>}{canReceive && <Button size="sm" onClick={() => setModal('receive')}>Receive stock</Button>}</div>} />
@@ -125,19 +137,27 @@ export function PharmacyInventoryPage() {
       <article><span>Units on hand</span><strong>{summary.units.toLocaleString('en-IN')}</strong><small>Across {summary.batches} batches</small></article>
       <article className="pharmacy-kpi--green"><span>Active batches</span><strong>{summary.batches}</strong><small>Tracked inventory lots</small></article>
       <article className="pharmacy-kpi--amber"><span>Low stock</span><strong>{summary.lowStock}</strong><small>At or below reorder level</small></article>
+      <article className="pharmacy-kpi--red"><span>Quarantined</span><strong>{summary.quarantined}</strong><small>Blocked from dispensing</small></article>
       <article className="pharmacy-kpi--red"><span>Expired stock</span><strong>{summary.expired}</strong><small>Expired batches with stock</small></article><article className="pharmacy-kpi--amber"><span>Expiry watch</span><strong>{summary.expiring}</strong><small>Usable batches expiring within 90 days</small></article>
     </div>
     <section className="pharmacy-section">
       <div className="pharmacy-section__heading"><div><span className="pharmacy-eyebrow">STOCK CONTROL</span><h2>Inventory batches</h2><p>Use FEFO handling: issue medicines with the nearest expiry first.</p></div></div>
-      <div className="pharmacy-alert-filters" role="group" aria-label="Filter inventory by stock alert">{([['All batches', null], ['Low stock', 'low-stock'], ['Expired stock', 'expired-stock'], ['Expiry watch', 'expiring-stock']] as const).map(([label, value]) => <button key={label} type="button" className={alertFilter === value ? 'is-active' : ''} aria-pressed={alertFilter === value} onClick={() => chooseAlert(value)}>{label}</button>)}</div>
+      <div className="pharmacy-alert-filters" role="group" aria-label="Filter inventory by stock alert">{([['All batches', null], ['Low stock', 'low-stock'], ['Expired stock', 'expired-stock'], ['Expiry watch', 'expiring-stock'], ['Quarantined', 'quarantined-stock']] as const).map(([label, value]) => <button key={label} type="button" className={alertFilter === value ? 'is-active' : ''} aria-pressed={alertFilter === value} onClick={() => chooseAlert(value)}>{label}</button>)}</div>
       <Table columns={columns} rows={visibleInventory} rowKey={(row) => row.id} loading={loading} onRefresh={() => void load()} searchText={(row) => `${row.medicationName} ${row.medicationCode} ${row.batchNumber} ${row.storageLocation || ''}`} searchPlaceholder="Search medicine, batch, or location" emptyMessage={alertFilter ? 'No batches match this stock alert.' : 'No inventory batches found. Receive stock to start tracking medicines.'} />
     </section>
     {modal === 'receive' && canReceive ? <ReceiveStockForm saving={saving} onClose={() => setModal(null)} onSubmit={(payload) => void saveReceipt(payload)} /> : null}
     {modal === 'dispense' && canDispense ? <DispenseStockForm inventory={inventory} saving={saving} onClose={() => setModal(null)} onSubmit={(payload) => void saveDispense(payload)} /> : null}
     {modal === 'history' ? <DispenseHistory onClose={() => setModal(null)} /> : null}
     {modal === 'adjust' && selectedBatch && canAdjust ? <AdjustStockForm batch={selectedBatch} saving={saving} error={error} onClose={() => setModal(null)} onSubmit={(count, reason) => void saveAdjustment(count, reason)} /> : null}
+    {modal === 'hold' && selectedBatch && canAdjust ? <BatchHoldForm batch={selectedBatch} saving={saving} error={error} onClose={() => setModal(null)} onSubmit={(reason) => void saveHold(reason)} /> : null}
     {modal === 'movements' && selectedBatch ? <StockMovements batch={selectedBatch} onClose={() => setModal(null)} /> : null}
   </div>;
+}
+
+function BatchHoldForm({ batch, saving, error, onClose, onSubmit }: { batch: InventoryBatch; saving: boolean; error: string; onClose: () => void; onSubmit: (reason: string) => void }) {
+  const [reason, setReason] = useState('');
+  const releasing = batch.isQuarantined;
+  return <ModalShell title={`${releasing ? 'Release' : 'Quarantine'} batch · ${batch.batchNumber}`} eyebrow="STOCK SAFETY" onClose={onClose}><form className="pharmacy-form" onSubmit={(event) => { event.preventDefault(); onSubmit(reason.trim()); }}><p>{releasing ? 'Release this batch for dispensing after checking its condition and expiry.' : 'Block dispensing from this batch while it is reviewed. Stock quantity and movement history will be retained.'}</p>{releasing && daysToExpiry(batch.expiryDate) < 0 && <Alert tone="error">Expired stock cannot be released for dispensing.</Alert>}<Input label={releasing ? 'Reason for release' : 'Reason for quarantine'} required minLength={5} maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} placeholder={releasing ? 'Inspection completed and stock cleared' : 'Damaged packaging, recall, or quality concern'} />{error && <Alert tone="error">{error}</Alert>}<FormFooter saving={saving} onClose={onClose} submitLabel={releasing ? 'Release batch' : 'Quarantine batch'} disabled={reason.trim().length < 5 || (releasing && daysToExpiry(batch.expiryDate) < 0)} /></form></ModalShell>;
 }
 
 function AdjustStockForm({ batch, saving, error, onClose, onSubmit }: { batch: InventoryBatch; saving: boolean; error: string; onClose: () => void; onSubmit: (countedQuantity: number, reason: string) => void }) {
@@ -199,7 +219,7 @@ function DispenseStockForm({ inventory, saving, onClose, onSubmit }: { inventory
     return () => { active = false; };
   }, [form.patientId]);
   const selectedPrescription = prescriptions.find((row) => String(row.id) === form.prescriptionId);
-  const sortedInventory = [...inventory].filter((row) => row.quantity > 0 && daysToExpiry(row.expiryDate) >= 0 && (!selectedPrescription || row.medicationId === selectedPrescription.medicationId)).sort((a, b) => a.expiryDate.localeCompare(b.expiryDate) || a.id - b.id);
+  const sortedInventory = [...inventory].filter((row) => row.quantity > 0 && !row.isQuarantined && daysToExpiry(row.expiryDate) >= 0 && (!selectedPrescription || row.medicationId === selectedPrescription.medicationId)).sort((a, b) => a.expiryDate.localeCompare(b.expiryDate) || a.id - b.id);
   const selected = sortedInventory.find((row) => String(row.id) === form.batchId);
   const suggested = selected ? sortedInventory.find((row) => row.medicationId === selected.medicationId && row.quantity >= Math.max(1, Number(form.quantity) || 1)) : null;
   const needsFefoReason = !!selected && !!suggested && suggested.expiryDate < selected.expiryDate && Number(form.quantity) > 0 && Number(form.quantity) <= selected.quantity;

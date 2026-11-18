@@ -9,7 +9,7 @@ export class StockTransaction {
   @PrimaryGeneratedColumn({ unsigned: true }) id!: number;
   @Column({ name: 'batch_id', type: 'int', unsigned: true }) batchId!: number;
   @ManyToOne(() => InventoryBatch, { onDelete: 'CASCADE' }) @JoinColumn({ name: 'batch_id' }) batch!: InventoryBatch;
-  @Column({ type: 'varchar', length: 30 }) type!: 'receipt' | 'dispense' | 'adjustment';
+  @Column({ type: 'varchar', length: 30 }) type!: 'receipt' | 'dispense' | 'adjustment' | 'quarantine' | 'release';
   @Column({ type: 'int' }) quantity!: number;
   @Column({ name: 'patient_id', type: 'int', unsigned: true, nullable: true }) patientId!: number | null;
   @ManyToOne(() => Patient, { onDelete: 'SET NULL', nullable: true }) @JoinColumn({ name: 'patient_id' }) patient!: Patient | null;

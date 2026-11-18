@@ -207,6 +207,9 @@ try {
     await evaluate('Array.from(document.querySelectorAll(".pharmacy-section table tbody tr button")).find(button => button.innerText === "Adjust count").click(); true');
     assert.equal(await evaluate('document.querySelector(".pharmacy-modal")?.innerText.includes("Counted quantity") && Boolean(document.querySelector(".pharmacy-modal button[type=submit]:disabled"))'), true, 'Pharmacy adjustment form did not require a changed count and reason');
     await evaluate('document.querySelector(".pharmacy-modal__header button").click(); true');
+    await evaluate('Array.from(document.querySelectorAll(".pharmacy-section table tbody tr button")).find(button => button.innerText === "Quarantine").click(); true');
+    assert.equal(await evaluate('document.querySelector(".pharmacy-modal")?.innerText.includes("Reason for quarantine") && Boolean(document.querySelector(".pharmacy-modal button[type=submit]:disabled"))'), true, 'Pharmacy quarantine form did not require a reason');
+    await evaluate('document.querySelector(".pharmacy-modal__header button").click(); true');
   }
   await evaluate('history.pushState({}, "", "/inpatient"); window.dispatchEvent(new PopStateEvent("popstate")); true');
   let inpatientLoaded = false;

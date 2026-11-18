@@ -9,7 +9,23 @@ export const inventoryService = {
     const exists = await AppDataSource.getRepository(InventoryBatch).exist({ where: { id: batchId } });
     if (!exists) throw new NotFoundError('Inventory batch not found');
     const [rows, total] = await AppDataSource.getRepository(StockTransaction).findAndCount({ where: { batchId }, relations: { createdBy: true }, order: { createdAt: 'DESC', id: 'DESC' }, skip: (input.page - 1) * input.pageSize, take: input.pageSize });
-    return { items: rows.map((row) => ({ id: row.id, type: row.type, quantity: row.quantity, reference: row.type === 'receipt' ? row.reference : null, notes: row.type === 'adjustment' ? row.notes : null, fefoOverrideReason: row.type === 'dispense' ? row.fefoOverrideReason : null, createdAt: row.createdAt, createdByName: row.createdBy?.fullName ?? null })), total, page: input.page, pageSize: input.pageSize };
+    return { items: rows.map((row) => ({ id: row.id, type: row.type, quantity: row.quantity, reference: row.type === 'receipt' ? row.reference : null, notes: ['adjustment', 'quarantine', 'release'].includes(row.type) ? row.notes : null, fefoOverrideReason: row.type === 'dispense' ? row.fefoOverrideReason : null, createdAt: row.createdAt, createdByName: row.createdBy?.fullName ?? null })), total, page: input.page, pageSize: input.pageSize };
+  },
+  async setQuarantine(batchId: number, quarantined: boolean, reason: string, userId: number) {
+    return AppDataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(InventoryBatch);
+      const batch = await repo.createQueryBuilder('batch').setLock('pessimistic_write').where('batch.id = :batchId AND batch.is_active = 1', { batchId }).getOne();
+      if (!batch) throw new NotFoundError('Active inventory batch not found');
+      if (batch.isQuarantined === quarantined) throw new ConflictError(quarantined ? 'Batch is already quarantined' : 'Batch is not quarantined');
+      if (!quarantined) {
+        const [clock] = await manager.query("SELECT DATE_FORMAT(CURRENT_DATE(), '%Y-%m-%d') AS today");
+        if (batch.expiryDate < clock.today) throw new ValidationError('Expired stock cannot be released from quarantine');
+      }
+      batch.isQuarantined = quarantined;
+      await repo.save(batch);
+      const movement = await manager.getRepository(StockTransaction).save({ batchId, type: quarantined ? 'quarantine' : 'release', quantity: 0, reference: null, notes: reason, createdById: userId });
+      return { batchId, isQuarantined: batch.isQuarantined, movementId: movement.id };
+    });
   },
   async adjust(batchId: number, input: AdjustStockInput, userId: number) {
     return AppDataSource.transaction(async (manager) => {
@@ -40,7 +56,13 @@ export const inventoryService = {
     return rows.map((row) => ({ ...row, createdBy: row.createdBy ? { id: row.createdBy.id, fullName: row.createdBy.fullName } : null }));
   },
   list(filters: { medicationId?: number; lowStock?: boolean }) {
-    return AppDataSource.getRepository(InventoryBatch).find({ where: { ...(filters.medicationId ? { medicationId: filters.medicationId } : {}), isActive: true }, relations: { medication: true }, order: { expiryDate: 'ASC', updatedAt: 'DESC' } }).then((rows) => filters.lowStock ? rows.filter((row) => row.quantity <= row.reorderLevel) : rows);
+    const query = AppDataSource.getRepository(InventoryBatch).createQueryBuilder('batch')
+      .leftJoinAndSelect('batch.medication', 'medication')
+      .where('batch.is_active = 1')
+      .orderBy('batch.expiry_date', 'ASC').addOrderBy('batch.updated_at', 'DESC');
+    if (filters.medicationId) query.andWhere('batch.medication_id = :medicationId', { medicationId: filters.medicationId });
+    if (filters.lowStock) query.andWhere('batch.is_quarantined = 0 AND batch.expiry_date >= CURRENT_DATE() AND batch.quantity <= batch.reorder_level');
+    return query.getMany();
   },
   async receive(input: ReceiveStockInput, userId: number | null) {
     return AppDataSource.transaction(async (manager) => {
@@ -80,12 +102,13 @@ export const inventoryService = {
       await manager.getRepository(Medication).createQueryBuilder('medication').setLock('pessimistic_write').where('medication.id = :id', { id: target.medicationId }).getOne();
       const batch = await repo.findOne({ where: { id: input.batchId, isActive: true }, relations: { medication: true }, lock: { mode: 'pessimistic_write' } });
       if (!batch) throw new NotFoundError('Inventory batch not found');
+      if (batch.isQuarantined) throw new ValidationError('Cannot dispense a quarantined batch');
       const [clock] = await manager.query("SELECT DATE_FORMAT(CURRENT_DATE(), '%Y-%m-%d') AS today");
       if (batch.expiryDate < clock.today) throw new ValidationError('Cannot dispense an expired batch');
       if (batch.quantity < input.quantity) throw new ValidationError(`Insufficient stock. Available: ${batch.quantity}`);
       const earliestEligible = await repo.createQueryBuilder('candidate')
         .setLock('pessimistic_write')
-        .where('candidate.medication_id = :medicationId AND candidate.is_active = 1 AND candidate.quantity >= :quantity AND candidate.expiry_date >= :today', { medicationId: batch.medicationId, quantity: input.quantity, today: clock.today })
+        .where('candidate.medication_id = :medicationId AND candidate.is_active = 1 AND candidate.is_quarantined = 0 AND candidate.quantity >= :quantity AND candidate.expiry_date >= :today', { medicationId: batch.medicationId, quantity: input.quantity, today: clock.today })
         .orderBy('candidate.expiry_date', 'ASC').addOrderBy('candidate.id', 'ASC').getOne();
       const needsFefoReason = !!earliestEligible && earliestEligible.expiryDate < batch.expiryDate;
       if (needsFefoReason && !input.fefoOverrideReason) throw new ValidationError(`Earlier eligible batch ${earliestEligible.batchNumber} is available. Provide a FEFO override reason`);

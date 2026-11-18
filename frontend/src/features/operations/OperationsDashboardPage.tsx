@@ -24,7 +24,7 @@ function formatTime(value?: string | null) {
 }
 
 function pharmacyAlertPath(id: string | number) {
-  return ['low-stock', 'expired-stock', 'expiring-stock'].includes(String(id)) ? `/pharmacy?alert=${id}` : null;
+  return ['low-stock', 'expired-stock', 'expiring-stock', 'quarantined-stock'].includes(String(id)) ? `/pharmacy?alert=${id}` : null;
 }
 
 function Queue({ items }: { items: OperationsQueueItem[] }) {

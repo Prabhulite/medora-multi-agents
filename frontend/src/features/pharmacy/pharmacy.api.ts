@@ -12,6 +12,7 @@ export interface InventoryBatch {
   quantity: number;
   reorderLevel: number;
   storageLocation: string | null;
+  isQuarantined: boolean;
 }
 
 export interface ReceiveStockPayload {
@@ -36,7 +37,7 @@ export interface DispenseStockPayload {
 }
 export interface DispenseRecord { id: number; quantity: number; createdAt: string; reference: string | null; batch: { batchNumber: string; medication: { brandName: string } }; prescription: { id: number; medicineName: string } | null; createdBy: { fullName: string } | null }
 export interface PharmacyPatientCandidate { id: number; mrdNumber: string; fullName: string }
-export interface StockMovement { id: number; type: 'receipt' | 'dispense' | 'adjustment'; quantity: number; reference: string | null; notes: string | null; fefoOverrideReason: string | null; createdAt: string; createdByName: string | null }
+export interface StockMovement { id: number; type: 'receipt' | 'dispense' | 'adjustment' | 'quarantine' | 'release'; quantity: number; reference: string | null; notes: string | null; fefoOverrideReason: string | null; createdAt: string; createdByName: string | null }
 export interface StockMovementPage { items: StockMovement[]; total: number; page: number; pageSize: number }
 export interface StockAdjustment { batchId: number; previousQuantity: number; countedQuantity: number; difference: number; movementId: number }
 
@@ -62,10 +63,14 @@ function mapBatch(row: any): InventoryBatch {
     quantity: Number(row.quantity || 0),
     reorderLevel: Number(row.reorderLevel || 0),
     storageLocation: row.storageLocation || null,
+    isQuarantined: Boolean(row.isQuarantined),
   };
 }
 
 export const pharmacyApi = {
+  async setBatchQuarantine(batchId: number, quarantined: boolean, reason: string): Promise<void> {
+    await api.post(`/pharmacy/inventory/batches/${batchId}/${quarantined ? 'quarantine' : 'release'}`, { reason });
+  },
   async movements(batchId: number, page = 1): Promise<StockMovementPage> {
     const response = await api.get<ApiEnvelope<StockMovementPage>>(`/pharmacy/inventory/batches/${batchId}/movements`, { params: { page, pageSize: 25 } });
     return response.data.data;
