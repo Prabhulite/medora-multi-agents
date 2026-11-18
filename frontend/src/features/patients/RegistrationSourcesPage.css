@@ -3,3 +3,6 @@
 .registration-sources-form .ui-field { flex: 1 1 13rem; }
 .registration-sources-note { margin: 0; color: #52677b; }
 .registration-sources-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+.registration-sources-history { margin: 0; padding-left: 1.5rem; display: grid; gap: .75rem; }
+.registration-sources-history li { display: grid; gap: .2rem; }
+.registration-sources-history small { color: #52677b; }

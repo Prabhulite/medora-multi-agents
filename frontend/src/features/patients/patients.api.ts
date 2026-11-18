@@ -5,6 +5,7 @@ import type {
   Patient,
   PatientAuditLog,
   RegistrationSource,
+  RegistrationSourceEvent,
   UpsertPatientPayload,
 } from '../../types';
 
@@ -19,6 +20,10 @@ export const patientsApi = {
   },
   updateRegistrationSource: async (id: number, payload: { name?: string; isActive?: boolean }) => {
     const { data } = await api.patch<ApiResponse<RegistrationSource>>(`/patients/registration-sources/${id}`, payload);
+    return data.data;
+  },
+  registrationSourceHistory: async (id: number) => {
+    const { data } = await api.get<ApiResponse<RegistrationSourceEvent[]>>(`/patients/registration-sources/${id}/history`);
     return data.data;
   },
   downloadFhirR4: async (patientId: number) => {

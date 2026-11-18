@@ -57,6 +57,7 @@ export { PatientMedicalHistory } from './PatientMedicalHistory.js';
 export { PatientVisit } from './PatientVisit.js';
 export { Permission } from './Permission.js';
 export { RegistrationSource } from './RegistrationSource.js';
+export { RegistrationSourceEvent } from './RegistrationSourceEvent.js';
 export { BedTransfer } from './BedTransfer.js';
 export { AdmissionHomeMedicationReview } from './AdmissionHomeMedicationReview.js';
 export { MedicationAdministration } from './MedicationAdministration.js';

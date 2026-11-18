@@ -252,6 +252,23 @@ try {
   }
   assert.ok(sourcePageReady, 'Registration source management page did not render');
   assert.equal(await evaluate('document.body.innerText.includes("Unable to load registration sources")'), false, 'Registration source catalog failed to load');
+  let sourceHistoryReady = false;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    sourceHistoryReady = await evaluate('Boolean([...document.querySelectorAll(".registration-sources-actions button")].find(button => button.textContent?.includes("History")))');
+    if (sourceHistoryReady) break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  const sourcePageState = await evaluate('({ text: document.querySelector(".registration-sources-page")?.innerText.slice(0, 650), rows: document.querySelectorAll(".registration-sources-actions").length, error: document.querySelector(".ui-alert")?.innerText })');
+  assert.ok(sourceHistoryReady, `Registration source catalog did not show seeded rows: ${JSON.stringify(sourcePageState)}`);
+  await evaluate('[...document.querySelectorAll(".registration-sources-actions button")].find(button => button.textContent?.includes("History")).click(); true');
+  let sourceHistoryLoaded = false;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    sourceHistoryLoaded = await evaluate('Boolean(document.querySelector("[role=dialog]")?.getAttribute("aria-label")?.startsWith("History:")) && !document.body.innerText.includes("Loading history...")');
+    if (sourceHistoryLoaded) break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.ok(sourceHistoryLoaded, 'Registration source history did not open');
+  assert.equal(await evaluate('document.body.innerText.includes("Unable to load source history")'), false, 'Registration source history API failed');
   await evaluate('history.pushState({}, "", "/billing"); window.dispatchEvent(new PopStateEvent("popstate")); true');
   let billingReady = false;
   for (let attempt = 0; attempt < 100; attempt++) {
@@ -288,7 +305,7 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   assert.ok(opdQueueReady, 'OPD consultation queue filters did not render');
-  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, communication queues, pharmacy patient forms${hasBatch ? ', stock movements and count form' : ''}, inpatient dashboard, patient registration${hasPatientRow ? ' and merge confirmation' : ''}, registration source management${patientLookup.body.data?.length ? ', radiology patient selection' : ''}${finalOrderNumber ? ', finalized radiology report print output' : ''}, cashier report, cash closeout review, and OPD queue rendered in headless Chrome.`);
+  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, communication queues, pharmacy patient forms${hasBatch ? ', stock movements and count form' : ''}, inpatient dashboard, patient registration${hasPatientRow ? ' and merge confirmation' : ''}, registration source management and history${patientLookup.body.data?.length ? ', radiology patient selection' : ''}${finalOrderNumber ? ', finalized radiology report print output' : ''}, cashier report, cash closeout review, and OPD queue rendered in headless Chrome.`);
   await send('Browser.close').catch(() => undefined);
   socket.close();
 } finally {

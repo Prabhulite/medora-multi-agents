@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { Modal } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Table, type TableColumn } from '../../components/ui/Table';
 import { getErrorMessage } from '../../lib/api';
-import type { RegistrationSource } from '../../types';
+import type { RegistrationSource, RegistrationSourceEvent } from '../../types';
 import { patientsApi } from './patients.api';
 import './RegistrationSourcesPage.css';
 
@@ -20,6 +21,10 @@ export function RegistrationSourcesPage() {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [historySource, setHistorySource] = useState<RegistrationSource | null>(null);
+  const [historyRows, setHistoryRows] = useState<RegistrationSourceEvent[]>([]);
+  const [historyError, setHistoryError] = useState('');
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -57,13 +62,20 @@ export function RegistrationSourcesPage() {
     finally { setBusy(false); }
   };
 
+  const showHistory = async (row: RegistrationSource) => {
+    setHistorySource(row); setHistoryRows([]); setHistoryError(''); setHistoryLoading(true);
+    try { setHistoryRows(await patientsApi.registrationSourceHistory(row.id)); }
+    catch (err) { setHistoryError(getErrorMessage(err, 'Unable to load source history')); }
+    finally { setHistoryLoading(false); }
+  };
+
   const columns: TableColumn<RegistrationSource>[] = [
     { key: 'code', header: 'Code', render: (row) => <strong>{row.code}</strong> },
     { key: 'name', header: 'Display name', render: (row) => editingId === row.id ? <Input label="Display name" value={editName} maxLength={120} onChange={(event) => setEditName(event.target.value)} /> : row.name },
     { key: 'status', header: 'Status', render: (row) => row.isActive ? 'Active' : 'Retired' },
     { key: 'actions', header: 'Actions', render: (row) => <div className="registration-sources-actions">
       {editingId === row.id ? <><Button size="sm" disabled={busy} onClick={() => void saveName(row)}>Save</Button><Button size="sm" variant="secondary" disabled={busy} onClick={() => setEditingId(null)}>Cancel</Button></>
-        : <><Button size="sm" variant="secondary" disabled={busy} onClick={() => { setEditingId(row.id); setEditName(row.name); }}>Rename</Button><Button size="sm" variant="secondary" disabled={busy} onClick={() => void toggle(row)}>{row.isActive ? 'Retire' : 'Reactivate'}</Button></>}
+        : <><Button size="sm" variant="secondary" disabled={busy} onClick={() => { setEditingId(row.id); setEditName(row.name); }}>Rename</Button><Button size="sm" variant="secondary" disabled={busy} onClick={() => void toggle(row)}>{row.isActive ? 'Retire' : 'Reactivate'}</Button><Button size="sm" variant="secondary" onClick={() => void showHistory(row)}>History</Button></>}
     </div> },
   ];
 
@@ -77,5 +89,14 @@ export function RegistrationSourcesPage() {
     </form>
     <p className="registration-sources-note">Codes stay fixed. Retiring a source removes it from new registrations while keeping its name on existing patient charts.</p>
     <Table columns={columns} rows={rows} rowKey={(row) => row.id} loading={loading} onRefresh={() => void load()} searchText={(row) => `${row.code} ${row.name}`} emptyMessage="No registration sources yet." />
+    <Modal open={Boolean(historySource)} title={`History: ${historySource?.name || ''}`} onClose={() => setHistorySource(null)}>
+      {historyLoading ? <p>Loading history...</p> : historyError ? <Alert tone="error">{historyError}</Alert> : historyRows.length ? <ol className="registration-sources-history">
+        {historyRows.map((event) => <li key={event.id}>
+          <strong>{event.action.replace(/^./, (letter) => letter.toUpperCase())}</strong>
+          <span>{event.beforeName && event.beforeName !== event.afterName ? `${event.beforeName} → ${event.afterName}` : event.afterName}</span>
+          <small>{event.actorName || 'Unknown staff'} · {new Date(event.createdAt).toLocaleString()}</small>
+        </li>)}
+      </ol> : <p>No catalog changes have been recorded for this source yet.</p>}
+    </Modal>
   </div>;
 }

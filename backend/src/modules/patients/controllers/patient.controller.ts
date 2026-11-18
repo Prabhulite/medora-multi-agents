@@ -9,10 +9,13 @@ export const patientController = {
     return sendSuccess(res, await registrationSourceService.list(), 'Registration sources fetched');
   },
   async createRegistrationSource(req: Request, res: Response) {
-    return sendCreated(res, await registrationSourceService.create(req.body), 'Registration source created');
+    return sendCreated(res, await registrationSourceService.create(req.body, req.user?.id ?? null), 'Registration source created');
   },
   async updateRegistrationSource(req: Request, res: Response) {
-    return sendSuccess(res, await registrationSourceService.update(Number(req.params.sourceId), req.body), 'Registration source updated');
+    return sendSuccess(res, await registrationSourceService.update(Number(req.params.sourceId), req.body, req.user?.id ?? null), 'Registration source updated');
+  },
+  async registrationSourceHistory(req: Request, res: Response) {
+    return sendSuccess(res, await registrationSourceService.history(Number(req.params.sourceId)), 'Registration source history fetched');
   },
   async followUps(req: Request, res: Response) {
     return sendSuccess(res, await communicationService.followUps(req.query.status === 'overdue' ? 'overdue' : 'open'), 'Patient follow-ups fetched');

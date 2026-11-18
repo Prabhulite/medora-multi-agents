@@ -670,6 +670,17 @@ export interface RegistrationSource {
   isActive: boolean;
 }
 
+export interface RegistrationSourceEvent {
+  id: number;
+  action: 'created' | 'renamed' | 'retired' | 'reactivated' | 'updated';
+  beforeName: string | null;
+  afterName: string;
+  beforeActive: boolean | null;
+  afterActive: boolean;
+  actorName: string | null;
+  createdAt: string;
+}
+
 export interface AppointmentSlot {
   time: string;
   available: boolean;

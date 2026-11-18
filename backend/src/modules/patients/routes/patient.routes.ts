@@ -25,6 +25,7 @@ router.get('/', authorize('patients.view'), asyncHandler(patientController.list)
 router.get('/registration-sources', authorizeAny('patients.view', 'patients.registration_sources.manage'), asyncHandler(patientController.registrationSources));
 router.post('/registration-sources', authorize('patients.registration_sources.manage'), validate(createRegistrationSourceSchema), asyncHandler(patientController.createRegistrationSource));
 router.patch('/registration-sources/:sourceId', authorize('patients.registration_sources.manage'), validate(registrationSourceIdParamSchema, 'params'), validate(updateRegistrationSourceSchema), asyncHandler(patientController.updateRegistrationSource));
+router.get('/registration-sources/:sourceId/history', authorize('patients.registration_sources.manage'), validate(registrationSourceIdParamSchema, 'params'), asyncHandler(patientController.registrationSourceHistory));
 
 router.get(
   '/search',
