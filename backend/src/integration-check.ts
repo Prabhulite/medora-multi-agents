@@ -69,6 +69,9 @@ try {
     assert.equal(response.status, expected, `${method} ${path}: ${response.message}`);
     return response.data;
   };
+  assert.equal((await request('GET', '/health')).status, 200);
+  const readiness = await ok('GET', '/health/ready');
+  assert.deepEqual(readiness, { service: 'medora-backend', database: 'ready' });
   token = (await ok('POST', '/api/auth/login', { username: 'integration_admin', password: 'Temporary!Pass123' })).token;
   assert.ok(token);
   const adminToken = token;

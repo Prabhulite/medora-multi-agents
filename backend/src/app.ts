@@ -3,6 +3,7 @@ import express, { type Request } from 'express';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { env } from './config/env.js';
+import { AppDataSource } from './config/data-source.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import appointmentRoutes from './modules/appointments/routes/appointment.routes.js';
 import visitRoutes from './modules/visits/routes/visit.routes.js';
@@ -61,6 +62,14 @@ export function createApp() {
         env: env.NODE_ENV,
       },
     });
+  });
+  app.get('/health/ready', async (_req, res) => {
+    try {
+      await AppDataSource.query('SELECT 1');
+      res.json({ success: true, data: { service: 'medora-backend', database: 'ready' } });
+    } catch {
+      res.status(503).json({ success: false, message: 'Database is unavailable' });
+    }
   });
 
   app.use('/api/auth', rateLimit({ windowMs: 60_000, max: 20, keyPrefix: 'auth' }), authRoutes);
