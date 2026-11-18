@@ -82,6 +82,7 @@ export const inpatientService = {
       if (!recipient) throw new ValidationError('Receiving staff must have active inpatient view and update permissions');
       const fromRecipientId = handoff.recipientId;
       handoff.recipientId = recipient.id;
+      handoff.overdueRemindedAt = null;
       await manager.getRepository(NursingHandoff).save(handoff);
       const assignment = await manager.getRepository(NursingHandoffAssignment).save({ handoffId, fromRecipientId, toRecipientId: recipient.id, reason: input.reason, changedById: userId });
       await manager.getRepository(UserNotification).save({ recipientId: recipient.id, kind: 'nursing_handoff_reassigned', sourceId: handoff.id, title: 'Nursing handoff reassigned', message: `Handoff for admission ${admission.admissionNumber} is assigned to you. Review it in Inpatient Management by ${handoff.acknowledgementDueAt?.toISOString() ?? 'the recorded due time'}.`, route: '/inpatient' });
