@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { operationsApi, OperationsDashboard, OperationsQueueItem } from './operations.api';
 import { FollowUpQueue } from '../patients/FollowUpQueue';
@@ -20,6 +21,10 @@ function formatTime(value?: string | null) {
   if (!value) return '';
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function pharmacyAlertPath(id: string | number) {
+  return ['low-stock', 'expired-stock', 'expiring-stock'].includes(String(id)) ? `/pharmacy?alert=${id}` : null;
 }
 
 function Queue({ items }: { items: OperationsQueueItem[] }) {
@@ -76,7 +81,7 @@ export function OperationsDashboardPage() {
           <article className="operations-panel"><header><div><small>Diagnostics</small><h2>Laboratory</h2></div><b>{k.labPending} pending</b></header><Queue items={dashboard.queues.laboratory} /></article>
           <article className="operations-panel"><header><div><small>Diagnostics</small><h2>Radiology</h2></div><b>{k.radiologyPending} pending</b></header><Queue items={dashboard.queues.radiology} /></article>
         </div>
-        <aside className="operations-alerts" aria-labelledby="operations-alerts-title"><header><div><small>Attention needed</small><h2 id="operations-alerts-title">Alerts</h2></div><b>{dashboard.alerts.length}</b></header>{dashboard.alerts.length ? <ul>{dashboard.alerts.map((alert) => <li key={alert.id} className={`operations-alert operations-alert--${alert.severity}`}><span className="operations-alert__marker" aria-hidden="true">!</span><div><strong>{alert.title}{alert.count != null && ` · ${alert.count}`}</strong><span>{alert.detail || 'Review this item when possible.'}</span></div></li>)}</ul> : <div className="operations-empty">No active alerts. Your teams are on track.</div>}</aside>
+        <aside className="operations-alerts" aria-labelledby="operations-alerts-title"><header><div><small>Attention needed</small><h2 id="operations-alerts-title">Alerts</h2></div><b>{dashboard.alerts.length}</b></header>{dashboard.alerts.length ? <ul>{dashboard.alerts.map((alert) => <li key={alert.id} className={`operations-alert operations-alert--${alert.severity}`}><span className="operations-alert__marker" aria-hidden="true">!</span><div><strong>{alert.title}{alert.count != null && ` · ${alert.count}`}</strong><span>{alert.detail || 'Review this item when possible.'}</span>{hasPermission(user, 'pharmacy.inventory.view') && pharmacyAlertPath(alert.id) && <Link className="operations-alert__link" to={pharmacyAlertPath(alert.id)!}>View affected batches</Link>}</div></li>)}</ul> : <div className="operations-empty">No active alerts. Your teams are on track.</div>}</aside>
       </section>
     </>}
   </div>;

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -35,6 +36,8 @@ function stockTone(row: InventoryBatch): 'success' | 'warning' | 'danger' {
 }
 
 export function PharmacyInventoryPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const alertFilter = ['low-stock', 'expired-stock', 'expiring-stock'].includes(searchParams.get('alert') ?? '') ? searchParams.get('alert') : null;
   const { user } = useAuth();
   const canReceive = hasPermission(user, 'pharmacy.inventory.create');
   const canDispense = hasPermission(user, 'pharmacy.inventory.update');
@@ -68,6 +71,14 @@ export function PharmacyInventoryPage() {
     expired: inventory.filter((row) => row.quantity > 0 && daysToExpiry(row.expiryDate) < 0).length,
     expiring: inventory.filter((row) => row.quantity > 0 && daysToExpiry(row.expiryDate) >= 0 && daysToExpiry(row.expiryDate) <= 90).length,
   }), [inventory]);
+  const visibleInventory = useMemo(() => inventory.filter((row) => {
+    const remaining = daysToExpiry(row.expiryDate);
+    if (alertFilter === 'low-stock') return remaining >= 0 && row.quantity <= row.reorderLevel;
+    if (alertFilter === 'expired-stock') return remaining < 0 && row.quantity > 0;
+    if (alertFilter === 'expiring-stock') return remaining >= 0 && remaining <= 90 && row.quantity > 0;
+    return true;
+  }), [inventory, alertFilter]);
+  const chooseAlert = (alert: string | null) => setSearchParams(alert ? { alert } : {});
 
   const columns = useMemo<TableColumn<InventoryBatch>[]>(() => [
     { key: 'medication', header: 'Medication', render: (row) => <div><div className="ui-table__cell-title">{row.medicationName}</div><div className="ui-table__cell-sub">{row.medicationCode || 'Medication'} · Batch {row.batchNumber}</div></div> },
@@ -118,7 +129,8 @@ export function PharmacyInventoryPage() {
     </div>
     <section className="pharmacy-section">
       <div className="pharmacy-section__heading"><div><span className="pharmacy-eyebrow">STOCK CONTROL</span><h2>Inventory batches</h2><p>Use FEFO handling: issue medicines with the nearest expiry first.</p></div></div>
-      <Table columns={columns} rows={inventory} rowKey={(row) => row.id} loading={loading} onRefresh={() => void load()} searchText={(row) => `${row.medicationName} ${row.medicationCode} ${row.batchNumber} ${row.storageLocation || ''}`} searchPlaceholder="Search medicine, batch, or location" emptyMessage="No inventory batches found. Receive stock to start tracking medicines." />
+      <div className="pharmacy-alert-filters" role="group" aria-label="Filter inventory by stock alert">{([['All batches', null], ['Low stock', 'low-stock'], ['Expired stock', 'expired-stock'], ['Expiry watch', 'expiring-stock']] as const).map(([label, value]) => <button key={label} type="button" className={alertFilter === value ? 'is-active' : ''} aria-pressed={alertFilter === value} onClick={() => chooseAlert(value)}>{label}</button>)}</div>
+      <Table columns={columns} rows={visibleInventory} rowKey={(row) => row.id} loading={loading} onRefresh={() => void load()} searchText={(row) => `${row.medicationName} ${row.medicationCode} ${row.batchNumber} ${row.storageLocation || ''}`} searchPlaceholder="Search medicine, batch, or location" emptyMessage={alertFilter ? 'No batches match this stock alert.' : 'No inventory batches found. Receive stock to start tracking medicines.'} />
     </section>
     {modal === 'receive' && canReceive ? <ReceiveStockForm saving={saving} onClose={() => setModal(null)} onSubmit={(payload) => void saveReceipt(payload)} /> : null}
     {modal === 'dispense' && canDispense ? <DispenseStockForm inventory={inventory} saving={saving} onClose={() => setModal(null)} onSubmit={(payload) => void saveDispense(payload)} /> : null}

@@ -110,6 +110,8 @@ Current patient chart tabs: Profile and MRD show identity details and audit hist
 
 The operations dashboard now separates three inventory risks using the database's current date: usable batches at or below their reorder level, positive stock already expired, and positive usable stock expiring within 90 days. Empty batches no longer count as expiry risk, and expired batches no longer inflate the reorder alert. The pharmacy inventory summary shows expired and expiring batches separately. These are review counts, not automatic supplier orders or a quarantine action.
 
+Operations stock alerts link to the corresponding filtered pharmacy inventory view for users with inventory view access. The pharmacy page also provides All, Low stock, Expired stock, and Expiry watch filters and keeps the selected filter in the URL so staff can share or revisit the worklist. The existing inventory API still loads active batches for the page; server pagination and large-inventory handling remain future work.
+
 ### Phase 6: Laboratory and radiology
 
 - Test catalog, panels, sample collection, lab workflow

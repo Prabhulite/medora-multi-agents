@@ -167,6 +167,16 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   assert.ok(pharmacyReady, 'Pharmacy inventory did not render');
+  assert.equal(await evaluate('Boolean(document.querySelector(".pharmacy-alert-filters button"))'), true, 'Pharmacy alert filters did not render');
+  await evaluate('Array.from(document.querySelectorAll(".pharmacy-alert-filters button")).find(button => button.textContent === "Expiry watch").click(); true');
+  let expiryFilterReady = false;
+  for (let attempt = 0; attempt < 30; attempt++) {
+    expiryFilterReady = await evaluate('location.search === "?alert=expiring-stock" && document.querySelector(".pharmacy-alert-filters button.is-active")?.textContent === "Expiry watch"');
+    if (expiryFilterReady) break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.ok(expiryFilterReady, 'Pharmacy expiry filter did not update the URL and selection');
+  await evaluate('Array.from(document.querySelectorAll(".pharmacy-alert-filters button")).find(button => button.textContent === "All batches").click(); true');
   await evaluate('Array.from(document.querySelectorAll("button")).find(button => button.innerText === "Receive stock").click(); true');
   assert.equal(await evaluate('document.querySelector(".pharmacy-modal")?.innerText.includes("Catalog medication") && Boolean(document.querySelector(".pharmacy-modal button[type=submit]:disabled"))'), true, 'Pharmacy receipt form did not require catalog medication selection');
   let medicationCatalogReady = false;
