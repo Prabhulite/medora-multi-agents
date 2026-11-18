@@ -8,6 +8,7 @@ export const inventoryController = {
   adjust: async (req: Request, res: Response) => res.json({ success: true, data: await inventoryService.adjust(Number(req.params.id), req.body, req.user!.id) }),
   quarantine: async (req: Request, res: Response) => res.json({ success: true, data: await inventoryService.setQuarantine(Number(req.params.id), true, req.body.reason, req.user!.id) }),
   release: async (req: Request, res: Response) => res.json({ success: true, data: await inventoryService.setQuarantine(Number(req.params.id), false, req.body.reason, req.user!.id) }),
+  dispose: async (req: Request, res: Response) => res.json({ success: true, data: await inventoryService.dispose(Number(req.params.id), req.body, req.user!.id) }),
   receive: async (req: Request, res: Response) => res.status(201).json({ success: true, data: await inventoryService.receive(req.body, req.user?.id ?? null) }),
   dispense: async (req: Request, res: Response) => res.json({ success: true, data: await inventoryService.dispense(req.body, req.user?.id ?? null) }),
   dispenses: async (req: Request, res: Response) => res.json({ success: true, data: await inventoryService.dispenses(Number(req.query.patientId)) }),

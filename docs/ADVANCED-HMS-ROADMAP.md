@@ -116,6 +116,8 @@ Inventory adjusters can quarantine an active batch with a reason, immediately bl
 
 Held batches are excluded from FEFO eligibility and from usable low-stock and near-expiry alerts. Expired stock with remaining quantity still appears in the expired-stock alert even when held. The API's `lowStock=true` inventory query uses the same usable-batch rule as the operations dashboard.
 
+Inventory adjusters can record disposal of a positive quantity from a quarantined or expired batch. The server locks the batch, requires the quantity seen by the operator to still match, prevents overdrawing and disposal of usable unheld stock, and records a signed stock movement with reason and staff. Partial disposal leaves the remainder visible for follow-up. This records an inventory reduction; the hospital must carry out physical destruction and any required external documentation separately.
+
 ### Phase 6: Laboratory and radiology
 
 - Test catalog, panels, sample collection, lab workflow

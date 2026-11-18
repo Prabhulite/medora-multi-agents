@@ -1,5 +1,5 @@
 .pharmacy-page { min-height: 100%; padding: 28px 30px 48px; color: var(--color-text); }
-.pharmacy-actions { display: flex; gap: 10px; }
+.pharmacy-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .pharmacy-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); gap: 16px; margin: 22px 0; }
 .pharmacy-kpis article { min-height: 126px; padding: 18px 20px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 7px; }
 .pharmacy-kpis span, .pharmacy-kpis small { color: var(--color-text-secondary); }

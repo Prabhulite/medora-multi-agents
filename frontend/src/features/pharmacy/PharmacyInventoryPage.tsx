@@ -48,7 +48,7 @@ export function PharmacyInventoryPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [modal, setModal] = useState<'receive' | 'dispense' | 'history' | 'adjust' | 'movements' | 'hold' | null>(null);
+  const [modal, setModal] = useState<'receive' | 'dispense' | 'history' | 'adjust' | 'movements' | 'hold' | 'dispose' | null>(null);
   const [selectedBatch, setSelectedBatch] = useState<InventoryBatch | null>(null);
 
   const load = async () => {
@@ -90,7 +90,7 @@ export function PharmacyInventoryPage() {
     { key: 'pricing', header: 'Price', render: (row) => <div><div>{currency.format(row.sellingPrice)}</div><div className="ui-table__cell-sub">Cost {currency.format(row.purchasePrice)}</div></div> },
     { key: 'location', header: 'Location', render: (row) => row.storageLocation || 'Not assigned' },
     { key: 'status', header: 'Status', render: (row) => <Badge tone={stockTone(row)}>{row.isQuarantined ? 'Quarantined' : daysToExpiry(row.expiryDate) < 0 ? 'Expired' : row.quantity === 0 ? 'Out of stock' : row.quantity <= row.reorderLevel ? 'Low stock' : daysToExpiry(row.expiryDate) <= 90 ? 'Review soon' : 'In stock'}</Badge> },
-    { key: 'actions', header: 'Actions', render: (row) => <div className="pharmacy-actions"><Button size="sm" variant="secondary" onClick={() => { setSelectedBatch(row); setModal('movements'); }}>Movements</Button>{canAdjust && <><Button size="sm" variant="secondary" onClick={() => { setSelectedBatch(row); setModal('adjust'); }}>Adjust count</Button><Button size="sm" variant="secondary" onClick={() => { setSelectedBatch(row); setModal('hold'); }}>{row.isQuarantined ? 'Release' : 'Quarantine'}</Button></>}</div> },
+    { key: 'actions', header: 'Actions', render: (row) => <div className="pharmacy-actions"><Button size="sm" variant="secondary" onClick={() => { setSelectedBatch(row); setModal('movements'); }}>Movements</Button>{canAdjust && <><Button size="sm" variant="secondary" onClick={() => { setSelectedBatch(row); setModal('adjust'); }}>Adjust count</Button><Button size="sm" variant="secondary" onClick={() => { setSelectedBatch(row); setModal('hold'); }}>{row.isQuarantined ? 'Release' : 'Quarantine'}</Button>{row.quantity > 0 && (row.isQuarantined || daysToExpiry(row.expiryDate) < 0) && <Button size="sm" variant="secondary" onClick={() => { setSelectedBatch(row); setModal('dispose'); }}>Dispose stock</Button>}</>}</div> },
   ], [canAdjust]);
 
   const saveReceipt = async (payload: ReceiveStockPayload) => {
@@ -128,6 +128,15 @@ export function PharmacyInventoryPage() {
     } catch (err) { setError(getErrorMessage(err, 'Unable to update batch quarantine')); }
     finally { setSaving(false); }
   };
+  const saveDisposal = async (quantity: number, reason: string) => {
+    if (!selectedBatch) return;
+    setSaving(true); setError(''); setNotice('');
+    try {
+      await pharmacyApi.disposeStock(selectedBatch.id, selectedBatch.quantity, quantity, reason);
+      setModal(null); setSelectedBatch(null); setNotice(`${quantity} unit${quantity === 1 ? '' : 's'} disposed and recorded in the stock ledger.`); await load();
+    } catch (err) { setError(getErrorMessage(err, 'Unable to dispose stock')); }
+    finally { setSaving(false); }
+  };
 
   return <div className="pharmacy-page">
     <PageHeader title="Pharmacy inventory" subtitle="Monitor medicine availability, expiry risk, and stock movements." actions={<div className="pharmacy-actions"><Button variant="secondary" size="sm" onClick={() => setModal('history')}>Dispense history</Button>{canDispense && <Button variant="secondary" size="sm" onClick={() => setModal('dispense')}>Dispense stock</Button>}{canReceive && <Button size="sm" onClick={() => setModal('receive')}>Receive stock</Button>}</div>} />
@@ -150,8 +159,16 @@ export function PharmacyInventoryPage() {
     {modal === 'history' ? <DispenseHistory onClose={() => setModal(null)} /> : null}
     {modal === 'adjust' && selectedBatch && canAdjust ? <AdjustStockForm batch={selectedBatch} saving={saving} error={error} onClose={() => setModal(null)} onSubmit={(count, reason) => void saveAdjustment(count, reason)} /> : null}
     {modal === 'hold' && selectedBatch && canAdjust ? <BatchHoldForm batch={selectedBatch} saving={saving} error={error} onClose={() => setModal(null)} onSubmit={(reason) => void saveHold(reason)} /> : null}
+    {modal === 'dispose' && selectedBatch && canAdjust ? <DisposeStockForm batch={selectedBatch} saving={saving} error={error} onClose={() => setModal(null)} onSubmit={(quantity, reason) => void saveDisposal(quantity, reason)} /> : null}
     {modal === 'movements' && selectedBatch ? <StockMovements batch={selectedBatch} onClose={() => setModal(null)} /> : null}
   </div>;
+}
+
+function DisposeStockForm({ batch, saving, error, onClose, onSubmit }: { batch: InventoryBatch; saving: boolean; error: string; onClose: () => void; onSubmit: (quantity: number, reason: string) => void }) {
+  const [quantity, setQuantity] = useState('');
+  const [reason, setReason] = useState('');
+  const validQuantity = Number.isInteger(Number(quantity)) && Number(quantity) > 0 && Number(quantity) <= batch.quantity;
+  return <ModalShell title={`Dispose stock · ${batch.batchNumber}`} eyebrow="STOCK DISPOSAL" onClose={onClose}><form className="pharmacy-form" onSubmit={(event) => { event.preventDefault(); onSubmit(Number(quantity), reason.trim()); }}><p>Available: <strong>{batch.quantity} units</strong>. Disposal permanently reduces recorded stock. Record the actual units removed and the reason.</p><Input label="Quantity to dispose" type="number" min="1" max={batch.quantity} required value={quantity} onChange={(event) => setQuantity(event.target.value)} /><Input label="Reason for disposal" required minLength={5} maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Expired stock removed or damaged units destroyed" />{error && <Alert tone="error">{error}</Alert>}<FormFooter saving={saving} onClose={onClose} submitLabel="Record disposal" disabled={!validQuantity || reason.trim().length < 5} /></form></ModalShell>;
 }
 
 function BatchHoldForm({ batch, saving, error, onClose, onSubmit }: { batch: InventoryBatch; saving: boolean; error: string; onClose: () => void; onSubmit: (reason: string) => void }) {

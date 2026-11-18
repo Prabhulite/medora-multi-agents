@@ -37,7 +37,7 @@ export interface DispenseStockPayload {
 }
 export interface DispenseRecord { id: number; quantity: number; createdAt: string; reference: string | null; batch: { batchNumber: string; medication: { brandName: string } }; prescription: { id: number; medicineName: string } | null; createdBy: { fullName: string } | null }
 export interface PharmacyPatientCandidate { id: number; mrdNumber: string; fullName: string }
-export interface StockMovement { id: number; type: 'receipt' | 'dispense' | 'adjustment' | 'quarantine' | 'release'; quantity: number; reference: string | null; notes: string | null; fefoOverrideReason: string | null; createdAt: string; createdByName: string | null }
+export interface StockMovement { id: number; type: 'receipt' | 'dispense' | 'adjustment' | 'quarantine' | 'release' | 'disposal'; quantity: number; reference: string | null; notes: string | null; fefoOverrideReason: string | null; createdAt: string; createdByName: string | null }
 export interface StockMovementPage { items: StockMovement[]; total: number; page: number; pageSize: number }
 export interface StockAdjustment { batchId: number; previousQuantity: number; countedQuantity: number; difference: number; movementId: number }
 
@@ -68,6 +68,9 @@ function mapBatch(row: any): InventoryBatch {
 }
 
 export const pharmacyApi = {
+  async disposeStock(batchId: number, expectedQuantity: number, quantity: number, reason: string): Promise<void> {
+    await api.post(`/pharmacy/inventory/batches/${batchId}/disposals`, { expectedQuantity, quantity, reason });
+  },
   async setBatchQuarantine(batchId: number, quarantined: boolean, reason: string): Promise<void> {
     await api.post(`/pharmacy/inventory/batches/${batchId}/${quarantined ? 'quarantine' : 'release'}`, { reason });
   },

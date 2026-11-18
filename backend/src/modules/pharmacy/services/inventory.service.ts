@@ -1,7 +1,7 @@
 import { AppDataSource } from '../../../config/data-source.js';
 import { InventoryBatch, Medication, Patient, PatientAuditLog, Prescription, StockTransaction } from '../../../database/entities/index.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
-import type { AdjustStockInput, DispenseStockInput, ReceiveStockInput, StockMovementListInput } from '../validators/inventory.validators.js';
+import type { AdjustStockInput, DispenseStockInput, DisposeStockInput, ReceiveStockInput, StockMovementListInput } from '../validators/inventory.validators.js';
 import { assertNoRecordedAllergy } from '../../clinical/services/allergy-check.js';
 
 export const inventoryService = {
@@ -9,7 +9,22 @@ export const inventoryService = {
     const exists = await AppDataSource.getRepository(InventoryBatch).exist({ where: { id: batchId } });
     if (!exists) throw new NotFoundError('Inventory batch not found');
     const [rows, total] = await AppDataSource.getRepository(StockTransaction).findAndCount({ where: { batchId }, relations: { createdBy: true }, order: { createdAt: 'DESC', id: 'DESC' }, skip: (input.page - 1) * input.pageSize, take: input.pageSize });
-    return { items: rows.map((row) => ({ id: row.id, type: row.type, quantity: row.quantity, reference: row.type === 'receipt' ? row.reference : null, notes: ['adjustment', 'quarantine', 'release'].includes(row.type) ? row.notes : null, fefoOverrideReason: row.type === 'dispense' ? row.fefoOverrideReason : null, createdAt: row.createdAt, createdByName: row.createdBy?.fullName ?? null })), total, page: input.page, pageSize: input.pageSize };
+    return { items: rows.map((row) => ({ id: row.id, type: row.type, quantity: row.quantity, reference: row.type === 'receipt' ? row.reference : null, notes: ['adjustment', 'quarantine', 'release', 'disposal'].includes(row.type) ? row.notes : null, fefoOverrideReason: row.type === 'dispense' ? row.fefoOverrideReason : null, createdAt: row.createdAt, createdByName: row.createdBy?.fullName ?? null })), total, page: input.page, pageSize: input.pageSize };
+  },
+  async dispose(batchId: number, input: DisposeStockInput, userId: number) {
+    return AppDataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(InventoryBatch);
+      const batch = await repo.createQueryBuilder('batch').setLock('pessimistic_write').where('batch.id = :batchId AND batch.is_active = 1', { batchId }).getOne();
+      if (!batch) throw new NotFoundError('Active inventory batch not found');
+      if (batch.quantity !== input.expectedQuantity) throw new ConflictError('Stock changed since this disposal was opened. Refresh and review the batch');
+      const [clock] = await manager.query("SELECT DATE_FORMAT(CURRENT_DATE(), '%Y-%m-%d') AS today");
+      if (!batch.isQuarantined && batch.expiryDate >= clock.today) throw new ValidationError('Only quarantined or expired stock can be disposed');
+      if (input.quantity > batch.quantity) throw new ValidationError(`Insufficient stock. Available: ${batch.quantity}`);
+      batch.quantity -= input.quantity;
+      await repo.save(batch);
+      const movement = await manager.getRepository(StockTransaction).save({ batchId, type: 'disposal', quantity: -input.quantity, reference: null, notes: input.reason, createdById: userId });
+      return { batchId, disposedQuantity: input.quantity, remainingQuantity: batch.quantity, movementId: movement.id };
+    });
   },
   async setQuarantine(batchId: number, quarantined: boolean, reason: string, userId: number) {
     return AppDataSource.transaction(async (manager) => {
