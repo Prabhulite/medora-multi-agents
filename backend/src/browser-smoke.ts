@@ -163,7 +163,7 @@ try {
     assert.equal(await evaluate('Boolean(document.querySelector(".radiology-modal button[type=submit]:not(:disabled)"))'), true, 'Patient selection did not enable radiology order submission');
   }
   await evaluate('document.querySelector(".radiology-modal__header button").click(); true');
-  const finalOrderLookup = await evaluate('fetch("/api/radiology/worklist?status=reported&page=1&pageSize=10", { credentials: "include" }).then(async response => ({ status: response.status, body: await response.json() }))') as { status: number; body: { data?: { items?: Array<{ orderNumber: string; reportedById: number | null; reportedByName: string | null; reportText: string | null }> } } };
+  const finalOrderLookup = await evaluate('fetch("/api/radiology/worklist?status=reported&page=1&pageSize=10", { credentials: "include" }).then(async response => ({ status: response.status, body: await response.json() }))') as { status: number; body: { data?: { items?: Array<{ id: number; orderNumber: string; reportedById: number | null; reportedByName: string | null; reportText: string | null }> } } };
   assert.equal(finalOrderLookup.status, 200, `Finalized radiology worklist returned ${finalOrderLookup.status}`);
   const finalOrder = finalOrderLookup.body.data?.items?.[0];
   const finalOrderNumber = finalOrder?.orderNumber ?? null;
@@ -186,6 +186,17 @@ try {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
     assert.ok(printReady, 'Final report print action did not become ready');
+    const archiveStatus = await evaluate(`fetch(${JSON.stringify(`/api/radiology/orders/${finalOrder.id}/archive`)}, { credentials: 'include' }).then(response => response.status)`);
+    if (archiveStatus === 200) {
+      await evaluate('Array.from(document.querySelectorAll(".radiology-report__actions button")).find(button => button.innerText === "View report archive").click(); true');
+      let archiveVisible = false;
+      for (let attempt = 0; attempt < 100; attempt++) {
+        archiveVisible = await evaluate('document.querySelector(".radiology-report")?.innerText.includes("Final report archive") && /Checksum: [a-f0-9]{64}/.test(document.querySelector(".radiology-report")?.innerText || "")');
+        if (archiveVisible) break;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      assert.ok(archiveVisible, 'Final radiology report archive did not render');
+    }
     await send('Emulation.setEmulatedMedia', { media: 'print' });
     const printState = await evaluate(`({ reportVisible: getComputedStyle(document.querySelector(".radiology-report")).visibility === "visible", actionsHidden: getComputedStyle(document.querySelector(".radiology-report__actions")).display === "none", correctionHidden: !document.querySelector(".radiology-report__correction") || getComputedStyle(document.querySelector(".radiology-report__correction")).display === "none", content: document.querySelector(".radiology-report").innerText.includes(${JSON.stringify(finalOrder.reportText)}), order: document.querySelector(".radiology-report__details")?.innerText.includes(${JSON.stringify(finalOrderNumber)}), reporter: document.querySelector(".radiology-report__details")?.innerText.includes("Reporting staff") })`);
     assert.deepEqual(printState, { reportVisible: true, actionsHidden: true, correctionHidden: true, content: true, order: true, reporter: true }, `Radiology print layout failed: ${JSON.stringify(printState)}`);

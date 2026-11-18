@@ -12,6 +12,7 @@ export const radiologyController = {
   createOrder: async (req: Request, res: Response) => res.status(201).json({ success: true, data: await radiologyService.createOrder(req.body, req.user?.id ?? null) }),
   cancelOrder: async (req: Request, res: Response) => res.json({ success: true, data: await radiologyService.cancelOrder(Number(req.params.id), req.body.reason, req.user!.id) }),
   updateReport: async (req: Request, res: Response) => res.json({ success: true, data: await radiologyService.updateReport(Number(req.params.id), req.body, req.user?.id ?? null) }),
+  reportArchive: async (req: Request, res: Response) => res.json({ success: true, data: await radiologyService.reportArchive(Number(req.params.id)) }),
   listAddenda: async (req: Request, res: Response) => res.json({ success: true, data: await radiologyService.listAddenda(Number(req.params.id)) }),
   addAddendum: async (req: Request, res: Response) => res.status(201).json({ success: true, data: await radiologyService.addAddendum(Number(req.params.id), req.body, req.user?.id ?? null) }),
   listCommunications: async (req: Request, res: Response) => res.json({ success: true, data: await radiologyService.listCommunications(Number(req.params.id), canViewDraft(req)) }),

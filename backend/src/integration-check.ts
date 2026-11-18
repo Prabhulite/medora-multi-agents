@@ -200,7 +200,13 @@ try {
   assert.equal((await ok('GET', `/api/radiology/orders/${imaging.id}/communications`)).map((row: { id: number }) => row.id).join(','), `${callAttempt.id},${callDelivered.id}`);
   assert.equal((await request('PATCH', `/api/radiology/orders/${imaging.id}/report`, { status: 'reported', reportText: 'Final image report' })).status, 422);
   assert.equal((await request('PATCH', `/api/radiology/orders/${imaging.id}/report`, { status: 'reported', reportText: 'Final image report', reviewAttested: false })).status, 422);
+  assert.equal((await request('GET', `/api/radiology/orders/${imaging.id}/archive`)).status, 409);
   assert.equal((await ok('PATCH', `/api/radiology/orders/${imaging.id}/report`, { status: 'reported', reportText: 'Final image report', reviewAttested: true })).status, 'reported');
+  const radiologyArchive = await ok('GET', `/api/radiology/orders/${imaging.id}/archive`);
+  assert.equal(radiologyArchive.orderId, imaging.id);
+  assert.equal(radiologyArchive.snapshot.report.reportText, 'Final image report');
+  assert.equal(radiologyArchive.snapshot.review.reviewAttested, true);
+  assert.match(radiologyArchive.checksum, /^[a-f0-9]{64}$/);
   token = radiologyViewerToken;
   const finalizedImaging = (await ok('GET', '/api/radiology/orders?patientId=1')).find((row: { id: number }) => row.id === imaging.id);
   assert.equal(finalizedImaging.reportText, 'Final image report');
@@ -211,6 +217,10 @@ try {
   assert.equal(worklistImaging.reportedByName, finalizedImaging.reportedByName);
   assert.equal('reportedBy' in worklistImaging, false);
   assert.equal((await ok('GET', '/api/radiology/worklist?search=Integration%20chest%20image')).items[0].impression, 'Preliminary impression');
+  assert.equal((await ok('GET', `/api/radiology/orders/${imaging.id}/archive`)).checksum, radiologyArchive.checksum);
+  token = driverToken;
+  assert.equal((await request('GET', `/api/radiology/orders/${imaging.id}/archive`)).status, 403);
+  token = radiologyViewerToken;
   assert.equal((await ok('GET', `/api/radiology/orders/${imaging.id}/communications`))[0].findingSummary, 'Urgent finding discussed');
   assert.equal((await ok('GET', `/api/radiology/orders/${imaging.id}/communications`))[0].note, 'Awaiting return call');
   token = adminToken;
@@ -232,6 +242,9 @@ try {
   assert.equal((await ok('GET', '/api/radiology/communication-queue')).total, 0);
   assert.equal(radiologyAddendum.reason, 'Clarify finding');
   assert.equal((await ok('GET', `/api/radiology/orders/${imaging.id}/addenda`))[0].addendum, 'Additional description');
+  const radiologyArchiveAfterAddendum = await ok('GET', `/api/radiology/orders/${imaging.id}/archive`);
+  assert.equal(radiologyArchiveAfterAddendum.checksum, radiologyArchive.checksum);
+  assert.equal(radiologyArchiveAfterAddendum.snapshot.addenda.length, 0);
   assert.equal((await ok('GET', '/api/radiology/orders')).find((order: { id: number }) => order.id === imaging.id).reportText, 'Final image report');
   const urgentImaging = await ok('POST', '/api/radiology/orders', { patientId: 1, modalityId: 1, studyName: 'Urgent queue study', priority: 'urgent' }, 201);
   await ok('PATCH', `/api/radiology/orders/${urgentImaging.id}/report`, { status: 'performed' });
@@ -296,7 +309,7 @@ try {
   token = adminToken;
   assert.equal((await request('POST', `/api/radiology/orders/${imaging.id}/cancel`, { reason: 'Too late after performance' })).status, 409);
   const radiologyAudit = await ok('GET', '/api/patients/1/audit-logs');
-  for (const action of ['radiology_order_created', 'radiology_order_scheduled', 'radiology_order_rescheduled', 'radiology_study_performed', 'radiology_draft_saved', 'radiology_report_finalized', 'radiology_report_amended', 'radiology_finding_communication', 'radiology_order_cancelled']) {
+  for (const action of ['radiology_order_created', 'radiology_order_scheduled', 'radiology_order_rescheduled', 'radiology_study_performed', 'radiology_draft_saved', 'radiology_report_finalized', 'radiology_report_archived', 'radiology_report_amended', 'radiology_finding_communication', 'radiology_order_cancelled']) {
     assert.ok(radiologyAudit.some((row: { action: string; changedByName: string | null }) => row.action === action && row.changedByName), `Missing attributed radiology audit: ${action}`);
   }
   const rawRadiologyAudit = await dataSource.query("SELECT action, change_summary AS changeSummary, before_data AS beforeData, after_data AS afterData FROM patient_audit_logs WHERE patient_id = 1 AND action LIKE 'radiology_%'");

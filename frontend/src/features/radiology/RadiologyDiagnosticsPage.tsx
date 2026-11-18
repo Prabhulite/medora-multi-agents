@@ -9,7 +9,7 @@ import { Table, type TableColumn } from '../../components/ui/Table';
 import { getErrorMessage } from '../../lib/api';
 import { hasPermission } from '../../lib/permissions';
 import { useAuth } from '../auth/AuthContext';
-import { radiologyApi, type CreateRadiologyOrderPayload, type RadiologyAddendum, type RadiologyCommunication, type RadiologyCommunicationQueueItem, type RadiologyModality, type RadiologyOrder, type RadiologyOrderStatus, type RadiologyPatientCandidate, type RadiologyResource, type RadiologyScheduleEvent, type ReferringDoctor, type UpdateRadiologyReportPayload } from './radiology.api';
+import { radiologyApi, type CreateRadiologyOrderPayload, type RadiologyAddendum, type RadiologyCommunication, type RadiologyCommunicationQueueItem, type RadiologyModality, type RadiologyOrder, type RadiologyOrderStatus, type RadiologyPatientCandidate, type RadiologyReportArchive, type RadiologyResource, type RadiologyScheduleEvent, type ReferringDoctor, type UpdateRadiologyReportPayload } from './radiology.api';
 import './RadiologyDiagnosticsPage.css';
 
 type Modal = 'order' | 'report' | 'communications' | 'schedule' | 'resources' | null;
@@ -208,6 +208,9 @@ function FinalReportView({ order, canUpdate, onClose }: { order: RadiologyOrder;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [archive, setArchive] = useState<RadiologyReportArchive | null>(null);
+  const [loadingArchive, setLoadingArchive] = useState(false);
+  const [archiveError, setArchiveError] = useState('');
   useEffect(() => {
     let active = true;
     radiologyApi.listAddenda(order.id).then((rows) => { if (active) setAddenda(rows); }).catch((err) => { if (active) setError(getErrorMessage(err, 'Unable to load report addenda')); }).finally(() => { if (active) setLoading(false); });
@@ -221,6 +224,7 @@ function FinalReportView({ order, canUpdate, onClose }: { order: RadiologyOrder;
     } catch (err) { setError(getErrorMessage(err, 'Unable to save report addendum')); }
     finally { setSaving(false); }
   };
+  const loadArchive = async () => { setLoadingArchive(true); setArchiveError(''); try { setArchive(await radiologyApi.getReportArchive(order.id)); } catch (err) { setArchiveError(getErrorMessage(err, 'Unable to load final report archive')); } finally { setLoadingArchive(false); } };
   return <ModalShell title={`Final report · ${order.studyName}`} eyebrow={order.orderNumber} onClose={onClose} className="radiology-report">
     <div className="radiology-form">
       <div className="radiology-result-context"><strong>{order.patientName || `Patient #${order.patientId}`}</strong><span>{order.patientMrdNumber || `Patient ID ${order.patientId}`} · {order.modalityName}</span></div>
@@ -228,10 +232,12 @@ function FinalReportView({ order, canUpdate, onClose }: { order: RadiologyOrder;
       <div className="radiology-report__notice"><Alert tone="info">The original final report is preserved. Corrections are dated addenda.</Alert></div>
       <section><h3>Report</h3><p>{order.report || 'No report text recorded.'}</p></section>
       {order.impression && <section><h3>Impression</h3><p>{order.impression}</p></section>}
+      {archive && <section><h3>Final report archive</h3><p>This immutable snapshot was archived {dateLabel(archive.archivedAt)}. Checksum: <code>{archive.checksum}</code></p><p>{archive.snapshot.report.reportText || 'No report text recorded.'}</p>{archive.snapshot.report.impression && <p>Impression: {archive.snapshot.report.impression}</p>}<small>Finalized by {archive.snapshot.review.reportedByName || `staff #${archive.snapshot.review.reportedById || 'unknown'}`}</small></section>}
       <section><h3>Addenda</h3>{loading ? <p>Loading addenda…</p> : addenda.length ? addenda.map((row) => <article key={row.id}><strong>{dateLabel(row.createdAt)} · {row.authorName || 'Former user'}</strong><p>Reason: {row.reason}</p><p>{row.addendum}</p></article>) : <p>No addenda recorded.</p>}</section>
       {error && <Alert tone="error">{error}</Alert>}
+      {archiveError && <Alert tone="error">{archiveError}</Alert>}
       {canUpdate && <form className="radiology-form radiology-report__correction" onSubmit={(event) => void saveAddendum(event)}><h3>Add a correction</h3><Input label="Reason" required minLength={5} maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} /><label className="radiology-textarea"><span>Addendum</span><textarea required rows={4} maxLength={10000} value={addendum} onChange={(event) => setAddendum(event.target.value)} /></label><Button type="submit" loading={saving} disabled={saving || reason.trim().length < 5 || !addendum.trim()}>Save addendum</Button></form>}
-      <div className="radiology-modal__footer radiology-report__actions"><Button type="button" variant="secondary" onClick={onClose}>Close</Button><Button type="button" disabled={loading || Boolean(error)} onClick={() => window.print()}>Print report</Button></div>
+      <div className="radiology-modal__footer radiology-report__actions"><Button type="button" variant="secondary" onClick={onClose}>Close</Button>{!archive && <Button type="button" variant="secondary" loading={loadingArchive} onClick={() => void loadArchive()}>View report archive</Button>}<Button type="button" disabled={loading || Boolean(error)} onClick={() => window.print()}>Print report</Button></div>
     </div>
   </ModalShell>;
 }

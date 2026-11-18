@@ -28,6 +28,7 @@ export { LaboratoryOrder } from './LaboratoryOrder.js';
 export { RadiologyModality } from './RadiologyModality.js';
 export { RadiologyOrder } from './RadiologyOrder.js';
 export { RadiologyReportAddendum } from './RadiologyReportAddendum.js';
+export { RadiologyReportArchive } from './RadiologyReportArchive.js';
 export { LaboratoryResultAddendum } from './LaboratoryResultAddendum.js';
 export { LaboratoryReportArchive } from './LaboratoryReportArchive.js';
 export { LaboratoryCommunication } from './LaboratoryCommunication.js';

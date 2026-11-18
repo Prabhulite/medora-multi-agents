@@ -22,6 +22,7 @@ router.get('/orders', authorize('radiology.view'), validate(radiologyOrderListSc
 router.post('/orders', authorize('radiology.create'), validate(createRadiologyOrderSchema), asyncHandler(radiologyController.createOrder));
 router.post('/orders/:id/cancel', authorize('radiology.cancel'), validate(radiologyOrderIdParamSchema, 'params'), validate(cancelRadiologyOrderSchema), asyncHandler(radiologyController.cancelOrder));
 router.patch('/orders/:id/report', authorize('radiology.update'), validate(radiologyOrderIdParamSchema, 'params'), validate(updateRadiologyReportSchema), asyncHandler(radiologyController.updateReport));
+router.get('/orders/:id/archive', authorize('radiology.view'), validate(radiologyOrderIdParamSchema, 'params'), asyncHandler(radiologyController.reportArchive));
 router.get('/orders/:id/addenda', authorize('radiology.view'), validate(radiologyOrderIdParamSchema, 'params'), asyncHandler(radiologyController.listAddenda));
 router.post('/orders/:id/addenda', authorize('radiology.update'), validate(radiologyOrderIdParamSchema, 'params'), validate(createRadiologyAddendumSchema), asyncHandler(radiologyController.addAddendum));
 router.get('/orders/:id/communications', authorize('radiology.view'), validate(radiologyOrderIdParamSchema, 'params'), asyncHandler(radiologyController.listCommunications));

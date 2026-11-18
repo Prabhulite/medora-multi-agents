@@ -14,6 +14,20 @@ export interface RadiologyWorklist { items: RadiologyOrder[]; total: number; pag
 export interface ReferringDoctor { id: number; name: string; doctorCode: string; medicalRegistrationNumber: string }
 export interface RadiologyPatientCandidate { id: number; mrdNumber: string; fullName: string }
 export interface RadiologyAddendum { id: number; reason: string; addendum: string; createdById: number | null; createdAt: string; authorName: string | null }
+export interface RadiologyReportArchive {
+  id: number;
+  orderId: number;
+  checksum: string;
+  reportedAt: string;
+  archivedAt: string;
+  archivedById: number | null;
+  snapshot: {
+    version: number;
+    report: { reportText: string | null; impression: string | null };
+    review: { reviewAttested: true; reportedAt: string; reportedById: number | null; reportedByName: string | null };
+    addenda: Array<{ id: number }>;
+  };
+}
 export interface RadiologyCommunication { id: number; outcome: 'attempted' | 'delivered'; method: 'phone' | 'in_person' | 'secure_message' | 'other'; recipientName: string; findingSummary: string | null; note: string | null; occurredAt: string; recordedById: number | null; createdAt: string; recorderName: string | null }
 export interface RadiologyCommunicationQueueItem { id: number; orderNumber: string; patientId: number; patientMrdNumber: string; patientName: string; studyName: string; modalityId: number; priority: 'routine' | 'urgent' | 'stat'; status: 'performed' | 'reported'; performedAt: string | null; reportedAt: string | null; latestAddendumAt: string | null; attemptCount: number; lastAttemptAt: string | null }
 export interface RadiologyCommunicationQueue { items: RadiologyCommunicationQueueItem[]; total: number; page: number; pageSize: number }
@@ -166,6 +180,10 @@ export const radiologyApi = {
     const response = await api.get<ApiEnvelope<RadiologyAddendum[]>>(`/radiology/orders/${orderId}/addenda`);
     return response.data.data;
   },
+  async getReportArchive(orderId: number): Promise<RadiologyReportArchive> {
+    const response = await api.get<ApiEnvelope<RadiologyReportArchive>>(`/radiology/orders/${orderId}/archive`);
+    return response.data.data;
+  },
   async addAddendum(orderId: number, payload: { reason: string; addendum: string }): Promise<RadiologyAddendum> {
     const response = await api.post<ApiEnvelope<RadiologyAddendum>>(`/radiology/orders/${orderId}/addenda`, payload);
     return response.data.data;
@@ -194,7 +212,7 @@ export const radiologyApi = {
   },
 
   async updateReport(orderId: number, payload: UpdateRadiologyReportPayload): Promise<RadiologyOrder> {
-    const response = await api.patch<ApiEnvelope<any> | any>(`/radiology/orders/${orderId}/report`, { status: payload.status, ...(payload.report !== undefined ? { reportText: payload.report } : {}), ...(payload.impression !== undefined ? { impression: payload.impression } : {}) });
+    const response = await api.patch<ApiEnvelope<any> | any>(`/radiology/orders/${orderId}/report`, { status: payload.status, ...(payload.report !== undefined ? { reportText: payload.report } : {}), ...(payload.impression !== undefined ? { impression: payload.impression } : {}), ...(payload.reviewAttested !== undefined ? { reviewAttested: payload.reviewAttested } : {}) });
     return mapOrder(unwrap(response.data));
   },
 };
