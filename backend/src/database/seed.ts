@@ -104,6 +104,7 @@ const PERMISSIONS = [
   { code: 'doctors.update', module: 'doctors', action: 'update', description: 'Update doctors' },
   { code: 'doctors.delete', module: 'doctors', action: 'delete', description: 'Delete doctors' },
   { code: 'doctors.account_link', module: 'doctors', action: 'account_link', description: 'Link verified doctor records to staff login accounts' },
+  { code: 'doctors.workspace.view', module: 'doctors', action: 'workspace_view', description: 'View the linked doctor workspace' },
   { code: 'patients.view', module: 'patients', action: 'view', description: 'View patients' },
   { code: 'patients.create', module: 'patients', action: 'create', description: 'Register patients' },
   { code: 'patients.update', module: 'patients', action: 'update', description: 'Update patients' },
@@ -346,6 +347,15 @@ const MENUS = [
     permissionCode: 'services.view',
     parentCode: 'master',
     sortOrder: 29,
+  },
+  {
+    code: 'my_practice',
+    label: 'My Practice',
+    route: '/my-practice',
+    icon: 'doctors',
+    permissionCode: 'doctors.workspace.view',
+    parentCode: null as string | null,
+    sortOrder: 14,
   },
   {
     code: 'front_office',

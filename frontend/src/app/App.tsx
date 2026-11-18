@@ -17,6 +17,7 @@ const ServicesPage = lazy(() => import('../features/services/ServicesPage').then
 const DoctorFormPage = lazy(() => import('../features/doctors/DoctorFormPage').then((module) => ({ default: module.DoctorFormPage })));
 const DoctorAccountPage = lazy(() => import('../features/doctors/DoctorAccountPage').then((module) => ({ default: module.DoctorAccountPage })));
 const DoctorsPage = lazy(() => import('../features/doctors/DoctorsPage').then((module) => ({ default: module.DoctorsPage })));
+const DoctorWorkspacePage = lazy(() => import('../features/doctors/DoctorWorkspacePage').then((module) => ({ default: module.DoctorWorkspacePage })));
 const HospitalProfilePage = lazy(() => import('../features/hospital-profile/HospitalProfilePage').then((module) => ({ default: module.HospitalProfilePage })));
 const AppointmentFormPage = lazy(() => import('../features/appointments/AppointmentFormPage').then((module) => ({ default: module.AppointmentFormPage })));
 const AppointmentsPage = lazy(() => import('../features/appointments/AppointmentsPage').then((module) => ({ default: module.AppointmentsPage })));
@@ -98,6 +99,9 @@ export default function App() {
               </Route>
               <Route element={<ProtectedRoute permission="doctors.view" />}>
                 <Route path="doctors" element={<DoctorsPage />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="doctors.workspace.view" />}>
+                <Route path="my-practice" element={<DoctorWorkspacePage />} />
               </Route>
               <Route element={<ProtectedRoute permission="doctors.create" />}>
                 <Route path="doctors/new" element={<DoctorFormPage />} />

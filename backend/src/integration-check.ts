@@ -127,12 +127,25 @@ try {
   assert.equal((await ok('POST', '/api/doctors/1/unlink-account', { doctorCode: 'IT-DOC-1', reason: 'Verify unlink audit trail for integration' })).account, null);
   assert.equal((await ok('GET', '/api/doctors/1/account-link')).events[0].fromUserId, 3);
   assert.equal((await ok('POST', '/api/doctors/1/account-link', { userId: 3, doctorCode: 'IT-DOC-1', reason: 'Verified staff identity again for test' })).account.id, 3);
+  await dataSource.query("INSERT INTO permissions (code,module,action,description) VALUES ('doctors.workspace.view','doctors','workspace_view','View linked doctor workspace')");
+  await dataSource.query("INSERT INTO roles (code,name,is_active) VALUES ('it_doctor_workspace','Integration Doctor Workspace',1)");
+  await dataSource.query("INSERT INTO role_permissions (role_id,permission_id) SELECT r.id,p.id FROM roles r JOIN permissions p ON p.code = 'doctors.workspace.view' WHERE r.code = 'it_doctor_workspace'");
+  await dataSource.query("INSERT INTO user_roles (user_id,role_id) SELECT u.id,r.id FROM users u JOIN roles r ON r.code = 'it_doctor_workspace' WHERE u.username = 'integration_doctor'");
+  await dataSource.query("INSERT INTO patient_visits (patient_id,visit_number,visit_type,visit_at,doctor_id,status) VALUES (1,'IT-DOCTOR-WORKSPACE-VISIT','OP',CURRENT_TIMESTAMP(),1,'consulting')");
+  token = (await ok('POST', '/api/auth/login', { username: 'integration_doctor', password: 'Temporary!Pass123' })).token;
+  const doctorWorkspaceToken = token;
+  const doctorWorkspace = await ok('GET', '/api/doctors/me/workspace');
+  assert.equal(doctorWorkspace.doctor.doctorCode, 'IT-DOC-1');
+  assert.ok(Array.isArray(doctorWorkspace.todayAppointments));
+  assert.equal(doctorWorkspace.recentPatients.some((row: { visitNumber: string; patient: { mrdNumber: string } }) => row.visitNumber === 'IT-DOCTOR-WORKSPACE-VISIT' && row.patient.mrdNumber === 'IT-MRD-001'), true);
+  token = adminToken;
+  await dataSource.query("DELETE FROM patient_visits WHERE visit_number = 'IT-DOCTOR-WORKSPACE-VISIT'");
 
   await dataSource.query("INSERT INTO radiology_modalities (modality_code,modality_name) VALUES ('IT-RAD','Integration imaging')");
   assert.equal((await request('POST', '/api/radiology/resources', { modalityId: 1, code: 'bad code', name: 'Test scanner' })).status, 422);
   const scanner = await ok('POST', '/api/radiology/resources', { modalityId: 1, code: 'it-scan-1', name: 'Integration scanner', location: 'Room 1' }, 201);
   assert.equal(scanner.code, 'IT-SCAN-1');
-  token = (await ok('POST', '/api/auth/login', { username: 'integration_doctor', password: 'Temporary!Pass123' })).token;
+  token = doctorWorkspaceToken;
   assert.equal((await request('POST', '/api/radiology/resources', { modalityId: 1, code: 'IT-SCAN-2', name: 'Unauthorized scanner' })).status, 403);
   const radiologyViewerToken = token;
   assert.equal((await request('GET', '/api/radiology/communication-queue')).status, 403);

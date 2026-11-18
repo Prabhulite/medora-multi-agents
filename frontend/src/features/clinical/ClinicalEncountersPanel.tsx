@@ -23,7 +23,7 @@ export function ClinicalEncountersPanel({ patientId, activeVisitId, onAllergiesC
   const canCreateClinical = hasPermission(user, 'clinical.create');
   const canSignClinical = hasPermission(user, 'clinical.update');
   const canManageDiagnosisCatalog = hasPermission(user, 'clinical.catalog.manage');
-  const canViewPharmacy = hasPermission(user, 'pharmacy.view') || hasPermission(user, 'pharmacy.inventory.update');
+  const canViewPharmacy = hasPermission(user, 'pharmacy.view') || hasPermission(user, 'pharmacy.inventory.update') || hasPermission(user, 'pharmacy.create');
   const canCreatePharmacy = hasPermission(user, 'pharmacy.create');
   const [rows, setRows] = useState<ClinicalEncounter[]>([]);
   const [editingDraft, setEditingDraft] = useState<ClinicalEncounter | null>(null);

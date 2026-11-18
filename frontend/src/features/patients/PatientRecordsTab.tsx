@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
 import { Loader } from '../../components/ui/Loader';
 import { getErrorMessage } from '../../lib/api';
 import { hasPermission } from '../../lib/permissions';
@@ -30,7 +31,7 @@ export function PatientRecordsTab({ patient, mode }: { patient: Patient; mode: P
   const permitted = mode === 'Visit' ? hasPermission(user, 'patients.view')
     : mode === 'Bills' ? hasPermission(user, 'billing.view')
     : mode === 'Appointment' ? hasPermission(user, 'appointments.view')
-    : mode === 'Rx' ? hasPermission(user, 'pharmacy.view') || hasPermission(user, 'pharmacy.inventory.update')
+    : mode === 'Rx' ? hasPermission(user, 'pharmacy.view') || hasPermission(user, 'pharmacy.inventory.update') || hasPermission(user, 'pharmacy.create')
     : hasPermission(user, 'laboratory.view') || hasPermission(user, 'radiology.view');
 
   useEffect(() => {
@@ -56,7 +57,7 @@ export function PatientRecordsTab({ patient, mode }: { patient: Patient; mode: P
   }, [patient, mode, permitted, user]);
 
   return <section className="pd-card pd-card--wide">
-    <div className="pd-card__head"><h3>{mode === 'Rx' ? 'Prescriptions' : mode === 'Tests' ? 'Diagnostic tests' : mode === 'Visit' ? 'Visits' : mode === 'Bills' ? 'Patient bills' : 'Appointments'}</h3><Badge tone="info">{rows.length} records</Badge></div>
+    <div className="pd-card__head"><h3>{mode === 'Rx' ? 'Prescriptions' : mode === 'Tests' ? 'Diagnostic tests' : mode === 'Visit' ? 'Visits' : mode === 'Bills' ? 'Patient bills' : 'Appointments'}</h3><div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>{mode === 'Rx' && rows.length ? <Button size="sm" variant="secondary" onClick={() => window.print()}>Print medication list</Button> : null}<Badge tone="info">{rows.length} records</Badge></div></div>
     {!permitted ? <Alert tone="error">You do not have permission to view these records.</Alert> : error ? <Alert tone="error">{error}</Alert> : loading ? <Loader size="sm" variant="block" label="Loading records…" /> : rows.length ? <div className="pd-card__body pd-visits">
       {rows.map((row) => <div className="pd-visit-row" key={row.key}><div><div className="ui-table__cell-title">{row.title}</div><div className="ui-table__cell-sub">{[row.detail, row.status].filter(Boolean).join(' · ')}</div></div><strong>{asDate(row.at)}</strong></div>)}
     </div> : <p className="pd-empty">No {mode.toLowerCase()} records found for this patient.</p>}
