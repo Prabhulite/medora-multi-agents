@@ -2,9 +2,9 @@ import type { cashierReportService } from './cashier-report.service.js';
 
 type CashierReport = Awaited<ReturnType<typeof cashierReportService.get>>;
 
-function cell(value: string | number | null): string {
+function cell(value: string | number | null, numeric = false): string {
   const raw = String(value ?? '');
-  const safe = /^[\s\u0000-\u001f]*[=+\-@]/.test(raw) ? `'${raw}` : raw;
+  const safe = numeric && /^-?\d+(?:\.\d{2})?$/.test(raw) ? raw : /^[\s\u0000-\u001f]*[=+\-@]/.test(raw) ? `'${raw}` : raw;
   return `"${safe.replaceAll('"', '""')}"`;
 }
 
@@ -16,5 +16,5 @@ export function cashierReportCsv(report: CashierReport): string {
     ...report.cashiers.map((row) => ['cashier', row.cashierName, row.paymentCount, row.received, row.refundCount, row.refunded, row.net]),
     ['total', 'All methods', report.totals.paymentCount, report.totals.received, report.totals.refundCount, report.totals.refunded, report.totals.net],
   ];
-  return '\uFEFF' + rows.map((row) => row.map(cell).join(',')).join('\r\n') + '\r\n';
+  return '\uFEFF' + rows.map((row, rowIndex) => row.map((value, columnIndex) => cell(value, rowIndex >= 2 && columnIndex >= 2)).join(',')).join('\r\n') + '\r\n';
 }

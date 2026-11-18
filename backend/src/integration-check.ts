@@ -987,6 +987,7 @@ try {
   assert.ok(cashierCsv.includes('"total","All methods","2","140.00","1","40.00","100.00"'));
   const { cashierReportCsv } = await import('./modules/billing/services/cashier-report-csv.js');
   assert.ok(cashierReportCsv({ ...cashierReport, cashiers: [{ ...cashierReport.cashiers[0], cashierName: '=1+1,"test"' }] }).includes('"cashier","\'=1+1,""test"""'));
+  assert.ok(cashierReportCsv({ ...cashierReport, totals: { ...cashierReport.totals, net: '-20.00' } }).includes('"total","All methods","2","140.00","1","40.00","-20.00"'));
   assert.equal((await request('GET', '/api/billing/reports/cashier.csv?from=2026-02-30&to=2026-03-01')).status, 422);
   token = radiologyViewerToken;
   assert.equal((await fetch(`${base}${csvPath}`, { headers: { authorization: `Bearer ${token}` } })).status, 403);
