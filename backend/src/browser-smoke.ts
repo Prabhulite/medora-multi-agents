@@ -83,6 +83,38 @@ try {
   assert.ok(worklistReady, 'Laboratory orders did not finish loading');
   assert.equal(await evaluate('Boolean(document.querySelector(".laboratory-section .ui-table-search input")) && Boolean(document.querySelector(".laboratory-section .ui-table-toolbar__entries select"))'), true, 'Worklist search and paging controls did not render');
   assert.equal(await evaluate('document.body.innerText.includes("Unable to load laboratory diagnostics")'), false, 'Laboratory workbench showed a load error');
+  await evaluate('history.pushState({}, "", "/operations"); window.dispatchEvent(new PopStateEvent("popstate")); true');
+  let operationsDashboardReady = false;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    try { operationsDashboardReady = await evaluate(`document.body.innerText.includes('Operations dashboard') && Boolean(Array.from(document.querySelectorAll('.operations-panel')).find(panel => panel.querySelector('h2')?.textContent === 'Laboratory'))`); } catch { /* navigation resets the execution context */ }
+    if (operationsDashboardReady) break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.ok(operationsDashboardReady, 'Operations dashboard did not render its laboratory queue');
+  const operationsLaboratoryLinkReady = await evaluate(`Boolean(Array.from(document.querySelectorAll('.operations-panel')).find(panel => panel.querySelector('h2')?.textContent === 'Laboratory')?.querySelector('.operations-queue__link[href^=\"/laboratory?search=\"]'))`);
+  const operationsLaboratoryLink = await evaluate(`(() => { const panel = Array.from(document.querySelectorAll('.operations-panel')).find(item => item.querySelector('h2')?.textContent === 'Laboratory'); const link = panel?.querySelector('.operations-queue__link'); return { href: link?.getAttribute('href'), label: link?.textContent?.trim() }; })()` ) as { href?: string; label?: string };
+  if (operationsLaboratoryLinkReady) {
+    assert.ok(operationsLaboratoryLink.href && operationsLaboratoryLink.label, 'Operations laboratory queue link was missing its target or order number');
+    const operationsLaboratoryOrderNumber = operationsLaboratoryLink.label;
+    await evaluate(`Array.from(document.querySelectorAll('.operations-panel')).find(panel => panel.querySelector('h2')?.textContent === 'Laboratory')?.querySelector('.operations-queue__link')?.click(); true`);
+    let operationsLaboratoryDrillThroughReady = false;
+    for (let attempt = 0; attempt < 100; attempt++) {
+      try { operationsLaboratoryDrillThroughReady = await evaluate(`location.pathname === '/laboratory' && new URLSearchParams(location.search).get('search') === ${JSON.stringify(operationsLaboratoryOrderNumber)} && document.querySelector('.laboratory-section .ui-table-search input')?.value === ${JSON.stringify(operationsLaboratoryOrderNumber)}`); } catch { /* navigation resets the execution context */ }
+      if (operationsLaboratoryDrillThroughReady) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.ok(operationsLaboratoryDrillThroughReady, `Operations laboratory drill-through did not preserve the selected order: ${JSON.stringify(operationsLaboratoryLink)}`);
+  } else {
+    assert.equal(await evaluate(`Array.from(document.querySelectorAll('.operations-panel')).find(panel => panel.querySelector('h2')?.textContent === 'Laboratory')?.innerText.includes('Nothing is waiting right now.')`), true, 'Empty operations laboratory queue did not render its safe empty state');
+    await evaluate('history.pushState({}, "", "/laboratory"); window.dispatchEvent(new PopStateEvent("popstate")); true');
+    let laboratoryReturnReady = false;
+    for (let attempt = 0; attempt < 100; attempt++) {
+      laboratoryReturnReady = await evaluate(`location.pathname === '/laboratory' && Boolean(document.querySelector('.laboratory-section .ui-table-search input'))`);
+      if (laboratoryReturnReady) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.ok(laboratoryReturnReady, 'Laboratory worklist did not return after checking its empty operations queue');
+  }
   await evaluate('Array.from(document.querySelectorAll("button")).find(button => button.innerText === "Manage tests")?.click(); true');
   let laboratoryCatalogReady = false;
   for (let attempt = 0; attempt < 100; attempt++) {
@@ -414,7 +446,7 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   assert.ok(opdQueueReady, 'OPD consultation queue filters did not render');
-  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, communication queues, laboratory catalog history${releasedLaboratoryOrderNumber ? ', released laboratory archive action' : ''}, pharmacy patient forms${hasBatch ? ', stock movements and count form' : ''}, inpatient dashboard, patient registration${hasPatientRow ? ' and merge confirmation' : ''}, registration source management, history and report${patientLookup.body.data?.length ? ', radiology patient selection' : ''}${finalOrderNumber ? ', finalized radiology report print output' : ''}, cashier and receivables reports, cash closeout review, and OPD queue rendered in headless Chrome.`);
+  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, Operations laboratory ${operationsLaboratoryLinkReady ? 'drill-through' : 'empty queue'}, communication queues, laboratory catalog history${releasedLaboratoryOrderNumber ? ', released laboratory archive action' : ''}, pharmacy patient forms${hasBatch ? ', stock movements and count form' : ''}, inpatient dashboard, patient registration${hasPatientRow ? ' and merge confirmation' : ''}, registration source management, history and report${patientLookup.body.data?.length ? ', radiology patient selection' : ''}${finalOrderNumber ? ', finalized radiology report print output' : ''}, cashier and receivables reports, cash closeout review, and OPD queue rendered in headless Chrome.`);
   await send('Browser.close').catch(() => undefined);
   socket.close();
 } finally {
