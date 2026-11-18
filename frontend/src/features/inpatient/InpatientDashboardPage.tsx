@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -37,6 +38,8 @@ function formatDate(value: string | null) {
 
 export function InpatientDashboardPage() {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const linkedHandoffId = searchParams.get('handoff');
   const canDischarge = ['inpatient.view', 'inpatient.update', 'clinical.view', 'clinical.update'].every((permission) => hasPermission(user, permission));
   const canReviewHomeMedications = ['inpatient.view', 'inpatient.update', 'clinical.view'].every((permission) => hasPermission(user, permission));
   const [tab, setTab] = useState<Tab>('overview');
@@ -66,6 +69,20 @@ export function InpatientDashboardPage() {
   const [handoffError, setHandoffError] = useState('');
   const [transfers, setTransfers] = useState<BedTransfer[]>([]);
   const [observations, setObservations] = useState<NursingObservation[]>([]);
+  useEffect(() => {
+    if (!linkedHandoffId) return;
+    const handoffId = Number(linkedHandoffId);
+    if (!Number.isSafeInteger(handoffId) || handoffId <= 0) { setHandoffError('Invalid handoff link.'); return; }
+    let active = true;
+    (async () => {
+      try {
+        const context = await inpatientApi.getHandoffContext(handoffId);
+        const admission = await inpatientApi.getAdmission(context.admissionId);
+        if (active) { setHandoffTarget(admission); setHandoffError(''); }
+      } catch (err) { if (active) setHandoffError(getErrorMessage(err, 'Unable to open linked handoff')); }
+    })();
+    return () => { active = false; };
+  }, [linkedHandoffId]);
 
   const load = async () => {
     setLoading(true);
@@ -190,7 +207,7 @@ export function InpatientDashboardPage() {
     {transferTarget ? <TransferPanel admission={transferTarget} availableBeds={availableBeds} transfers={transfers} onClose={() => setTransferTarget(null)} onSave={async (toBedId, reason) => { await inpatientApi.transfer(transferTarget.id, toBedId, reason); setTransfers(await inpatientApi.listTransfers(transferTarget.id)); await load(); }} /> : null}
     {medicationTarget ? <MedicationAdministrationPanel admission={medicationTarget} onClose={() => setMedicationTarget(null)} /> : null}
     {admissionReviewTarget ? <AdmissionMedicationReviewPanel admission={admissionReviewTarget} onClose={() => setAdmissionReviewTarget(null)} /> : null}
-    {handoffTarget ? <NursingHandoffPanel admission={handoffTarget} onClose={() => { setHandoffTarget(null); void loadPendingHandoffs(); }} /> : null}
+    {handoffTarget ? <NursingHandoffPanel admission={handoffTarget} onClose={() => { setHandoffTarget(null); if (linkedHandoffId) setSearchParams((current) => { const next = new URLSearchParams(current); next.delete('handoff'); return next; }, { replace: true }); void loadPendingHandoffs(); }} /> : null}
     {carePlanTarget ? <CarePlanPanel admission={carePlanTarget} onClose={() => { setCarePlanTarget(null); void loadDueCarePlans(); }} /> : null}
   </div>;
 }

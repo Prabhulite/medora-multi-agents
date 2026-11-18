@@ -581,6 +581,9 @@ try {
   const handoffDue = new Date(Date.now() + 60_000).toISOString();
   assert.equal((await request('POST', `/api/inpatient/admissions/${admission.id}/handoffs`, { recipientId: receiver.id, conditionSummary: 'Late deadline', pendingTasks: 'Review mobility care plan', acknowledgementDueAt: new Date(Date.now() - 60_000).toISOString() })).status, 422);
   const handoff = await ok('POST', `/api/inpatient/admissions/${admission.id}/handoffs`, { recipientId: receiver.id, conditionSummary: 'Stable for handoff', pendingTasks: 'Review mobility care plan', safetyConcerns: 'Fall risk', acknowledgementDueAt: handoffDue }, 201);
+  assert.deepEqual(await ok('GET', `/api/inpatient/handoffs/${handoff.id}/context`), { id: handoff.id, admissionId: admission.id });
+  assert.equal((await request('GET', '/api/inpatient/handoffs/999999/context')).status, 404);
+  assert.equal((await request('GET', '/api/inpatient/handoffs/bad/context')).status, 422);
   assert.equal(handoff.outgoingBy.fullName, 'Integration Admin');
   assert.equal(handoff.recipient.fullName, 'Integration Receiver');
   token = (await (await import('./modules/auth/services/auth.service.js')).authService.login({ username: 'integration_receiver', password: 'Temporary!Pass123' })).token;
@@ -636,6 +639,7 @@ try {
   assert.equal((await ok('GET', '/api/inpatient/handoffs/pending')).items[0].recipientId, bystander.id);
   token = (await (await import('./modules/auth/services/auth.service.js')).authService.login({ username: 'integration_clinician', password: 'Temporary!Pass123' })).token;
   assert.equal((await request('POST', `/api/inpatient/admissions/${admission.id}/handoffs/${handoff.id}/reassign`, { recipientId: receiver.id, reason: 'Unauthorized change' })).status, 403);
+  assert.equal((await request('GET', `/api/inpatient/handoffs/${handoff.id}/context`)).status, 403);
   token = (await (await import('./modules/auth/services/auth.service.js')).authService.login({ username: 'integration_receiver', password: 'Temporary!Pass123' })).token;
   assert.equal((await request('POST', `/api/inpatient/admissions/${admission.id}/handoffs/${handoff.id}/acknowledge`)).status, 409);
   token = adminToken;

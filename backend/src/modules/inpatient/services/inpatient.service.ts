@@ -21,6 +21,11 @@ const observationResponse = (row: NursingObservation) => ({ ...row, recordedBy: 
 const handoffResponse = (row: NursingHandoff) => { const { outgoingBy, recipient, acknowledgedBy, closedOnDischargeBy, ...fields } = row; return { ...fields, outgoingBy: staffReference(outgoingBy), recipient: staffReference(recipient), acknowledgedBy: staffReference(acknowledgedBy), closedOnDischargeBy: staffReference(closedOnDischargeBy) }; };
 
 export const inpatientService = {
+  async nursingHandoffContext(handoffId: number) {
+    const row = await AppDataSource.getRepository(NursingHandoff).findOne({ where: { id: handoffId }, select: { id: true, admissionId: true } });
+    if (!row) throw new NotFoundError('Handoff not found');
+    return { id: row.id, admissionId: row.admissionId };
+  },
   async nursingHandoffEscalations(admissionId: number, handoffId: number) {
     if (!(await AppDataSource.getRepository(NursingHandoff).exist({ where: { id: handoffId, admissionId } }))) throw new NotFoundError('Handoff not found');
     const rows = await AppDataSource.getRepository(NursingHandoffEscalation).find({ where: { handoffId }, relations: { recipient: true, raisedBy: true }, order: { id: 'ASC' } });
