@@ -40,6 +40,8 @@ export interface PharmacyPatientCandidate { id: number; mrdNumber: string; fullN
 export interface StockMovement { id: number; type: 'receipt' | 'dispense' | 'adjustment' | 'quarantine' | 'release' | 'disposal'; quantity: number; reference: string | null; notes: string | null; fefoOverrideReason: string | null; createdAt: string; createdByName: string | null }
 export interface StockMovementPage { items: StockMovement[]; total: number; page: number; pageSize: number }
 export interface StockAdjustment { batchId: number; previousQuantity: number; countedQuantity: number; difference: number; movementId: number }
+export interface InventorySummary { units: number; batches: number; lowStock: number; quarantined: number; expired: number; expiring: number }
+export interface InventoryWorklist { items: InventoryBatch[]; total: number; page: number; pageSize: number; summary: InventorySummary }
 
 interface ApiEnvelope<T> { data: T; }
 
@@ -68,6 +70,10 @@ function mapBatch(row: any): InventoryBatch {
 }
 
 export const pharmacyApi = {
+  async inventoryWorklist(page: number, pageSize: number, search: string, alert: string | null): Promise<InventoryWorklist> {
+    const response = await api.get<ApiEnvelope<InventoryWorklist>>('/pharmacy/inventory/worklist', { params: { page, pageSize, ...(search.trim() ? { search: search.trim() } : {}), ...(alert ? { alert } : {}) } });
+    return { ...response.data.data, items: response.data.data.items.map(mapBatch) };
+  },
   async disposeStock(batchId: number, expectedQuantity: number, quantity: number, reason: string): Promise<void> {
     await api.post(`/pharmacy/inventory/batches/${batchId}/disposals`, { expectedQuantity, quantity, reason });
   },

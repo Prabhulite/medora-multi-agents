@@ -12,7 +12,7 @@ import { hasPermission } from '../../lib/permissions';
 import { useAuth } from '../auth/AuthContext';
 import { prescriptionsApi } from '../clinical/prescriptions.api';
 import type { Prescription } from '../../types';
-import { pharmacyApi, type DispenseRecord, type DispenseStockPayload, type InventoryBatch, type PharmacyPatientCandidate, type ReceiveStockPayload, type StockMovement } from './pharmacy.api';
+import { pharmacyApi, type DispenseRecord, type DispenseStockPayload, type InventoryBatch, type InventorySummary, type PharmacyPatientCandidate, type ReceiveStockPayload, type StockMovement } from './pharmacy.api';
 import './PharmacyInventoryPage.css';
 
 const currency = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
@@ -44,6 +44,14 @@ export function PharmacyInventoryPage() {
   const canDispense = hasPermission(user, 'pharmacy.inventory.update');
   const canAdjust = hasPermission(user, 'pharmacy.inventory.adjust');
   const [inventory, setInventory] = useState<InventoryBatch[]>([]);
+  const [summary, setSummary] = useState<InventorySummary>({ units: 0, batches: 0, lowStock: 0, expired: 0, expiring: 0, quarantined: 0 });
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [search, setSearch] = useState('');
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [dispenseInventory, setDispenseInventory] = useState<InventoryBatch[]>([]);
+  const [dispenseLoading, setDispenseLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -51,37 +59,26 @@ export function PharmacyInventoryPage() {
   const [modal, setModal] = useState<'receive' | 'dispense' | 'history' | 'adjust' | 'movements' | 'hold' | 'dispose' | null>(null);
   const [selectedBatch, setSelectedBatch] = useState<InventoryBatch | null>(null);
 
-  const load = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      setInventory(await pharmacyApi.listInventory());
-    } catch (err) {
-      setError(getErrorMessage(err, 'Unable to load pharmacy inventory'));
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    let active = true;
+    setLoading(true); setError('');
+    const timer = window.setTimeout(() => {
+      void pharmacyApi.inventoryWorklist(page, pageSize, search, alertFilter).then((result) => {
+        if (!active) return;
+        setInventory(result.items); setSummary(result.summary); setTotal(result.total);
+      }).catch((err) => { if (active) setError(getErrorMessage(err, 'Unable to load pharmacy inventory')); })
+        .finally(() => { if (active) setLoading(false); });
+    }, search ? 250 : 0);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [page, pageSize, search, alertFilter, refreshKey]);
+  const load = async () => { setRefreshKey((current) => current + 1); };
+  const chooseAlert = (alert: string | null) => { setPage(1); setSearchParams(alert ? { alert } : {}); };
+  const openDispense = async () => {
+    setDispenseLoading(true); setError('');
+    try { setDispenseInventory(await pharmacyApi.listInventory()); setModal('dispense'); }
+    catch (err) { setError(getErrorMessage(err, 'Unable to load dispensing choices')); }
+    finally { setDispenseLoading(false); }
   };
-
-  useEffect(() => { void load(); }, []);
-
-  const summary = useMemo(() => ({
-    units: inventory.reduce((total, row) => total + row.quantity, 0),
-    batches: inventory.length,
-    lowStock: inventory.filter((row) => !row.isQuarantined && daysToExpiry(row.expiryDate) >= 0 && row.quantity <= row.reorderLevel).length,
-    expired: inventory.filter((row) => row.quantity > 0 && daysToExpiry(row.expiryDate) < 0).length,
-    expiring: inventory.filter((row) => !row.isQuarantined && row.quantity > 0 && daysToExpiry(row.expiryDate) >= 0 && daysToExpiry(row.expiryDate) <= 90).length,
-    quarantined: inventory.filter((row) => row.isQuarantined).length,
-  }), [inventory]);
-  const visibleInventory = useMemo(() => inventory.filter((row) => {
-    const remaining = daysToExpiry(row.expiryDate);
-    if (alertFilter === 'low-stock') return !row.isQuarantined && remaining >= 0 && row.quantity <= row.reorderLevel;
-    if (alertFilter === 'expired-stock') return remaining < 0 && row.quantity > 0;
-    if (alertFilter === 'expiring-stock') return !row.isQuarantined && remaining >= 0 && remaining <= 90 && row.quantity > 0;
-    if (alertFilter === 'quarantined-stock') return row.isQuarantined;
-    return true;
-  }), [inventory, alertFilter]);
-  const chooseAlert = (alert: string | null) => setSearchParams(alert ? { alert } : {});
 
   const columns = useMemo<TableColumn<InventoryBatch>[]>(() => [
     { key: 'medication', header: 'Medication', render: (row) => <div><div className="ui-table__cell-title">{row.medicationName}</div><div className="ui-table__cell-sub">{row.medicationCode || 'Medication'} · Batch {row.batchNumber}</div></div> },
@@ -139,7 +136,7 @@ export function PharmacyInventoryPage() {
   };
 
   return <div className="pharmacy-page">
-    <PageHeader title="Pharmacy inventory" subtitle="Monitor medicine availability, expiry risk, and stock movements." actions={<div className="pharmacy-actions"><Button variant="secondary" size="sm" onClick={() => setModal('history')}>Dispense history</Button>{canDispense && <Button variant="secondary" size="sm" onClick={() => setModal('dispense')}>Dispense stock</Button>}{canReceive && <Button size="sm" onClick={() => setModal('receive')}>Receive stock</Button>}</div>} />
+    <PageHeader title="Pharmacy inventory" subtitle="Monitor medicine availability, expiry risk, and stock movements." actions={<div className="pharmacy-actions"><Button variant="secondary" size="sm" onClick={() => setModal('history')}>Dispense history</Button>{canDispense && <Button variant="secondary" size="sm" onClick={() => void openDispense()}>{dispenseLoading ? 'Loading stock...' : 'Dispense stock'}</Button>}{canReceive && <Button size="sm" onClick={() => setModal('receive')}>Receive stock</Button>}</div>} />
     {error ? <Alert tone="error">{error}</Alert> : null}
     {notice ? <Alert tone="success">{notice}</Alert> : null}
     <div className="pharmacy-kpis" aria-label="Pharmacy inventory summary">
@@ -152,10 +149,10 @@ export function PharmacyInventoryPage() {
     <section className="pharmacy-section">
       <div className="pharmacy-section__heading"><div><span className="pharmacy-eyebrow">STOCK CONTROL</span><h2>Inventory batches</h2><p>Use FEFO handling: issue medicines with the nearest expiry first.</p></div></div>
       <div className="pharmacy-alert-filters" role="group" aria-label="Filter inventory by stock alert">{([['All batches', null], ['Low stock', 'low-stock'], ['Expired stock', 'expired-stock'], ['Expiry watch', 'expiring-stock'], ['Quarantined', 'quarantined-stock']] as const).map(([label, value]) => <button key={label} type="button" className={alertFilter === value ? 'is-active' : ''} aria-pressed={alertFilter === value} onClick={() => chooseAlert(value)}>{label}</button>)}</div>
-      <Table columns={columns} rows={visibleInventory} rowKey={(row) => row.id} loading={loading} onRefresh={() => void load()} searchText={(row) => `${row.medicationName} ${row.medicationCode} ${row.batchNumber} ${row.storageLocation || ''}`} searchPlaceholder="Search medicine, batch, or location" emptyMessage={alertFilter ? 'No batches match this stock alert.' : 'No inventory batches found. Receive stock to start tracking medicines.'} />
+      <Table columns={columns} rows={inventory} rowKey={(row) => row.id} loading={loading} onRefresh={() => void load()} serverPagination={{ page, pageSize, total, search, onPageChange: setPage, onPageSizeChange: (size) => { setPage(1); setPageSize(size); }, onSearchChange: (value) => { setPage(1); setSearch(value); } }} searchPlaceholder="Search medicine, batch, or location" emptyMessage={alertFilter ? 'No batches match this stock alert.' : 'No inventory batches found. Receive stock to start tracking medicines.'} />
     </section>
     {modal === 'receive' && canReceive ? <ReceiveStockForm saving={saving} onClose={() => setModal(null)} onSubmit={(payload) => void saveReceipt(payload)} /> : null}
-    {modal === 'dispense' && canDispense ? <DispenseStockForm inventory={inventory} saving={saving} onClose={() => setModal(null)} onSubmit={(payload) => void saveDispense(payload)} /> : null}
+    {modal === 'dispense' && canDispense ? <DispenseStockForm inventory={dispenseInventory} saving={saving} onClose={() => setModal(null)} onSubmit={(payload) => void saveDispense(payload)} /> : null}
     {modal === 'history' ? <DispenseHistory onClose={() => setModal(null)} /> : null}
     {modal === 'adjust' && selectedBatch && canAdjust ? <AdjustStockForm batch={selectedBatch} saving={saving} error={error} onClose={() => setModal(null)} onSubmit={(count, reason) => void saveAdjustment(count, reason)} /> : null}
     {modal === 'hold' && selectedBatch && canAdjust ? <BatchHoldForm batch={selectedBatch} saving={saving} error={error} onClose={() => setModal(null)} onSubmit={(reason) => void saveHold(reason)} /> : null}

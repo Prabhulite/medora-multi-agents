@@ -1330,6 +1330,18 @@ try {
   const [stockAlertCounts] = await dataSource.query("SELECT SUM(is_quarantined = 0 AND expiry_date >= CURRENT_DATE() AND quantity <= reorder_level) AS lowStock, SUM(quantity > 0 AND expiry_date < CURRENT_DATE()) AS expired, SUM(is_quarantined = 0 AND quantity > 0 AND expiry_date BETWEEN CURRENT_DATE() AND DATE_ADD(CURRENT_DATE(), INTERVAL 90 DAY)) AS expiring, SUM(is_quarantined = 1) AS quarantined FROM inventory_batches WHERE is_active = 1");
   assert.equal(operations.kpis.lowStockItems, Number(stockAlertCounts.lowStock));
   assert.equal((await ok('GET', '/api/pharmacy/inventory?lowStock=true')).length, Number(stockAlertCounts.lowStock));
+  assert.equal((await request('GET', '/api/pharmacy/inventory/worklist?pageSize=101')).status, 422);
+  token = radiologyViewerToken;
+  assert.equal((await request('GET', '/api/pharmacy/inventory/worklist')).status, 403);
+  token = adminToken;
+  const stockWorklist = await ok('GET', '/api/pharmacy/inventory/worklist?page=1&pageSize=10');
+  assert.equal(stockWorklist.items.length, 10);
+  assert.equal(stockWorklist.summary.lowStock, Number(stockAlertCounts.lowStock));
+  assert.equal(stockWorklist.summary.quarantined, Number(stockAlertCounts.quarantined));
+  assert.equal((await ok('GET', '/api/pharmacy/inventory/worklist?page=2&pageSize=10')).items.length, Math.min(10, stockWorklist.total - 10));
+  const heldWorklist = await ok('GET', '/api/pharmacy/inventory/worklist?alert=quarantined-stock&search=IT-BATCH');
+  assert.equal(heldWorklist.total, 0);
+  assert.ok((await ok('GET', '/api/pharmacy/inventory/worklist?search=IT-OPS-BATCH-1')).total >= 1);
   assert.equal(operations.alerts.find((alert: { id: string }) => alert.id === 'low-stock')?.count, operations.kpis.lowStockItems);
   assert.equal(operations.alerts.find((alert: { id: string }) => alert.id === 'expired-stock')?.count, Number(stockAlertCounts.expired));
   assert.equal(operations.alerts.find((alert: { id: string }) => alert.id === 'expiring-stock')?.count, Number(stockAlertCounts.expiring));

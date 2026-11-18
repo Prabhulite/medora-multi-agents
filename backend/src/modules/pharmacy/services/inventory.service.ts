@@ -1,10 +1,34 @@
 import { AppDataSource } from '../../../config/data-source.js';
 import { InventoryBatch, Medication, Patient, PatientAuditLog, Prescription, StockTransaction } from '../../../database/entities/index.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
-import type { AdjustStockInput, DispenseStockInput, DisposeStockInput, ReceiveStockInput, StockMovementListInput } from '../validators/inventory.validators.js';
+import type { AdjustStockInput, DispenseStockInput, DisposeStockInput, InventoryWorklistInput, ReceiveStockInput, StockMovementListInput } from '../validators/inventory.validators.js';
 import { assertNoRecordedAllergy } from '../../clinical/services/allergy-check.js';
 
 export const inventoryService = {
+  async worklist(input: InventoryWorklistInput) {
+    const query = AppDataSource.getRepository(InventoryBatch).createQueryBuilder('batch')
+      .leftJoinAndSelect('batch.medication', 'medication').where('batch.is_active = 1');
+    const summary = await AppDataSource.getRepository(InventoryBatch).createQueryBuilder('batch')
+      .select('COUNT(*)', 'batches')
+      .addSelect('COALESCE(SUM(batch.quantity), 0)', 'units')
+      .addSelect('COALESCE(SUM(batch.is_quarantined = 0 AND batch.expiry_date >= CURRENT_DATE() AND batch.quantity <= batch.reorder_level), 0)', 'lowStock')
+      .addSelect('COALESCE(SUM(batch.is_quarantined = 1), 0)', 'quarantined')
+      .addSelect('COALESCE(SUM(batch.quantity > 0 AND batch.expiry_date < CURRENT_DATE()), 0)', 'expired')
+      .addSelect('COALESCE(SUM(batch.is_quarantined = 0 AND batch.quantity > 0 AND batch.expiry_date BETWEEN CURRENT_DATE() AND DATE_ADD(CURRENT_DATE(), INTERVAL 90 DAY)), 0)', 'expiring')
+      .where('batch.is_active = 1').getRawOne<Record<string, string>>();
+    if (input.search) {
+      const escaped = input.search.replace(/[%_\\]/g, '\\$&');
+      query.andWhere('(medication.brand_name LIKE :search OR medication.generic_name LIKE :search OR medication.medicine_code LIKE :search OR batch.batch_number LIKE :search OR batch.storage_location LIKE :search)', { search: `%${escaped}%` });
+    }
+    if (input.alert === 'low-stock') query.andWhere('batch.is_quarantined = 0 AND batch.expiry_date >= CURRENT_DATE() AND batch.quantity <= batch.reorder_level');
+    if (input.alert === 'expired-stock') query.andWhere('batch.quantity > 0 AND batch.expiry_date < CURRENT_DATE()');
+    if (input.alert === 'expiring-stock') query.andWhere('batch.is_quarantined = 0 AND batch.quantity > 0 AND batch.expiry_date BETWEEN CURRENT_DATE() AND DATE_ADD(CURRENT_DATE(), INTERVAL 90 DAY)');
+    if (input.alert === 'quarantined-stock') query.andWhere('batch.is_quarantined = 1');
+    query.orderBy('batch.expiryDate', 'ASC').addOrderBy('batch.id', 'ASC')
+      .skip((input.page - 1) * input.pageSize).take(input.pageSize);
+    const [items, total] = await query.getManyAndCount();
+    return { items, total, page: input.page, pageSize: input.pageSize, summary: Object.fromEntries(Object.entries(summary ?? {}).map(([key, value]) => [key, Number(value)])) };
+  },
   async movements(batchId: number, input: StockMovementListInput) {
     const exists = await AppDataSource.getRepository(InventoryBatch).exist({ where: { id: batchId } });
     if (!exists) throw new NotFoundError('Inventory batch not found');
