@@ -4,7 +4,7 @@ import { authorize } from '../../../middleware/authorize.js';
 import { validate } from '../../../middleware/validate.js';
 import { asyncHandler } from '../../../shared/utils/asyncHandler.js';
 import { billingController } from '../controllers/billing.controller.js';
-import { cashierReportQuerySchema, closeoutQuerySchema, closeoutSchema, chargeIdParamSchema, chargeSchema, claimActionSchema, claimIdParamSchema, createClaimSchema, createInvoiceSchema, invoiceIdParamSchema, invoiceListQuerySchema, paymentSchema, refundSchema, updateChargeSchema } from '../validators/billing.validators.js';
+import { cashierReportQuerySchema, closeoutQuerySchema, closeoutSchema, chargeIdParamSchema, chargeSchema, claimActionSchema, claimIdParamSchema, createClaimSchema, createInvoiceSchema, invoiceIdParamSchema, invoiceListQuerySchema, paymentSchema, receivablesReportQuerySchema, refundSchema, updateChargeSchema } from '../validators/billing.validators.js';
 import { z } from 'zod';
 
 const router = Router(); router.use(authenticate);
@@ -12,6 +12,7 @@ router.get('/closeouts', authorize('billing.view'), validate(closeoutQuerySchema
 router.post('/closeouts', authorize('billing.closeout'), validate(closeoutSchema), asyncHandler(billingController.closeout));
 router.get('/payments/:id/receipt', authorize('billing.view'), validate(invoiceIdParamSchema, 'params'), asyncHandler(billingController.receipt));
 router.get('/reports/cashier', authorize('billing.view'), validate(cashierReportQuerySchema, 'query'), asyncHandler(billingController.cashierReport));
+router.get('/reports/receivables', authorize('billing.view'), validate(receivablesReportQuerySchema, 'query'), asyncHandler(billingController.receivablesReport));
 router.get('/charges', authorize('billing.view'), asyncHandler(billingController.charges));
 router.post('/charges', authorize('billing.charges.manage'), validate(chargeSchema), asyncHandler(billingController.createCharge));
 router.patch('/charges/:id', authorize('billing.charges.manage'), validate(chargeIdParamSchema, 'params'), validate(updateChargeSchema), asyncHandler(billingController.updateCharge));

@@ -296,7 +296,15 @@ try {
   }
   const cashierState = await evaluate('({ dialog: document.querySelector("[role=dialog]")?.innerText.slice(0, 600), path: location.pathname })');
   assert.ok(cashierReady, `Cashier operator breakdown did not render: ${JSON.stringify(cashierState)}`);
-  await evaluate('document.querySelector("#cashier-report-title").closest("[role=dialog]").querySelector("button[aria-label]").click(); [...document.querySelectorAll("button")].find(button => button.textContent?.includes("Cash closeouts")).click(); true');
+  await evaluate('document.querySelector("#cashier-report-title").closest("[role=dialog]").querySelector("button[aria-label]").click(); [...document.querySelectorAll("button")].find(button => button.textContent?.includes("Receivables")).click(); true');
+  let receivablesReady = false;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    receivablesReady = await evaluate('Boolean(document.querySelector("#receivables-title")) && document.body.innerText.includes("Invoice details") && Boolean(document.querySelector("#receivables-title").closest("[role=dialog]").querySelector(".billing-ledger-table tbody tr"))');
+    if (receivablesReady) break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.ok(receivablesReady, 'Receivables report did not render');
+  await evaluate('document.querySelector("#receivables-title").closest("[role=dialog]").querySelector("button[aria-label]").click(); [...document.querySelectorAll("button")].find(button => button.textContent?.includes("Cash closeouts")).click(); true');
   let closeoutsReady = false;
   for (let attempt = 0; attempt < 100; attempt++) {
     closeoutsReady = await evaluate('Boolean(document.querySelector("#cash-closeout-title")) && Boolean(document.querySelector(".billing-ledger-table"))');
@@ -315,7 +323,7 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   assert.ok(opdQueueReady, 'OPD consultation queue filters did not render');
-  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, communication queues, pharmacy patient forms${hasBatch ? ', stock movements and count form' : ''}, inpatient dashboard, patient registration${hasPatientRow ? ' and merge confirmation' : ''}, registration source management, history and report${patientLookup.body.data?.length ? ', radiology patient selection' : ''}${finalOrderNumber ? ', finalized radiology report print output' : ''}, cashier report, cash closeout review, and OPD queue rendered in headless Chrome.`);
+  console.log(`Browser smoke passed: authenticated laboratory and radiology worklists, communication queues, pharmacy patient forms${hasBatch ? ', stock movements and count form' : ''}, inpatient dashboard, patient registration${hasPatientRow ? ' and merge confirmation' : ''}, registration source management, history and report${patientLookup.body.data?.length ? ', radiology patient selection' : ''}${finalOrderNumber ? ', finalized radiology report print output' : ''}, cashier and receivables reports, cash closeout review, and OPD queue rendered in headless Chrome.`);
   await send('Browser.close').catch(() => undefined);
   socket.close();
 } finally {
