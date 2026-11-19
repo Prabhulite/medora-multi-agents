@@ -6,6 +6,7 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   error?: string;
   fieldKey?: string;
   passwordToggle?: boolean;
+  hint?: string;
 }
 
 function EyeIcon({ open }: { open: boolean }) {
@@ -37,6 +38,8 @@ export function Input({
   id,
   className = '',
   passwordToggle = false,
+  hint,
+  'aria-describedby': describedBy,
   type = 'text',
   ...props
 }: InputProps) {
@@ -55,6 +58,7 @@ export function Input({
           type={inputType}
           data-field={fieldKey || props.name || inputId}
           aria-invalid={Boolean(error)}
+          aria-describedby={[describedBy, hint ? `${inputId}-hint` : '', error ? `${inputId}-error` : ''].filter(Boolean).join(' ') || undefined}
           {...props}
         />
         {passwordToggle ? (
@@ -69,7 +73,8 @@ export function Input({
           </button>
         ) : null}
       </span>
-      {error ? <span className="ui-field__error">{error}</span> : null}
+      {hint ? <small id={`${inputId}-hint`}>{hint}</small> : null}
+      {error ? <span id={`${inputId}-error`} className="ui-field__error">{error}</span> : null}
     </label>
   );
 }

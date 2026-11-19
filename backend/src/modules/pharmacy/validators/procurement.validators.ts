@@ -4,6 +4,12 @@ export const createSupplierSchema = z.object({ code: z.string().trim().min(2).ma
 export const createPurchaseOrderSchema = z.object({ supplierId: positiveInt, orderDate: z.string().date(), expectedDate: z.string().date().nullable().optional(), notes: z.string().trim().max(2000).nullable().optional(), items: z.array(z.object({ medicationId: positiveInt, quantity: positiveInt.max(1000000), unitPrice: z.number().min(0).max(100000000) })).min(1) });
 export const receivePurchaseOrderSchema = z.object({ batchNumber: z.string().trim().min(1).max(80), expiryDate: z.string().date(), storageLocation: z.string().trim().max(120).nullable().optional(), reference: z.string().trim().max(160).nullable().optional() });
 export const purchaseOrderIdParamSchema = z.object({ id: z.coerce.number().int().positive() });
+const money = z.number().finite().positive().max(100000000).refine((value) => Math.abs(Math.round(value * 100) - value * 100) < 0.000001, 'Use at most two decimal places');
+export const createSupplierInvoiceSchema = z.object({ supplierId: positiveInt, purchaseOrderId: positiveInt.nullable().optional(), invoiceNumber: z.string().trim().min(1).max(80), invoiceDate: z.string().date(), dueDate: z.string().date().nullable().optional(), amount: money, notes: z.string().trim().max(2000).nullable().optional() });
+export const supplierInvoiceIdParamSchema = z.object({ id: z.coerce.number().int().positive() });
+export const createSupplierPaymentSchema = z.object({ amount: money, paidOn: z.string().date(), method: z.enum(['cash', 'bank_transfer', 'card', 'cheque', 'upi', 'other']), reference: z.string().trim().max(120).nullable().optional() });
+export type CreateSupplierInvoiceInput = z.infer<typeof createSupplierInvoiceSchema>;
+export type CreateSupplierPaymentInput = z.infer<typeof createSupplierPaymentSchema>;
 export type CreateSupplierInput = z.infer<typeof createSupplierSchema>;
 export type CreatePurchaseOrderInput = z.infer<typeof createPurchaseOrderSchema>;
 export type ReceivePurchaseOrderInput = z.infer<typeof receivePurchaseOrderSchema>;

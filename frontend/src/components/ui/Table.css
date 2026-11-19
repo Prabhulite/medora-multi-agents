@@ -222,6 +222,31 @@
   color: #015b2d;
 }
 
+.ui-table-panel--compact-index .ui-table th,
+.ui-table-panel--compact-index .ui-table td {
+  padding-block: 6px;
+  padding-inline: 10px;
+}
+
+.ui-table-panel--compact-index .ui-table th:first-child,
+.ui-table-panel--compact-index .ui-table td:first-child {
+  padding-inline: 8px;
+}
+
+.ui-table-panel--compact-index .ui-table__index {
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  font-weight: 500;
+}
+
+.ui-table-panel--compact-index .ui-table td,
+.ui-table-panel--compact-index .ui-table__cell-title {
+  font-weight: 500;
+}
+
 .ui-table__cell-title {
   font-family: var(--font);
   font-size: 13px;
@@ -305,6 +330,14 @@
 .ui-table-footer strong {
   color: #0f172a;
   font-weight: 700;
+}
+
+.ui-table-footer__right,
+.ui-table-footer__page-size {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .ui-table-pager {

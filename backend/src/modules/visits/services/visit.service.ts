@@ -9,7 +9,7 @@ import {
   PatientAuditLog,
 } from '../../../database/entities/index.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
-import { nextSequenceNumber } from '../../patients/services/number-sequence.service.js';
+import { nextMonthlyNumber, nextSequenceNumber } from '../../patients/services/number-sequence.service.js';
 import type { CreateOpCheckinInput, VisitListFilters } from '../validators/visit.validators.js';
 
 function patientFullName(patient: Patient | null | undefined) {
@@ -311,7 +311,7 @@ export const visitService = {
       await manager.getRepository(Doctor).createQueryBuilder('doctor')
         .setLock('pessimistic_write').where('doctor.id = :id', { id: doctor.id }).getOneOrFail();
       const visitNumber = await nextSequenceNumber(manager, 'VIS', 'VIS', 6);
-      const opNumber = await nextSequenceNumber(manager, 'OP', 'OP', 6);
+      const opNumber = await nextMonthlyNumber(manager, 'OP');
       const tokenNumber = await nextTokenForDoctor(manager, doctor.id, today);
 
       const visit = await manager.save(

@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Select } from '../../components/ui/Select';
 import { getErrorMessage } from '../../lib/api';
-import type { Doctor, OpCheckinAppointmentOption, Patient } from '../../types';
+import { hasPermission } from '../../lib/permissions';
+import type { Doctor, OpCheckinAppointmentOption, Patient, PatientGender } from '../../types';
+import { useAuth } from '../auth/AuthContext';
 import { doctorsApi } from '../doctors/doctors.api';
 import { patientsApi } from '../patients/patients.api';
 import { checkinApi } from './checkin.api';
@@ -32,6 +34,12 @@ const REFERRED_BY_OPTIONS = [
 
 export function CheckinPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const canRegister = hasPermission(user, 'patients.create');
+  const [registrationOpen, setShowRegistration] = useState(searchParams.get('mode') === 'register');
+  const showRegistration = canRegister && registrationOpen;
+  const [registering, setRegistering] = useState(false);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [appointments, setAppointments] = useState<OpCheckinAppointmentOption[]>([]);
 
@@ -161,6 +169,46 @@ export function CheckinPage() {
     setFieldErrors((prev) => ({ ...prev, patient: '' }));
   };
 
+  const registerPatient = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (registering || saving) return;
+    const fields = new FormData(event.currentTarget);
+    const firstName = String(fields.get('firstName') ?? '').trim();
+    const lastName = String(fields.get('lastName') ?? '').trim();
+    const mobileNumber = String(fields.get('mobile') ?? '').trim();
+    setError('');
+    if (!firstName || !/^[0-9+\-\s()]{8,20}$/.test(mobileNumber)) {
+      setError('Enter a first name and a valid mobile number.');
+      return;
+    }
+    setRegistering(true);
+    try {
+      const matches = await patientsApi.checkDuplicates({ firstName, lastName: lastName || null, mobileNumber });
+      if (matches.length) {
+        setError('A matching patient already exists. Search by mobile number and select their chart.');
+        setMrdQuery(mobileNumber);
+        setPatient(null);
+        setShowRegistration(false);
+        return;
+      }
+      const created = await patientsApi.create({
+        firstName,
+        lastName: lastName || null,
+        gender: String(fields.get('gender')) as PatientGender,
+        ageYears: Number(fields.get('age')),
+        ageIsApproximate: true,
+        contact: { mobileNumber },
+        createVisit: false,
+      });
+      selectPatient(created);
+      setShowRegistration(false);
+    } catch (err) {
+      setError(getErrorMessage(err, 'Unable to register patient'));
+    } finally {
+      setRegistering(false);
+    }
+  };
+
   const onSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (!searchOpen || !searchResults.length) return;
     if (event.key === 'ArrowDown') {
@@ -185,7 +233,8 @@ export function CheckinPage() {
     if (selected?.reason) setPurposeOfVisit(selected.reason);
   };
 
-  const submit = async () => {
+  const submit = async (openBill = false) => {
+    if (saving || registering || showRegistration) return;
     setError('');
     setSuccess('');
     const nextErrors: Record<string, string> = {};
@@ -213,7 +262,11 @@ export function CheckinPage() {
       setSuccess(
         `Checked in ${result.patientName} · OP ${result.opNumber || result.visitNumber} · Token ${result.tokenNumber ?? '—'}`,
       );
-      navigate('/checkin', { replace: true });
+      if (openBill) {
+        navigate(`/checkin/${result.id}/bill`, { replace: true, state: { visit: result } });
+      } else {
+        navigate('/checkin', { replace: true });
+      }
     } catch (err) {
       setError(getErrorMessage(err, 'Unable to check in patient'));
     } finally {
@@ -235,6 +288,31 @@ export function CheckinPage() {
 
       {error ? <Alert tone="error">{error}</Alert> : null}
       {success ? <Alert tone="success">{success}</Alert> : null}
+
+      {canRegister ? (
+        <section className="checkin-card">
+          <Button type="button" size="sm" variant="secondary" disabled={registering || saving}
+            aria-expanded={showRegistration} onClick={() => setShowRegistration((open) => !open)}>
+            {showRegistration ? 'Close registration' : 'Register new OP patient'}
+          </Button>
+          {showRegistration ? (
+            <form className="checkin-form__grid" onSubmit={(event) => void registerPatient(event)}>
+              <Input label="First name" name="firstName" required maxLength={80} />
+              <Input label="Last name" name="lastName" maxLength={80} />
+              <Input label="Mobile number" name="mobile" type="tel" required maxLength={20} />
+              <Select label="Gender" name="gender" required defaultValue="" options={[
+                { value: '', label: 'Select gender' },
+                { value: 'female', label: 'Female' },
+                { value: 'male', label: 'Male' },
+                { value: 'transgender', label: 'Transgender' },
+                { value: 'other', label: 'Other' },
+              ]} />
+              <Input label="Approximate age (years)" name="age" type="number" min={0} max={150} step={1} required />
+              <div><Button type="submit" size="sm" disabled={registering}>{registering ? 'Registering…' : 'Register and select'}</Button></div>
+            </form>
+          ) : null}
+        </section>
+      ) : null}
 
       <section className="checkin-card">
         <h2 className="checkin-card__title">OP Checkin</h2>
@@ -373,9 +451,14 @@ export function CheckinPage() {
           </div>
 
           <div className="checkin-actions">
-            <Button onClick={() => void submit()} disabled={saving}>
-              {saving ? 'Checking in…' : 'Checkin'}
+            <Button onClick={() => void submit()} disabled={saving || showRegistration}>
+              {saving ? 'Checking in…' : 'Check in'}
             </Button>
+            {hasPermission(user, 'billing.create') ? (
+              <Button variant="secondary" onClick={() => void submit(true)} disabled={saving || showRegistration}>
+                Check in and open bill
+              </Button>
+            ) : null}
           </div>
         </div>
       </section>

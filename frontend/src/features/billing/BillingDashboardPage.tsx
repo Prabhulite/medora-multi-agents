@@ -22,6 +22,7 @@ import { CashierReportPanel } from './CashierReportPanel';
 import { PaymentReceiptPanel } from './PaymentReceiptPanel';
 import { CashierCloseoutPanel } from './CashierCloseoutPanel';
 import { ReceivablesReportPanel } from './ReceivablesReportPanel';
+import { PatientBillPanel } from './PatientBillPanel';
 
 const currency = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
 
@@ -59,6 +60,7 @@ export function BillingDashboardPage() {
   const [showCharges, setShowCharges] = useState(false);
   const [showCashierReport, setShowCashierReport] = useState(false);
   const [receiptPaymentId, setReceiptPaymentId] = useState<number | null>(null);
+  const [billInvoice, setBillInvoice] = useState<BillingInvoice | null>(null);
   const [showCloseouts, setShowCloseouts] = useState(false);
   const [showReceivables, setShowReceivables] = useState(false);
 
@@ -89,6 +91,7 @@ export function BillingDashboardPage() {
     { key: 'paid', header: 'Paid', render: (row) => amount(row.paidAmount) },
     { key: 'balance', header: 'Balance', render: (row) => <strong className={Number(row.balanceAmount || 0) > 0 ? 'billing-amount--due' : ''}>{amount(row.balanceAmount ?? (Number(row.totalAmount || 0) - Number(row.paidAmount || 0)))}</strong> },
     { key: 'status', header: 'Status', render: (row) => <Badge tone={statusTone(row.status)}>{(row.status || 'draft').replace('_', ' ')}</Badge> },
+    { key: 'print', header: 'Patient bill', render: (row) => <Button size="sm" variant="secondary" onClick={() => setBillInvoice(row)}>Print bill</Button> },
     { key: 'refunds', header: 'Refunds', render: (row) => (row.payments?.length || 0) > 0 ? <Button size="sm" variant="secondary" onClick={() => setRefundInvoice(row)}>View / refund</Button> : <span>—</span> },
     { key: 'claim', header: 'Insurance', render: (row) => <Button size="sm" variant="secondary" onClick={() => setClaimInvoice(row)}>Claim</Button> },
   ], []);
@@ -136,6 +139,7 @@ export function BillingDashboardPage() {
     {showCharges ? <ChargeMasterPanel onClose={() => setShowCharges(false)} /> : null}
     {showCashierReport ? <CashierReportPanel onClose={() => setShowCashierReport(false)} /> : null}
     {receiptPaymentId !== null ? <PaymentReceiptPanel paymentId={receiptPaymentId} onClose={() => setReceiptPaymentId(null)} /> : null}
+    {billInvoice ? <PatientBillPanel invoice={billInvoice} onClose={() => setBillInvoice(null)} /> : null}
     {showCloseouts ? <CashierCloseoutPanel onClose={() => setShowCloseouts(false)} /> : null}
     {showReceivables ? <ReceivablesReportPanel onClose={() => setShowReceivables(false)} /> : null}
   </div>;

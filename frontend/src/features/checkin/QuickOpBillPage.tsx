@@ -6,7 +6,9 @@ import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { getErrorMessage } from '../../lib/api';
 import type { Doctor, OpCheckinVisit, Patient, ServiceMaster } from '../../types';
-import { billingApi } from '../billing/billing.api';
+import { billingApi, type BillingInvoice } from '../billing/billing.api';
+import { PatientBillPanel } from '../billing/PatientBillPanel';
+import '../billing/BillingDashboardPage.css';
 import { doctorsApi } from '../doctors/doctors.api';
 import { patientsApi } from '../patients/patients.api';
 import { servicesApi } from '../services/services.api';
@@ -112,6 +114,7 @@ export function QuickOpBillPage() {
   const [services, setServices] = useState<ServiceMaster[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savedInvoice, setSavedInvoice] = useState<BillingInvoice | null>(null);
   const [error, setError] = useState('');
 
   const [locationName, setLocationName] = useState('Main Branch');
@@ -123,7 +126,6 @@ export function QuickOpBillPage() {
     stateVisit?.purposeOfVisit || stateVisit?.natureOfVisit || 'Consultation',
   );
   const [search, setSearch] = useState('');
-  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [items, setItems] = useState<LineItem[]>([]);
   const [paymentMode, setPaymentMode] = useState<'single' | 'multiple'>('single');
   const [paymentType, setPaymentType] = useState('cash');
@@ -163,12 +165,12 @@ export function QuickOpBillPage() {
         const [patientRow, doctorRows, serviceRows] = await Promise.all([
           patientsApi.getById(visitRow.patientId),
           doctorsApi.list(),
-          servicesApi.listActive().catch(() => [] as ServiceMaster[]),
+          servicesApi.listActive(),
         ]);
         if (!active) return;
         setPatient(patientRow);
         setDoctors(doctorRows.filter((row) => row.isActive));
-        setServices(serviceRows);
+        setServices(serviceRows.filter((row) => row.billingApplicable === 'OP' || row.billingApplicable === 'Both'));
       })
       .catch((err) => {
         if (active) setError(getErrorMessage(err, 'Unable to load quick bill data'));
@@ -184,14 +186,12 @@ export function QuickOpBillPage() {
 
   const suggestions = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (q.length < 2) return [];
     return services
       .filter((service) =>
         `${service.serviceName} ${service.serviceCode} ${service.categoryName || ''}`
           .toLowerCase()
           .includes(q),
-      )
-      .slice(0, 8);
+      );
   }, [search, services]);
 
   const itemTotals = useMemo(
@@ -225,7 +225,31 @@ export function QuickOpBillPage() {
       },
     ]);
     setSearch('');
-    setSuggestionsOpen(false);
+    setError('');
+  };
+
+  const addCustomParticular = () => {
+    const name = search.trim();
+    if (name.length < 2) {
+      setError('Enter at least 2 characters for the particular');
+      return;
+    }
+    setItems((current) => [
+      ...current,
+      {
+        key: `custom-${Date.now()}-${current.length}`,
+        serviceId: null,
+        name,
+        qty: '1',
+        price: '',
+        gstPercent: '0',
+        discountPercent: '0',
+        allowDiscount: true,
+        allowQuantity: true,
+      },
+    ]);
+    setSearch('');
+    setError('');
   };
 
   const updateItem = (key: string, patch: Partial<LineItem>) => {
@@ -240,7 +264,9 @@ export function QuickOpBillPage() {
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    const printAfterSave = (event.nativeEvent as SubmitEvent).submitter?.getAttribute('value') === 'print';
     if (!visit) return;
+    if (savedInvoice) return;
     setError('');
     if (!consultantId) {
       setError('Consultant is required');
@@ -252,6 +278,10 @@ export function QuickOpBillPage() {
     }
     if (!items.length) {
       setError('Add at least one particular to the bill');
+      return;
+    }
+    if (items.some((item) => !Number.isFinite(Number(item.qty)) || Number(item.qty) <= 0 || item.price.trim() === '' || !Number.isFinite(Number(item.price)) || Number(item.price) < 0)) {
+      setError('Enter a valid quantity and price for every particular');
       return;
     }
 
@@ -280,6 +310,7 @@ export function QuickOpBillPage() {
         notes: noteParts.join(' | '),
         items: invoiceItems,
       });
+      setSavedInvoice(invoice);
 
       if (receivedValue > 0 && invoice.id) {
         await billingApi.recordPayment({
@@ -288,6 +319,17 @@ export function QuickOpBillPage() {
           method: paymentType as 'cash' | 'card' | 'upi' | 'bank_transfer',
           reference: `Quick bill ${invoice.invoiceNumber}`,
         });
+      }
+
+      if (printAfterSave) {
+        try {
+          const updated = (await billingApi.listInvoices(visit.patientId))
+            .find((row) => row.id === invoice.id);
+          setSavedInvoice(updated ?? invoice);
+        } catch {
+          setSavedInvoice(invoice);
+        }
+        return;
       }
 
       navigate('/checkin', {
@@ -388,48 +430,39 @@ export function QuickOpBillPage() {
         </div>
 
         <div className="qob-card">
-          <div className="qob-search">
-            <svg
-              className="qob-search__icon"
-              viewBox="0 0 24 24"
-              width="16"
-              height="16"
-              aria-hidden="true"
-            >
-              <path
-                fill="currentColor"
-                d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
-              />
-            </svg>
-            <input
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
-                setSuggestionsOpen(true);
-              }}
-              onFocus={() => setSuggestionsOpen(true)}
-              placeholder="Search particular"
-              aria-label="Search particular"
-            />
-            {suggestionsOpen && suggestions.length ? (
-              <div className="qob-suggestions">
+          <div className="qob-service-picker">
+            <label>
+              Search services
+              <input type="search" value={search} onChange={(event) => setSearch(event.target.value)}
+                placeholder="Name, code, or category" />
+            </label>
+            <label>
+              Select service
+              <select value="" onChange={(event) => {
+                if (event.target.value === 'custom') {
+                  addCustomParticular();
+                  return;
+                }
+                const service = suggestions.find((option) => String(option.id) === event.target.value);
+                if (service) addService(service);
+              }}>
+                <option value="" disabled>
+                  {suggestions.length ? 'Choose a particular' : services.length ? 'No matching services' : 'No active services configured'}
+                </option>
                 {suggestions.map((service) => (
-                  <button
-                    key={service.id}
-                    type="button"
-                    className="qob-suggestion"
-                    onClick={() => addService(service)}
-                  >
-                    <strong>{service.serviceName}</strong>
-                    <span>
-                      {service.categoryName || 'Service'} · {money(service.defaultPrice)}
-                      {service.taxPercent != null ? ` · GST ${service.taxPercent}%` : ''}
-                    </span>
-                  </button>
+                  <option key={service.id} value={service.id}>
+                    {service.serviceName} — {money(service.defaultPrice)}{service.description?.includes('placeholder price') ? ' (placeholder)' : ''}
+                  </option>
                 ))}
-              </div>
-            ) : null}
+                {search.trim().length >= 2 && (
+                  <option value="custom">Use "{search.trim()}" as a custom particular (enter price below)</option>
+                )}
+              </select>
+            </label>
           </div>
+          {services.some((service) => service.description?.includes('placeholder price')) && (
+            <p className="qob-price-notice">Starter service prices of ₹1–₹3 are placeholders. Confirm and update each price before charging a patient.</p>
+          )}
 
           <div className="qob-table-wrap">
             <table className="qob-table">
@@ -451,7 +484,7 @@ export function QuickOpBillPage() {
                 {itemTotals.length === 0 ? (
                   <tr>
                     <td className="qob-table__empty" colSpan={10}>
-                      Search a particular to add it.
+                      Search and select a service, or type a particular and choose the custom option.
                     </td>
                   </tr>
                 ) : (
@@ -616,11 +649,20 @@ export function QuickOpBillPage() {
           <Button type="button" variant="secondary" size="sm" onClick={goBack}>
             Cancel
           </Button>
-          <Button type="submit" size="sm" loading={saving} disabled={loading || !visit}>
+          <Button type="submit" size="sm" loading={saving} disabled={loading || !visit || !!savedInvoice}>
             Save Bill
+          </Button>
+          <Button type="submit" value="print" size="sm" loading={saving} disabled={loading || !visit || !!savedInvoice}>
+            Save and Print
           </Button>
         </footer>
       </form>
+      {savedInvoice && !saving ? (
+        <PatientBillPanel invoice={savedInvoice} onClose={() => navigate('/checkin', {
+          replace: true,
+          state: { notice: `OP bill saved for ${visit?.patientName ?? 'patient'}.` },
+        })} />
+      ) : null}
     </div>
   );
 }

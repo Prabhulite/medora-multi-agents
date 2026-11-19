@@ -23,12 +23,13 @@ function asDate(value?: string | null) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
-export function PatientRecordsTab({ patient, mode }: { patient: Patient; mode: PatientRecordsMode }) {
+export function PatientRecordsTab({ patient, mode, previewPrescriptionId }: { patient: Patient; mode: PatientRecordsMode; previewPrescriptionId?: number | null }) {
   const { user } = useAuth();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [preview, setPreview] = useState<Prescription | null>(null);
+  const printItems = preview ? rows.map((row) => row.prescription).filter((item): item is Prescription => !!item && (preview.encounterId ? item.encounterId === preview.encounterId && item.prescriberName === preview.prescriberName : item.id === preview.id)) : [];
 
   const permitted = mode === 'Visit' ? hasPermission(user, 'patients.view')
     : mode === 'Bills' ? hasPermission(user, 'billing.view')
@@ -55,12 +56,12 @@ export function PatientRecordsTab({ patient, mode }: { patient: Patient; mode: P
         ...imaging.map((row): Row => ({ key: `radiology-${row.id}`, title: `Imaging: ${row.studyName}`, detail: row.orderNumber, at: row.orderedAt, status: row.status })),
       ].sort((a, b) => new Date(b.at || 0).getTime() - new Date(a.at || 0).getTime());
     };
-    load().then((result) => { if (active) setRows(result); }).catch((err) => { if (active) setError(getErrorMessage(err, `Unable to load ${mode.toLowerCase()} records`)); }).finally(() => { if (active) setLoading(false); });
+    load().then((result) => { if (active) { setRows(result); if (mode === 'Rx' && previewPrescriptionId) setPreview(result.find((row) => row.prescription?.id === previewPrescriptionId)?.prescription ?? null); } }).catch((err) => { if (active) setError(getErrorMessage(err, `Unable to load ${mode.toLowerCase()} records`)); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [patient, mode, permitted, user]);
 
   return <section className="pd-card pd-card--wide">
-    <div className="pd-card__head"><h3>{mode === 'Rx' ? 'Prescriptions' : mode === 'Tests' ? 'Diagnostic tests' : mode === 'Visit' ? 'Visits' : mode === 'Bills' ? 'Patient bills' : 'Appointments'}</h3><div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>{mode === 'Rx' && rows.length ? <Button size="sm" variant="secondary" onClick={() => window.print()}>Print medication list</Button> : null}<Badge tone="info">{rows.length} records</Badge></div></div>
+    <div className="pd-card__head"><h3>{mode === 'Rx' ? 'Prescriptions' : mode === 'Tests' ? 'Diagnostic tests' : mode === 'Visit' ? 'Visits' : mode === 'Bills' ? 'Patient bills' : 'Appointments'}</h3><Badge tone="info">{rows.length} records</Badge></div>
     {!permitted ? <Alert tone="error">You do not have permission to view these records.</Alert> : error ? <Alert tone="error">{error}</Alert> : loading ? <Loader size="sm" variant="block" label="Loading records…" /> : rows.length ? <div className="pd-card__body pd-visits">
       {rows.map((row) => <div className="pd-visit-row" key={row.key}>
         <div><div className="ui-table__cell-title">{row.title}</div><div className="ui-table__cell-sub">{[row.detail, row.status].filter(Boolean).join(' · ')}</div></div>
@@ -75,17 +76,23 @@ export function PatientRecordsTab({ patient, mode }: { patient: Patient; mode: P
         <section className="rx-print__sheet" aria-label="Prescription preview">
           <h2>Medication prescription</h2>
           <p>{patient.fullName} · MRD {patient.mrdNumber}</p>
-          <p>Prescription #{preview.id} · {asDate(preview.createdAt)}</p>
-          <h3>{preview.medicineName}</h3>
+          <p>{preview.encounterId ? `Consultation #${preview.encounterId}` : `Prescription #${preview.id}`} · {asDate(preview.createdAt)}</p>
           <dl>
-            <dt>Status</dt><dd>{preview.status}</dd>
-            <dt>Dosage</dt><dd>{preview.dosage || 'Not recorded'}</dd>
-            <dt>Frequency</dt><dd>{preview.frequency || 'Not recorded'}</dd>
-            <dt>Route</dt><dd>{preview.route || 'Not recorded'}</dd>
-            <dt>Duration</dt><dd>{preview.durationDays == null ? 'Not recorded' : `${preview.durationDays} days`}</dd>
-            <dt>Quantity</dt><dd>{preview.quantityPrescribed ?? 'Not recorded'}</dd>
-            <dt>Instructions</dt><dd>{preview.instructions || 'None recorded'}</dd>
+            <dt>Prescriber</dt><dd>{preview.prescriberName || 'Not recorded'}</dd>
+            {preview.prescriberRegistration ? <><dt>Registration number</dt><dd>{preview.prescriberRegistration}</dd></> : null}
           </dl>
+          {printItems.map((item, index) => <section key={item.id} className="rx-print__medicine">
+            <h3>{index + 1}. {item.medicineName}</h3>
+            <dl>
+              <dt>Status</dt><dd>{item.status}</dd>
+              <dt>Dosage</dt><dd>{item.dosage || 'Not recorded'}</dd>
+              <dt>Frequency</dt><dd>{item.frequency || 'Not recorded'}</dd>
+              <dt>Route</dt><dd>{item.route || 'Not recorded'}</dd>
+              <dt>Duration</dt><dd>{item.durationDays == null ? 'Not recorded' : `${item.durationDays} days`}</dd>
+              <dt>Quantity</dt><dd>{item.quantityPrescribed ?? 'Not recorded'}</dd>
+              <dt>Instructions</dt><dd>{item.instructions || 'None recorded'}</dd>
+            </dl>
+          </section>)}
           <div className="rx-print__actions">
             <Button onClick={() => window.print()}>Print prescription</Button>
             <Button variant="secondary" onClick={() => setPreview(null)}>Close preview</Button>

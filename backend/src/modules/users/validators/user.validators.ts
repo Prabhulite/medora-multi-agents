@@ -29,7 +29,7 @@ export const createUserSchema = z.object({
   email: optionalEmail,
   gender: genderSchema,
   designation: z
-    .union([z.string().trim().max(120), z.literal('')])
+    .string().trim().max(120).nullable()
     .optional()
     .transform((value) => (value ? value : null)),
   departmentId: z.number().int().positive('Department is required'),
@@ -58,7 +58,7 @@ export const updateUserSchema = z
     email: optionalEmail,
     gender: genderSchema,
     designation: z
-      .union([z.string().trim().max(120), z.literal('')])
+      .string().trim().max(120).nullable()
       .optional()
       .transform((value) => (value === undefined ? undefined : value ? value : null)),
     departmentId: z.number().int().positive().nullable().optional(),

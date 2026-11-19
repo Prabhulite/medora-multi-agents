@@ -559,7 +559,7 @@ export interface UpsertPatientPayload {
     alternateMobile?: string | null;
     email?: string | null;
   };
-  address: {
+  address?: {
     addressLine1: string;
     addressLine2?: string | null;
     country: string;
@@ -646,6 +646,8 @@ export interface UpdateClinicalEncounterPayload {
 }
 
 export interface Prescription {
+  prescriberName?: string | null;
+  prescriberRegistration?: string | null;
   id: number;
   patientId: number;
   encounterId: number | null;

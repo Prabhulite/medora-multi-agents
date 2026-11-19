@@ -21,6 +21,7 @@ import { CarePlanPanel } from './CarePlanPanel';
 import { NursingHandoffPanel } from './NursingHandoffPanel';
 import { DischargeReviewForm } from './DischargeReviewForm';
 import { AdmissionMedicationReviewPanel } from './AdmissionMedicationReviewPanel';
+import { IntakeOutputPanel } from './IntakeOutputPanel';
 
 type Tab = 'overview' | 'beds' | 'admissions';
 
@@ -44,7 +45,7 @@ export function InpatientDashboardPage() {
   const linkedTab = searchParams.get('tab');
   const canDischarge = ['inpatient.view', 'inpatient.update', 'clinical.view', 'clinical.update'].every((permission) => hasPermission(user, permission));
   const canReviewHomeMedications = ['inpatient.view', 'inpatient.update', 'clinical.view'].every((permission) => hasPermission(user, permission));
-  const [tab, setTab] = useState<Tab>('overview');
+  const [tab, setTab] = useState<Tab>(window.location.pathname === '/nursing' ? 'admissions' : 'overview');
   const [wards, setWards] = useState<Ward[]>([]);
   const [beds, setBeds] = useState<Bed[]>([]);
   const [admissions, setAdmissions] = useState<Admission[]>([]);
@@ -56,6 +57,7 @@ export function InpatientDashboardPage() {
   const [dischargeTarget, setDischargeTarget] = useState<Admission | null>(null);
   const [dischargeView, setDischargeView] = useState<Admission | null>(null);
   const [observationTarget, setObservationTarget] = useState<Admission | null>(null);
+  const [intakeOutputTarget, setIntakeOutputTarget] = useState<Admission | null>(null);
   const [transferTarget, setTransferTarget] = useState<Admission | null>(null);
   const [medicationTarget, setMedicationTarget] = useState<Admission | null>(null);
   const [admissionReviewTarget, setAdmissionReviewTarget] = useState<Admission | null>(null);
@@ -148,7 +150,7 @@ export function InpatientDashboardPage() {
     { key: 'doctor', header: 'Attending doctor', render: (row) => <span>{row.attendingDoctor}</span> },
     { key: 'type', header: 'Type', render: (row) => <span className="inpatient-capitalize">{row.admissionType.replace('_', ' ')}</span> },
     { key: 'status', header: 'Status', render: (row) => <Badge tone={admissionTone[row.status]}>{row.status}</Badge> },
-    { key: 'action', header: 'Action', render: (row) => <div className="inpatient-row-actions"><Button size="sm" variant="secondary" onClick={() => { setObservationTarget(row); void inpatientApi.listObservations(row.id).then(setObservations).catch((err) => setError(getErrorMessage(err))); }}>Observations</Button><Button size="sm" variant="secondary" onClick={() => setCarePlanTarget(row)}>Care plans</Button><Button size="sm" variant="secondary" onClick={() => setHandoffTarget(row)}>Handoffs</Button><Button size="sm" variant="secondary" onClick={() => setMedicationTarget(row)}>Medications</Button>{['admitted', 'transferred'].includes(row.status) && canReviewHomeMedications ? <Button size="sm" variant="secondary" onClick={() => setAdmissionReviewTarget(row)}>Admission medication review</Button> : null}<Button size="sm" variant="secondary" onClick={() => { setTransferTarget(row); void inpatientApi.listTransfers(row.id).then(setTransfers).catch((err) => setError(getErrorMessage(err))); }}>Transfers</Button>{['admitted', 'transferred'].includes(row.status) && canDischarge ? <Button size="sm" variant="secondary" onClick={() => setDischargeTarget(row)}>Discharge</Button> : row.status === 'discharged' ? <Button size="sm" variant="secondary" onClick={() => setDischargeView(row)}>View discharge</Button> : null}</div> },
+    { key: 'action', header: 'Action', render: (row) => <div className="inpatient-row-actions"><Button size="sm" variant="secondary" onClick={() => { setObservationTarget(row); void inpatientApi.listObservations(row.id).then(setObservations).catch((err) => setError(getErrorMessage(err))); }}>Observations</Button><Button size="sm" variant="secondary" onClick={() => setIntakeOutputTarget(row)}>Intake/output</Button><Button size="sm" variant="secondary" onClick={() => setCarePlanTarget(row)}>Care plans</Button><Button size="sm" variant="secondary" onClick={() => setHandoffTarget(row)}>Handoffs</Button><Button size="sm" variant="secondary" onClick={() => setMedicationTarget(row)}>Medications</Button>{['admitted', 'transferred'].includes(row.status) && canReviewHomeMedications ? <Button size="sm" variant="secondary" onClick={() => setAdmissionReviewTarget(row)}>Admission medication review</Button> : null}<Button size="sm" variant="secondary" onClick={() => { setTransferTarget(row); void inpatientApi.listTransfers(row.id).then(setTransfers).catch((err) => setError(getErrorMessage(err))); }}>Transfers</Button>{['admitted', 'transferred'].includes(row.status) && canDischarge ? <Button size="sm" variant="secondary" onClick={() => setDischargeTarget(row)}>Discharge</Button> : row.status === 'discharged' ? <Button size="sm" variant="secondary" onClick={() => setDischargeView(row)}>View discharge</Button> : null}</div> },
   ], [canDischarge, canReviewHomeMedications]);
 
   const saveAdmission = async (payload: CreateAdmissionPayload) => {
@@ -208,6 +210,7 @@ export function InpatientDashboardPage() {
     {showForm ? <AdmissionForm wards={wards} beds={availableBeds} saving={saving} onClose={() => setShowForm(false)} onSubmit={(payload) => void saveAdmission(payload)} /> : null}
     {dischargeTarget ? <DischargeReviewForm admission={dischargeTarget} saving={saving} submitError={error} onClose={() => setDischargeTarget(null)} onSubmit={(payload) => void saveDischarge(payload)} /> : null}
     {dischargeView ? <DischargeSummaryView admission={dischargeView} onClose={() => setDischargeView(null)} /> : null}
+    {intakeOutputTarget ? <IntakeOutputPanel admission={intakeOutputTarget} onClose={() => setIntakeOutputTarget(null)} /> : null}
     {observationTarget ? <ObservationPanel admission={observationTarget} observations={observations} onClose={() => setObservationTarget(null)} onSave={async (payload) => { await inpatientApi.addObservation(observationTarget.id, payload); setObservations(await inpatientApi.listObservations(observationTarget.id)); }} /> : null}
     {transferTarget ? <TransferPanel admission={transferTarget} availableBeds={availableBeds} transfers={transfers} onClose={() => setTransferTarget(null)} onSave={async (toBedId, reason) => { await inpatientApi.transfer(transferTarget.id, toBedId, reason); setTransfers(await inpatientApi.listTransfers(transferTarget.id)); await load(); }} /> : null}
     {medicationTarget ? <MedicationAdministrationPanel admission={medicationTarget} onClose={() => setMedicationTarget(null)} /> : null}

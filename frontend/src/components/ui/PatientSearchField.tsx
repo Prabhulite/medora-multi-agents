@@ -96,10 +96,10 @@ export function PatientSearchField({
 
   return (
     <label className={`patient-search-field ${className}`.trim()}>
-      <span className="patient-search-field__label">
+      {label ? <span className="patient-search-field__label">
         {label}
         {required ? <span className="patient-search-field__required">*</span> : null}
-      </span>
+      </span> : null}
       <span className="patient-search-field__control">
         <input
           type="search"

@@ -37,6 +37,14 @@ import { rateLimit } from './middleware/rateLimit.js';
 import fhirRoutes from './modules/interoperability/routes/fhir.routes.js';
 import bloodBankRoutes from './modules/blood-bank/routes/blood-bank.routes.js';
 import notificationRoutes from './modules/notifications/routes/notification.routes.js';
+import expenseRoutes from './modules/expenses/routes/expense.routes.js';
+import supportTicketRoutes from './modules/support-tickets/support-ticket.routes.js';
+import chatRoutes from './modules/chat/chat.routes.js';
+import vaccinationRoutes from './modules/vaccination/vaccination.routes.js';
+import intakeOutputRoutes from './modules/intake-output/intake-output.routes.js';
+import glucoseRoutes from './modules/glucose-monitoring/glucose.routes.js';
+import fixedAssetsRoutes from './modules/fixed-assets/fixed-assets.routes.js';
+import { automationRoutes } from './modules/automation/automation.routes.js';
 
 export function createApp() {
   const app = express();
@@ -101,6 +109,14 @@ export function createApp() {
   app.use('/api/ambulance', ambulanceRoutes);
   app.use('/api/blood-bank', bloodBankRoutes);
   app.use('/api/notifications', notificationRoutes);
+  app.use('/api/expenses', expenseRoutes);
+  app.use('/api/support-tickets', supportTicketRoutes);
+  app.use('/api/chat', chatRoutes);
+  app.use('/api/vaccination', vaccinationRoutes);
+  app.use('/api/intake-output', intakeOutputRoutes);
+  app.use('/api/glucose-monitoring', glucoseRoutes);
+  app.use('/api/fixed-assets', fixedAssetsRoutes);
+  app.use('/api/automation', automationRoutes);
   app.use('/api/hospital-profile', hospitalProfileRoutes);
   app.use('/api/roles', roleRoutes);
   app.use('/api/menus', menuRoutes);

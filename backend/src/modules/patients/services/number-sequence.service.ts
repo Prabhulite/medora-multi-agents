@@ -14,7 +14,7 @@ export async function nextSequenceNumber(
   const yearCode = currentYearCode();
   const repo = manager.getRepository(NumberSequence);
   await manager.query(
-    'INSERT INTO `number_sequences` (`sequence_key`, `prefix`, `year_code`, `last_number`, `pad_length`) VALUES (?, ?, ?, 1, ?) ON DUPLICATE KEY UPDATE `last_number` = `last_number` + 1',
+    'INSERT INTO `number_sequences` (`sequence_key`, `prefix`, `year_code`, `last_number`, `pad_length`) VALUES (?, ?, ?, 1, ?) ON DUPLICATE KEY UPDATE `last_number` = `last_number` + 1, `pad_length` = VALUES(`pad_length`)',
     [sequenceKey, prefix, yearCode, padLength],
   );
   const sequence = await repo
@@ -30,4 +30,24 @@ export async function nextSequenceNumber(
 
   const padded = String(sequence.lastNumber).padStart(sequence.padLength || padLength, '0');
   return `${sequence.prefix}-${sequence.yearCode}-${padded}`;
+}
+
+export async function nextMonthlyNumber(
+  manager: EntityManager,
+  sequenceKey: 'OP' | 'IP',
+  date = new Date(),
+): Promise<string> {
+  const monthCode = `${String(date.getFullYear()).slice(-2)}${String(date.getMonth() + 1).padStart(2, '0')}`;
+  await manager.query(
+    'INSERT INTO `number_sequences` (`sequence_key`, `prefix`, `year_code`, `last_number`, `pad_length`) VALUES (?, ?, ?, 1, 0) ON DUPLICATE KEY UPDATE `last_number` = `last_number` + 1',
+    [sequenceKey, sequenceKey, monthCode],
+  );
+  const sequence = await manager.getRepository(NumberSequence)
+    .createQueryBuilder('seq')
+    .setLock('pessimistic_write')
+    .where('seq.sequence_key = :sequenceKey', { sequenceKey })
+    .andWhere('seq.year_code = :monthCode', { monthCode })
+    .getOne();
+  if (!sequence) throw new Error(`Unable to allocate monthly sequence for ${sequenceKey}`);
+  return `${sequenceKey}-${monthCode}-${sequence.lastNumber}`;
 }

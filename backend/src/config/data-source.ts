@@ -97,6 +97,17 @@ import {
   User,
 } from '../database/entities/index.js';
 import { env } from './env.js';
+import { ExpenseActivity } from '../database/entities/ExpenseActivity.js';
+import { SupportTicket } from '../database/entities/SupportTicket.js';
+import { SupportTicketResponse } from '../database/entities/SupportTicketResponse.js';
+import { ChatMessage } from '../database/entities/ChatMessage.js';
+import { SupplierInvoice } from '../database/entities/SupplierInvoice.js';
+import { SupplierInvoicePayment } from '../database/entities/SupplierInvoicePayment.js';
+import { Vaccine } from '../database/entities/Vaccine.js';
+import { PatientImmunization } from '../database/entities/PatientImmunization.js';
+import { GlucoseReading } from '../database/entities/GlucoseReading.js';
+import { FixedAsset } from '../database/entities/FixedAsset.js';
+import { FixedAssetMaintenance } from '../database/entities/FixedAssetMaintenance.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -109,6 +120,17 @@ export const AppDataSource = new DataSource({
   password: env.DB_PASSWORD,
   database: env.DB_NAME,
   entities: [
+    Vaccine,
+    PatientImmunization,
+    GlucoseReading,
+    FixedAsset,
+    FixedAssetMaintenance,
+    ExpenseActivity,
+    SupportTicket,
+    SupportTicketResponse,
+    ChatMessage,
+    SupplierInvoice,
+    SupplierInvoicePayment,
     User,
     Role,
     Permission,

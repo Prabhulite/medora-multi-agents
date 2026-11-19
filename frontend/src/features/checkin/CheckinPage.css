@@ -391,3 +391,30 @@
     max-width: none;
   }
 }
+.checkin-bill-picker__list {
+  display: grid;
+  gap: 8px;
+  max-height: 55vh;
+  overflow-y: auto;
+  margin: 16px 0;
+}
+
+.checkin-bill-picker__item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.checkin-bill-picker__item:hover,
+.checkin-bill-picker__item:focus-visible {
+  background: #f0f8f3;
+  border-color: #70b58c;
+}

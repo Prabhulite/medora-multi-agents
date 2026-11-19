@@ -6,4 +6,7 @@ export const procurementController = {
   listOrders: async (_req: Request, res: Response) => res.json({ success: true, data: await procurementService.listOrders() }),
   createOrder: async (req: Request, res: Response) => res.status(201).json({ success: true, data: await procurementService.createOrder(req.body, req.user?.id ?? null) }),
   receiveOrder: async (req: Request, res: Response) => res.json({ success: true, data: await procurementService.receiveOrder(Number(req.params.id), req.body, req.user?.id ?? null) }),
+  listInvoices: async (_req: Request, res: Response) => res.json({ success: true, data: await procurementService.listInvoices() }),
+  createInvoice: async (req: Request, res: Response) => res.status(201).json({ success: true, data: await procurementService.createInvoice(req.body) }),
+  createPayment: async (req: Request, res: Response) => res.status(201).json({ success: true, data: await procurementService.createPayment(Number(req.params.id), req.body, req.user?.id ?? null) }),
 };

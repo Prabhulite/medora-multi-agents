@@ -10,6 +10,7 @@ import './DraftEncounterEditor.css';
 
 const vitalFields = [
   ['temperature', 'Temperature (°C)'], ['pulse', 'Pulse (bpm)'], ['bloodPressure', 'Blood pressure'],
+  ['bloodGlucose', 'Blood glucose (mg/dL)'], ['respiratoryRate', 'Respiratory rate (per minute)'],
   ['spo2', 'SpO₂ (%)'], ['weight', 'Weight (kg)'],
 ] as const;
 

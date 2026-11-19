@@ -21,6 +21,10 @@ const DoctorWorkspacePage = lazy(() => import('../features/doctors/DoctorWorkspa
 const HospitalProfilePage = lazy(() => import('../features/hospital-profile/HospitalProfilePage').then((module) => ({ default: module.HospitalProfilePage })));
 const AppointmentFormPage = lazy(() => import('../features/appointments/AppointmentFormPage').then((module) => ({ default: module.AppointmentFormPage })));
 const AppointmentsPage = lazy(() => import('../features/appointments/AppointmentsPage').then((module) => ({ default: module.AppointmentsPage })));
+const ExpensesPage = lazy(() => import('../features/expenses/ExpensesPage').then((module) => ({ default: module.ExpensesPage })));
+const SupportTicketsPage = lazy(() => import('../features/support-tickets/SupportTicketsPage').then((module) => ({ default: module.SupportTicketsPage })));
+const ChatPage = lazy(() => import('../features/chat/ChatPage').then((module) => ({ default: module.ChatPage })));
+const PrescriptionsPage = lazy(() => import('../features/clinical/PrescriptionsPage').then((module) => ({ default: module.PrescriptionsPage })));
 const CheckinPage = lazy(() => import('../features/checkin/CheckinPage').then((module) => ({ default: module.CheckinPage })));
 const CheckinListPage = lazy(() => import('../features/checkin/CheckinListPage').then((module) => ({ default: module.CheckinListPage })));
 const QuickOpBillPage = lazy(() => import('../features/checkin/QuickOpBillPage').then((module) => ({ default: module.QuickOpBillPage })));
@@ -38,6 +42,8 @@ const EmergencyPage = lazy(() => import('../features/emergency/EmergencyPage').t
 const SurgeryPage = lazy(() => import('../features/surgery/SurgeryPage').then((module) => ({ default: module.SurgeryPage })));
 const RosterPage = lazy(() => import('../features/roster/RosterPage').then((module) => ({ default: module.RosterPage })));
 const AmbulancePage = lazy(() => import('../features/ambulance/AmbulancePage').then((module) => ({ default: module.AmbulancePage })));
+const VaccinationPage = lazy(() => import('../features/vaccination/VaccinationPage').then((module) => ({ default: module.VaccinationPage })));
+const FixedAssetsPage = lazy(() => import('../features/fixed-assets/FixedAssetsPage').then((module) => ({ default: module.FixedAssetsPage })));
 const BloodBankPage = lazy(() => import('../features/blood-bank/BloodBankPage').then((module) => ({ default: module.BloodBankPage })));
 const NotificationsPage = lazy(() => import('../features/notifications/NotificationsPage').then((module) => ({ default: module.NotificationsPage })));
 const PharmacyInventoryPage = lazy(() => import('../features/pharmacy/PharmacyInventoryPage').then((module) => ({ default: module.PharmacyInventoryPage })));
@@ -45,6 +51,8 @@ const PharmacyPurchasingPage = lazy(() => import('../features/pharmacy/PharmacyP
 const LaboratoryDiagnosticsPage = lazy(() => import('../features/laboratory/LaboratoryDiagnosticsPage').then((module) => ({ default: module.LaboratoryDiagnosticsPage })));
 const RadiologyDiagnosticsPage = lazy(() => import('../features/radiology/RadiologyDiagnosticsPage').then((module) => ({ default: module.RadiologyDiagnosticsPage })));
 const OperationsDashboardPage = lazy(() => import('../features/operations/OperationsDashboardPage').then((module) => ({ default: module.OperationsDashboardPage })));
+const ReportsPage = lazy(() => import('../features/reports/ReportsPage').then((module) => ({ default: module.ReportsPage })));
+const AutomationSettingsPage = lazy(() => import('../features/automation/AutomationSettingsPage'));
 const AuditLogsPage = lazy(() => import('../features/audit/AuditLogsPage').then((module) => ({ default: module.AuditLogsPage })));
 
 export default function App() {
@@ -129,6 +137,10 @@ export default function App() {
               </Route>
               <Route element={<ProtectedRoute permission="appointments.view" />}>
                 <Route path="appointments" element={<AppointmentsPage />} />
+                <Route path="calendar" element={<AppointmentsPage />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="patients.view" />}>
+                <Route path="prescriptions" element={<PrescriptionsPage />} />
               </Route>
               <Route
                 element={
@@ -146,6 +158,7 @@ export default function App() {
               </Route>
               <Route element={<ProtectedRoute permission="inpatient.view" />}>
                 <Route path="inpatient" element={<InpatientDashboardPage />} />
+                <Route path="nursing" element={<InpatientDashboardPage />} />
               </Route>
               <Route element={<ProtectedRoute permission="billing.view" />}>
                 <Route path="billing" element={<BillingDashboardPage />} />
@@ -165,12 +178,21 @@ export default function App() {
               <Route element={<ProtectedRoute permission="blood_bank.view" />}>
                 <Route path="blood-bank" element={<BloodBankPage />} />
               </Route>
+              <Route element={<ProtectedRoute permission="vaccination.view" />}><Route path="vaccination" element={<VaccinationPage />} /></Route>
+              <Route element={<ProtectedRoute permission="fixed_assets.view" />}><Route path="fixed-assets" element={<FixedAssetsPage />} /></Route>
               <Route path="notifications" element={<NotificationsPage />} />
+              <Route path="chat" element={<ChatPage />} />
+              <Route path="automation" element={<AutomationSettingsPage />} />
+              <Route path="support-tickets" element={<SupportTicketsPage />} />
+              <Route element={<ProtectedRoute permission="expenses.view" />}>
+                <Route path="expenses" element={<ExpensesPage />} />
+              </Route>
               <Route element={<ProtectedRoute permission="pharmacy.inventory.view" />}>
                 <Route path="pharmacy" element={<PharmacyInventoryPage />} />
               </Route>
               <Route element={<ProtectedRoute permission="pharmacy.procurement.view" />}>
                 <Route path="pharmacy/procurement" element={<PharmacyPurchasingPage />} />
+                <Route path="suppliers" element={<PharmacyPurchasingPage />} />
               </Route>
               <Route element={<ProtectedRoute permission="laboratory.view" />}>
                 <Route path="laboratory" element={<LaboratoryDiagnosticsPage />} />
@@ -180,6 +202,7 @@ export default function App() {
               </Route>
               <Route element={<ProtectedRoute permission="operations.view" />}>
                 <Route path="operations" element={<OperationsDashboardPage />} />
+                <Route path="reports" element={<ReportsPage />} />
               </Route>
               <Route element={<ProtectedRoute permission="audit.view" />}>
                 <Route path="audit-logs" element={<AuditLogsPage />} />

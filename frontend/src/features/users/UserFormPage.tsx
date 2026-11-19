@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { isAxiosError } from 'axios';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
@@ -24,6 +25,8 @@ type UserField =
   | 'password'
   | 'departmentId'
   | 'roleIds';
+
+const passwordRequirements = 'Use 8–128 characters, with at least one letter (A–Z) and one number (0–9).';
 
 export function UserFormPage() {
   const { id } = useParams();
@@ -134,6 +137,9 @@ export function UserFormPage() {
     if (!departmentId) nextErrors.departmentId = 'Department is required';
     if (!isEdit && !username.trim()) nextErrors.username = 'Username is required';
     if (!isEdit && !password) nextErrors.password = 'Password is required';
+    if (password && (password.length < 8 || password.length > 128 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password))) {
+      nextErrors.password = 'Password does not meet the requirements below.';
+    }
     if (!editing?.isSuperAdmin && roleIds.length === 0) {
       nextErrors.roleIds = 'Select at least one role';
     }
@@ -175,7 +181,11 @@ export function UserFormPage() {
       }
       navigate('/users');
     } catch (err) {
-      setFormError(getErrorMessage(err, 'Unable to save user'));
+      const details = isAxiosError<{
+        details?: { fieldErrors?: Record<string, string[]> };
+      }>(err) ? err.response?.data?.details : undefined;
+      const messages = Object.values(details?.fieldErrors ?? {}).flat();
+      setFormError(messages.join('. ') || getErrorMessage(err, 'Unable to save user'));
     } finally {
       setSaving(false);
     }
@@ -312,7 +322,9 @@ export function UserFormPage() {
               setPassword(event.target.value);
               clearError('password');
             }}
-            placeholder={isEdit ? 'Leave blank to keep current' : 'Min 8 chars, letter + number'}
+            placeholder={isEdit ? 'Leave blank to keep current' : 'Enter password'}
+            hint={passwordRequirements}
+            autoComplete="new-password"
             passwordToggle
           />
           <Select

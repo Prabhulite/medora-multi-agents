@@ -1,4 +1,6 @@
 import 'reflect-metadata';
+import { seedHospitalRoles } from './hospital-roles.js';
+import { seedStarterServices } from './starter-services.js';
 import bcrypt from 'bcryptjs';
 import { env } from '../config/env.js';
 import { closeDataSource, initializeDataSource } from '../config/data-source.js';
@@ -23,6 +25,11 @@ import {
 } from './entities/index.js';
 
 const PERMISSIONS = [
+  { code: 'expenses.view', module: 'expenses', action: 'view', description: 'View activities and expenses' },
+  { code: 'expenses.manage', module: 'expenses', action: 'manage', description: 'Manage expense entries' },
+  { code: 'support-tickets.view', module: 'support-tickets', action: 'view', description: 'View support tickets' },
+  { code: 'support-tickets.create', module: 'support-tickets', action: 'create', description: 'Create support tickets' },
+  { code: 'support-tickets.manage', module: 'support-tickets', action: 'manage', description: 'Manage support tickets and responses' },
   { code: 'users.view', module: 'users', action: 'view', description: 'View users' },
   { code: 'users.create', module: 'users', action: 'create', description: 'Create users' },
   { code: 'users.update', module: 'users', action: 'update', description: 'Update users' },
@@ -206,6 +213,9 @@ const PERMISSIONS = [
   { code: 'roster.view', module: 'roster', action: 'view', description: 'View staff duty shifts' },
   { code: 'roster.manage', module: 'roster', action: 'manage', description: 'Schedule and close staff duty shifts' },
   { code: 'ambulance.view', module: 'ambulance', action: 'view', description: 'View ambulance vehicles and dispatch trips' },
+  { code: 'vaccination.view', module: 'vaccination', action: 'view', description: 'View vaccine catalog and immunization records' },
+  { code: 'vaccination.manage', module: 'vaccination', action: 'manage', description: 'Manage vaccine catalog' },
+  { code: 'vaccination.record', module: 'vaccination', action: 'record', description: 'Record administered vaccine doses' },
   { code: 'blood_bank.view', module: 'blood_bank', action: 'view', description: 'View blood component units and traceability events' },
   { code: 'blood_bank.manage', module: 'blood_bank', action: 'manage', description: 'Receive, release, and discard blood units' },
   { code: 'blood_bank.issue', module: 'blood_bank', action: 'issue', description: 'Issue released blood units to patients' },
@@ -442,6 +452,7 @@ const MENUS = [
   { code: 'emergency', label: 'Emergency Triage', route: '/emergency', icon: 'clinical', permissionCode: 'emergency.view', parentCode: 'front_office', sortOrder: 39 },
   { code: 'surgery', label: 'Operating Theatre', route: '/surgery', icon: 'hospital_profile', permissionCode: 'surgery.view', parentCode: 'front_office', sortOrder: 40 },
   { code: 'roster', label: 'Duty Roster', route: '/roster', icon: 'users', permissionCode: 'roster.view', parentCode: 'front_office', sortOrder: 41 },
+  { code: 'vaccination', label: 'Vaccination', route: '/vaccination', icon: 'clinical', permissionCode: 'vaccination.view', parentCode: 'front_office', sortOrder: 43 },
   { code: 'ambulance', label: 'Ambulance Dispatch', route: '/ambulance', icon: 'hospital_profile', permissionCode: 'ambulance.view', parentCode: 'front_office', sortOrder: 42 },
   { code: 'operations', label: 'Operations Dashboard', route: '/operations', icon: 'dashboard', permissionCode: 'operations.view', parentCode: null as string | null, sortOrder: 15 },
   { code: 'audit', label: 'Audit Logs', route: '/audit-logs', icon: 'roles', permissionCode: 'audit.view', parentCode: 'master', sortOrder: 28 },
@@ -564,6 +575,9 @@ async function seed(): Promise<void> {
       );
     }
   }
+
+  const starterServicesCreated = await seedStarterServices(dataSource);
+  console.log(`Starter billing services created: ${starterServicesCreated}`);
 
   for (const specialization of SPECIALIZATIONS) {
     const existing = await specializationRepo.findOne({ where: { code: specialization.code } });
@@ -709,6 +723,7 @@ async function seed(): Promise<void> {
     await menuRepo.save(menu);
   }
 
+  await seedHospitalRoles(dataSource);
   const allPermissions = await permissionRepo.find();
   const adminDepartment = await departmentRepo.findOne({ where: { code: 'admin' } });
 

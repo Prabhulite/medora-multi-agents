@@ -12,6 +12,9 @@ import { getErrorMessage } from '../../lib/api';
 import { hasPermission } from '../../lib/permissions';
 import type { Doctor, OpCheckinVisit } from '../../types';
 import { useAuth } from '../auth/AuthContext';
+import { billingApi, type BillingInvoice } from '../billing/billing.api';
+import { PatientBillPanel } from '../billing/PatientBillPanel';
+import '../billing/BillingDashboardPage.css';
 import { doctorsApi } from '../doctors/doctors.api';
 import { checkinApi } from './checkin.api';
 import './CheckinPage.css';
@@ -60,6 +63,9 @@ export function CheckinListPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [checkoutTarget, setCheckoutTarget] = useState<OpCheckinVisit | null>(null);
   const [notice, setNotice] = useState('');
+  const [billPicker, setBillPicker] = useState<{ patientName: string; invoices: BillingInvoice[] } | null>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<BillingInvoice | null>(null);
+  const [billLoadingId, setBillLoadingId] = useState<number | null>(null);
 
   useEffect(() => {
     const message = (location.state as { notice?: string } | null)?.notice;
@@ -73,6 +79,20 @@ export function CheckinListPage() {
   const canConsult = hasPermission(user, 'visits.consult');
   const canOpenChart = hasPermission(user, 'clinical.view') && hasPermission(user, 'patients.view');
   const canBill = hasPermission(user, 'billing.create');
+  const canPrintBill = hasPermission(user, 'billing.view');
+
+  const openBills = async (row: OpCheckinVisit) => {
+    setBillLoadingId(row.id);
+    setError('');
+    try {
+      const invoices = await billingApi.listInvoices(row.patientId);
+      setBillPicker({ patientName: row.patientName || 'Patient', invoices });
+    } catch (err) {
+      setError(getErrorMessage(err, 'Unable to load patient bills'));
+    } finally {
+      setBillLoadingId(null);
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -232,6 +252,12 @@ export function CheckinListPage() {
                 Quick Bill
               </button>
             ) : null}
+            {canPrintBill ? (
+              <button type="button" className="checkin-bill__quick" disabled={billLoadingId === row.id}
+                onClick={() => void openBills(row)}>
+                {billLoadingId === row.id ? 'Loading…' : 'Print bill'}
+              </button>
+            ) : null}
           </div>
         ),
       },
@@ -277,7 +303,7 @@ export function CheckinListPage() {
         },
       },
     ],
-    [busyId, canBill, canCheckout, canConsult, canOpenChart, navigate],
+    [busyId, billLoadingId, canBill, canPrintBill, canCheckout, canConsult, canOpenChart, navigate],
   );
 
   return (
@@ -377,6 +403,28 @@ export function CheckinListPage() {
           if (target) void checkout(target);
         }}
       />
+
+      {billPicker ? (
+        <div className="billing-modal-backdrop" role="presentation" onClick={() => setBillPicker(null)}>
+          <section className="billing-modal" role="dialog" aria-modal="true" aria-labelledby="checkin-bills-title"
+            onClick={(event) => event.stopPropagation()}>
+            <h2 id="checkin-bills-title">Bills for {billPicker.patientName}</h2>
+            {billPicker.invoices.length ? (
+              <div className="checkin-bill-picker__list">
+                {billPicker.invoices.map((invoice) => (
+                  <button key={invoice.id} type="button" className="checkin-bill-picker__item"
+                    onClick={() => { setSelectedInvoice(invoice); setBillPicker(null); }}>
+                    <span>{invoice.invoiceNumber} · {invoice.invoiceDate ? new Date(invoice.invoiceDate).toLocaleDateString('en-IN') : 'Date unavailable'}</span>
+                    <strong>{money(invoice.totalAmount)}</strong>
+                  </button>
+                ))}
+              </div>
+            ) : <p>No bills found for this patient.</p>}
+            <div className="billing-modal__footer"><Button variant="secondary" onClick={() => setBillPicker(null)}>Close</Button></div>
+          </section>
+        </div>
+      ) : null}
+      {selectedInvoice ? <PatientBillPanel invoice={selectedInvoice} onClose={() => setSelectedInvoice(null)} /> : null}
 
     </div>
   );

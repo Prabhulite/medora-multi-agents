@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { ActionMenu, type ActionMenuItem } from '../../components/ui/ActionMenu';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
@@ -151,7 +151,8 @@ export function AppointmentsPage() {
   const [fromDate, setFromDate] = useState(todayIso());
   const [toDate, setToDate] = useState(todayIso());
   const [status, setStatus] = useState('');
-  const [view, setView] = useState<'list' | 'calendar'>('list');
+  const location = useLocation();
+  const [view, setView] = useState<'list' | 'calendar'>(location.pathname === '/calendar' ? 'calendar' : 'list');
   const [busyId, setBusyId] = useState<number | null>(null);
   const [confirmAction, setConfirmAction] = useState<{
     title: string;

@@ -10,6 +10,10 @@ export const prescriptionsApi = {
     const { data } = await api.get<ApiResponse<Prescription[]>>(`/pharmacy/patients/${patientId}/prescriptions`);
     return data.data;
   },
+  pendingDispense: async () => {
+    const { data } = await api.get<ApiResponse<Array<{ id: number; patientId: number; patientName: string; patientNumber: string; medicineName: string; quantityPrescribed: number; dispensedQuantity: string; remainingQuantity: number; createdAt: string }>>>('/pharmacy/prescriptions/pending-dispense');
+    return data.data;
+  },
   create: async (payload: CreatePrescriptionPayload) => {
     const { data } = await api.post<ApiResponse<Prescription>>('/pharmacy/prescriptions', payload);
     return data.data;

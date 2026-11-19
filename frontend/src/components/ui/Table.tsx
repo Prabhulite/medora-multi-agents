@@ -17,7 +17,10 @@ interface TableProps<T> {
   searchPlaceholder?: string;
   searchText?: (row: T) => string;
   onRefresh?: () => void;
+  toolbarLeft?: ReactNode;
+  pageSizeInFooter?: boolean;
   showIndex?: boolean;
+  compactIndex?: boolean;
   loading?: boolean;
   serverPagination?: { page: number; pageSize: number; total: number; search: string; onPageChange: (page: number) => void; onPageSizeChange: (size: number) => void; onSearchChange: (search: string) => void };
 }
@@ -63,7 +66,10 @@ export function Table<T>({
   searchPlaceholder = 'Search...',
   searchText,
   onRefresh,
+  toolbarLeft,
+  pageSizeInFooter = false,
   showIndex = true,
+  compactIndex = false,
   loading = false,
   serverPagination,
 }: TableProps<T>) {
@@ -99,26 +105,25 @@ export function Table<T>({
 
   const rangeStart = effectiveTotal === 0 ? 0 : (effectivePage - 1) * effectivePageSize + 1;
   const rangeEnd = Math.min(effectivePage * effectivePageSize, effectiveTotal);
+  const pageSizeControl = <>
+    <label className="ui-table-toolbar__entries">
+      Show
+      <select
+        value={effectivePageSize}
+        onChange={(event) => serverPagination ? serverPagination.onPageSizeChange(Number(event.target.value)) : setPageSize(Number(event.target.value))}
+      >
+        {PAGE_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
+      </select>
+      entries
+    </label>
+    <span className="ui-table-toolbar__count">{effectiveTotal} records.</span>
+  </>;
 
   return (
-    <div className="ui-table-panel">
+    <div className={`ui-table-panel${compactIndex ? ' ui-table-panel--compact-index' : ''}`}>
       <div className="ui-table-toolbar">
         <div className="ui-table-toolbar__left">
-          <label className="ui-table-toolbar__entries">
-            Show
-            <select
-              value={effectivePageSize}
-              onChange={(event) => serverPagination ? serverPagination.onPageSizeChange(Number(event.target.value)) : setPageSize(Number(event.target.value))}
-            >
-              {PAGE_SIZES.map((size) => (
-                <option key={size} value={size}>
-                  {size}
-                </option>
-              ))}
-            </select>
-            entries
-          </label>
-          <span className="ui-table-toolbar__count">{effectiveTotal} records.</span>
+          {pageSizeInFooter ? toolbarLeft : pageSizeControl}
         </div>
 
         <div className="ui-table-toolbar__right">
@@ -157,7 +162,7 @@ export function Table<T>({
         <table className="ui-table">
           <thead>
             <tr>
-              {showIndex ? <th style={{ width: 64 }}>#</th> : null}
+              {showIndex ? <th style={{ width: compactIndex ? 54 : 64 }}>{compactIndex ? 'S.No' : '#'}</th> : null}
               {columns.map((column) => (
                 <th key={column.key} style={column.width ? { width: column.width } : undefined}>
                   {column.header}
@@ -211,7 +216,9 @@ export function Table<T>({
           Showing <strong>{rangeStart}</strong> to <strong>{rangeEnd}</strong> of{' '}
           <strong>{effectiveTotal}</strong> entries
         </span>
-        <div className="ui-table-pager">
+        <div className="ui-table-footer__right">
+          {pageSizeInFooter ? <div className="ui-table-footer__page-size">{pageSizeControl}</div> : null}
+          <div className="ui-table-pager">
           <button
             type="button"
             disabled={effectivePage <= 1 || loading || effectiveTotal === 0}
@@ -237,6 +244,7 @@ export function Table<T>({
           >
             Next
           </button>
+          </div>
         </div>
       </div>
     </div>

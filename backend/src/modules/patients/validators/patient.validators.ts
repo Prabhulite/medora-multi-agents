@@ -144,7 +144,7 @@ const patientBaseObjectSchema = z.object({
   preferredLanguage: optionalText(60),
   specialRemarks: optionalText(2000),
   contact: contactSchema,
-  address: addressSchema,
+  address: addressSchema.optional(),
   identification: identificationSchema.optional().nullable(),
   emergencyContact: emergencySchema,
   isActive: z.boolean().optional(),

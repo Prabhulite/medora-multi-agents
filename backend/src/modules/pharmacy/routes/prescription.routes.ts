@@ -9,6 +9,7 @@ import { createPrescriptionSchema, patientIdParamSchema } from '../validators/pr
 const router = Router();
 router.use(authenticate);
 router.get('/medications', authorizeAny('pharmacy.view', 'pharmacy.create', 'pharmacy.inventory.view'), asyncHandler(prescriptionController.listMedications));
+router.get('/prescriptions/pending-dispense', authorize('pharmacy.inventory.view'), asyncHandler(prescriptionController.pendingDispense));
 router.get('/patients/:patientId/prescriptions', authorizeAny('pharmacy.view', 'pharmacy.inventory.update', 'pharmacy.create'), validate(patientIdParamSchema, 'params'), asyncHandler(prescriptionController.listByPatient));
 router.post('/prescriptions', authorize('pharmacy.create'), validate(createPrescriptionSchema), asyncHandler(prescriptionController.create));
 export default router;

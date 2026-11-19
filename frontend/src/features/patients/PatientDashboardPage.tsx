@@ -14,12 +14,15 @@ import { hasPermission } from '../../lib/permissions';
 import type { Patient } from '../../types';
 import { useAuth } from '../auth/AuthContext';
 import { ClinicalEncountersPanel } from '../clinical/ClinicalEncountersPanel';
+import { PrescriptionComposer } from '../clinical/PrescriptionComposer';
 import { PatientTimeline } from '../clinical/PatientTimeline';
 import { AllergyBanner } from '../clinical/AllergyBanner';
 import { patientsApi } from './patients.api';
 import { PatientCommunicationsPanel } from './PatientCommunicationsPanel';
 import { PatientRecordsTab } from './PatientRecordsTab';
 import { PatientMrdTab } from './PatientMrdTab';
+import { GlucoseMonitoringPanel } from '../glucose-monitoring/GlucoseMonitoringPanel';
+import { PatientVaccinationPanel } from '../vaccination/PatientVaccinationPanel';
 import './PatientDashboardPage.css';
 
 const TABS = [
@@ -29,6 +32,8 @@ const TABS = [
   'Bills',
   'Tests',
   'Rx',
+  'Glucose',
+  'Vaccination',
   'MRD',
   'Appointment',
   'Timeline',
@@ -84,7 +89,10 @@ export function PatientDashboardPage() {
   const [patient, setPatient] = useState<Patient | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>('Dashboard');
+  const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>(searchParams.get('tab') === 'Rx' ? 'Rx' : 'Dashboard');
+  useEffect(() => { if (searchParams.get('tab') === 'Rx') setActiveTab('Rx'); }, [searchParams]);
+  const [prescriptionRevision, setPrescriptionRevision] = useState(0);
+  const [newPrescriptionId, setNewPrescriptionId] = useState<number | null>(null);
   const [allergyRevision, setAllergyRevision] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
@@ -222,8 +230,20 @@ export function PatientDashboardPage() {
         </div></section>
       ) : activeTab === 'MRD' ? (
         <PatientMrdTab patient={patient} />
+      ) : activeTab === 'Glucose' ? (
+        hasPermission(user, 'clinical.view') ? <div className="pd-card pd-card--wide pd-card__body"><GlucoseMonitoringPanel patientId={patient.id} canCreate={hasPermission(user, 'clinical.create')} /></div> : <Alert tone="error">Clinical view permission is required to see glucose readings.</Alert>
+      ) : activeTab === 'Vaccination' ? (
+        hasPermission(user, 'vaccination.view') ? <PatientVaccinationPanel patientId={patient.id} /> : <Alert tone="error">Vaccination view permission is required to see immunization history.</Alert>
       ) : activeTab === 'Visit' || activeTab === 'Bills' || activeTab === 'Tests' || activeTab === 'Rx' || activeTab === 'Appointment' ? (
-        <PatientRecordsTab patient={patient} mode={activeTab} />
+        <>
+          {activeTab === 'Rx' && hasPermission(user, 'clinical.view') && hasPermission(user, 'pharmacy.create') ? (
+            <details className="pd-card" open>
+              <summary>Create prescription</summary>
+              <PrescriptionComposer patientId={patient.id} visitId={activeVisitId} onSaved={(id) => { setPrescriptionRevision((value) => value + 1); setNewPrescriptionId(id); }} />
+            </details>
+          ) : null}
+          <PatientRecordsTab key={activeTab === 'Rx' ? prescriptionRevision : activeTab} patient={patient} mode={activeTab} previewPrescriptionId={activeTab === 'Rx' ? newPrescriptionId : null} />
+        </>
       ) : (
         <>
           <section className="pd-hero">

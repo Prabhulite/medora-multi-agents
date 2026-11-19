@@ -251,6 +251,13 @@
   background: #10291c99;
 }
 
+.rx-composer { padding: 18px; display: grid; gap: 12px; }
+.rx-composer h3, .rx-composer p { margin: 0; }
+.rx-composer p { color: #5d7164; font-size: 13px; }
+.rx-composer__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.rx-composer__grid .ui-field { min-width: 0; }
+@media (max-width: 760px) { .rx-composer__grid { grid-template-columns: 1fr; } .rx-composer button { min-height: 44px; } }
+
 .rx-print__sheet {
   width: min(100%, 42rem);
   padding: clamp(16px, 5vw, 32px);
@@ -264,6 +271,8 @@
   grid-template-columns: minmax(6rem, 1fr) 2fr;
   gap: 10px;
 }
+.rx-print__medicine { border-top: 1px solid #dce8df; margin-top: 16px; padding-top: 12px; }
+.rx-print__medicine h3 { margin: 0 0 10px; }
 
 .rx-print__sheet dt { font-weight: 700; }
 .rx-print__sheet dd { margin: 0; white-space: pre-wrap; }

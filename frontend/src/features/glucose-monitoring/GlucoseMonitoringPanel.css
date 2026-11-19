@@ -1,0 +1,11 @@
+.glucose-panel { display: grid; gap: 16px; min-width: 0; }
+.glucose-panel h2 { margin: 0; font-size: 19px; color: #153a2b; }
+.glucose-panel form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.glucose-panel label { display: grid; gap: 6px; color: #315344; font-size: 13px; font-weight: 600; }
+.glucose-panel input, .glucose-panel select { width: 100%; min-height: 40px; padding: 8px 10px; border: 1px solid #ccdcd3; border-radius: 8px; background: white; color: #17342a; font: inherit; }
+.glucose-panel button { justify-self: start; padding: 9px 16px; min-height: 40px; border: 0; border-radius: 8px; background: #076c40; color: white; font: inherit; font-weight: 600; cursor: pointer; }
+.glucose-panel button:disabled { opacity: .6; cursor: wait; }
+.glucose-panel [role=alert] { color: #a31d1d; }
+.glucose-panel table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.glucose-panel th, .glucose-panel td { padding: 10px; border-bottom: 1px solid #e2ebe5; text-align: left; }
+@media (max-width: 760px) { .glucose-panel form { grid-template-columns: 1fr; } .glucose-panel { overflow-x: auto; } }

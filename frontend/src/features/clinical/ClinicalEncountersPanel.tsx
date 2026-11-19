@@ -18,7 +18,7 @@ function dateTime(value: string) {
   return new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-export function ClinicalEncountersPanel({ patientId, activeVisitId, onAllergiesChanged }: { patientId: number; activeVisitId?: number; onAllergiesChanged?: () => void }) {
+export function ClinicalEncountersPanel({ patientId, activeVisitId, onAllergiesChanged, onPrescriptionCreated }: { patientId: number; activeVisitId?: number; onAllergiesChanged?: () => void; onPrescriptionCreated?: () => void }) {
   const { user } = useAuth();
   const canCreateClinical = hasPermission(user, 'clinical.create');
   const canSignClinical = hasPermission(user, 'clinical.update');
@@ -55,6 +55,8 @@ export function ClinicalEncountersPanel({ patientId, activeVisitId, onAllergiesC
   const [temperature, setTemperature] = useState('');
   const [pulse, setPulse] = useState('');
   const [bloodPressure, setBloodPressure] = useState('');
+  const [bloodGlucose, setBloodGlucose] = useState('');
+  const [respiratoryRate, setRespiratoryRate] = useState('');
   const [spo2, setSpo2] = useState('');
   const [weight, setWeight] = useState('');
   const [medicineName, setMedicineName] = useState('');
@@ -75,10 +77,12 @@ export function ClinicalEncountersPanel({ patientId, activeVisitId, onAllergiesC
 
   const savePrescription = async () => {
     if (!medicineName.trim()) { setError('Enter a medicine name before saving.'); return; }
+    if (!medicationId || !Number.isInteger(Number(quantityPrescribed)) || Number(quantityPrescribed) < 1) { setError('Select a catalog medicine and enter the quantity so pharmacy can dispense it.'); return; }
     setBusy(true); setError('');
     try {
-      await prescriptionsApi.create({ patientId, medicineName, medicationId: medicationId ? Number(medicationId) : null, dosage, frequency, durationDays: durationDays ? Number(durationDays) : null, quantityPrescribed: quantityPrescribed ? Number(quantityPrescribed) : null, instructions });
-      setMedicineName(''); setMedicationId(''); setDosage(''); setFrequency(''); setDurationDays(''); setQuantityPrescribed(''); setInstructions(''); await load();
+      const visitEncounters = activeVisitId ? rows.filter((row) => row.visitId === activeVisitId) : [];
+      await prescriptionsApi.create({ patientId, encounterId: visitEncounters.length === 1 ? visitEncounters[0].id : null, medicineName, medicationId: medicationId ? Number(medicationId) : null, dosage, frequency, durationDays: durationDays ? Number(durationDays) : null, quantityPrescribed: quantityPrescribed ? Number(quantityPrescribed) : null, instructions });
+      setMedicineName(''); setMedicationId(''); setDosage(''); setFrequency(''); setDurationDays(''); setQuantityPrescribed(''); setInstructions(''); onPrescriptionCreated?.(); await load();
     } catch (err) { setError(getErrorMessage(err, 'Unable to save prescription')); }
     finally { setBusy(false); }
   };
@@ -123,7 +127,7 @@ export function ClinicalEncountersPanel({ patientId, activeVisitId, onAllergiesC
     }, 200);
     return () => window.clearTimeout(timer);
   }, [canCreateClinical, canManageDiagnosisCatalog, diagnosisSearch]);
-  useEffect(() => { if (canCreatePharmacy) prescriptionsApi.listMedications().then(setMedications).catch(() => undefined); }, [canCreatePharmacy]);
+  useEffect(() => { if (canCreatePharmacy) prescriptionsApi.listMedications().then(setMedications).catch((err) => setError(getErrorMessage(err, 'Unable to load medicine catalog'))); }, [canCreatePharmacy]);
 
   const save = async () => {
     if (!complaints.trim() && !assessment.trim() && !plan.trim()) {
@@ -135,10 +139,10 @@ export function ClinicalEncountersPanel({ patientId, activeVisitId, onAllergiesC
       await clinicalApi.create({
         patientId, visitId: activeVisitId, complaints, assessment, plan, diagnosisName: diagnosisTermId ? null : diagnosisName,
         diagnosisTermId: diagnosisTermId ? Number(diagnosisTermId) : null,
-        vitals: { temperature, pulse, bloodPressure, spo2, weight },
+        vitals: { temperature, pulse, bloodPressure, bloodGlucose, respiratoryRate, spo2, weight },
       });
       setComplaints(''); setAssessment(''); setPlan(''); setDiagnosisName(''); setDiagnosisTermId('');
-      setTemperature(''); setPulse(''); setBloodPressure(''); setSpo2(''); setWeight('');
+      setTemperature(''); setPulse(''); setBloodPressure(''); setBloodGlucose(''); setRespiratoryRate(''); setSpo2(''); setWeight('');
       await load();
     } catch (err) { setError(getErrorMessage(err, 'Unable to save clinical encounter')); }
     finally { setBusy(false); }
@@ -215,6 +219,8 @@ export function ClinicalEncountersPanel({ patientId, activeVisitId, onAllergiesC
         <Input label="Temperature (°C)" value={temperature} onChange={(event) => setTemperature(event.target.value)} inputMode="decimal" />
         <Input label="Pulse (bpm)" value={pulse} onChange={(event) => setPulse(event.target.value)} inputMode="numeric" />
         <Input label="Blood pressure" value={bloodPressure} onChange={(event) => setBloodPressure(event.target.value)} placeholder="120/80" />
+        <Input label="Blood glucose (mg/dL)" value={bloodGlucose} onChange={(event) => setBloodGlucose(event.target.value)} inputMode="decimal" placeholder="Record measured value" />
+        <Input label="Respiratory rate (per minute)" value={respiratoryRate} onChange={(event) => setRespiratoryRate(event.target.value)} inputMode="numeric" />
         <Input label="SpO₂ (%)" value={spo2} onChange={(event) => setSpo2(event.target.value)} inputMode="decimal" />
         <Input label="Weight (kg)" value={weight} onChange={(event) => setWeight(event.target.value)} inputMode="decimal" />
         <label className="ui-field"><span className="ui-field__label">Presenting complaints</span><textarea className="ui-field__input clinical-encounter-textarea" value={complaints} onChange={(event) => setComplaints(event.target.value)} /></label>
@@ -239,7 +245,7 @@ export function ClinicalEncountersPanel({ patientId, activeVisitId, onAllergiesC
         {rows.length ? rows.map((row) => (
           <div key={row.id}>
             <div className="pd-visit-row">
-              <div><div className="ui-table__cell-title">{row.diagnosisName || 'Clinical consultation'} · {row.status}</div>{row.diagnosisSystem && row.diagnosisCode ? <div className="ui-table__cell-sub">{row.diagnosisSystem} {row.diagnosisCode}{row.diagnosisVersion ? ` · ${row.diagnosisVersion}` : ''}</div> : null}<div className="ui-table__cell-sub">{row.complaints || row.assessment || 'No narrative recorded'}</div><div className="ui-table__cell-sub">{row.signedAt ? `Signed ${dateTime(row.signedAt)}${row.signedBy?.fullName ? ` by ${row.signedBy.fullName}` : ''}` : 'Draft encounter'}</div></div>
+              <div><div className="ui-table__cell-title">{row.diagnosisName || 'Clinical consultation'} · {row.status}</div>{row.diagnosisSystem && row.diagnosisCode ? <div className="ui-table__cell-sub">{row.diagnosisSystem} {row.diagnosisCode}{row.diagnosisVersion ? ` · ${row.diagnosisVersion}` : ''}</div> : null}<div className="ui-table__cell-sub">{row.complaints || row.assessment || 'No narrative recorded'}</div>{row.vitals && Object.entries(row.vitals).some(([, value]) => value !== null && value !== '') ? <div className="ui-table__cell-sub">{Object.entries(row.vitals).filter(([, value]) => value !== null && value !== '').map(([key, value]) => `${({ bloodPressure: 'BP', bloodGlucose: 'Glucose mg/dL', respiratoryRate: 'Resp/min', pulse: 'Pulse/min', temperature: 'Temp °C', spo2: 'SpO₂ %', weight: 'Weight kg' } as Record<string, string>)[key] || key}: ${value}`).join(' · ')}</div> : null}<div className="ui-table__cell-sub">{row.signedAt ? `Signed ${dateTime(row.signedAt)}${row.signedBy?.fullName ? ` by ${row.signedBy.fullName}` : ''}` : 'Draft encounter'}</div></div>
               <div><strong>{dateTime(row.createdAt)}</strong>{canSignClinical && row.status === 'draft' ? <><Button size="sm" variant="secondary" disabled={busy} onClick={() => setEditingDraft(row)}>Edit draft</Button><Button size="sm" disabled={busy} onClick={() => void signEncounter(row.id)}>Sign</Button></> : null}{canSignClinical && row.status !== 'draft' ? <Button size="sm" variant="secondary" disabled={busy} onClick={() => setAddendumEncounterId(addendumEncounterId === row.id ? null : row.id)}>Add addendum</Button> : null}</div>
             </div>
             {row.addenda?.map((item) => <div key={item.id} className="pd-visit-row"><div><div className="ui-table__cell-title">Addendum: {item.reason}</div><div className="ui-table__cell-sub">{item.addendum}</div></div><strong>{dateTime(item.createdAt)}{item.createdBy?.fullName ? ` · ${item.createdBy.fullName}` : ''}</strong></div>)}
@@ -250,7 +256,7 @@ export function ClinicalEncountersPanel({ patientId, activeVisitId, onAllergiesC
       {canViewPharmacy || canCreatePharmacy ? <div className="clinical-prescription-section">
         <h4>Prescriptions</h4>
         {canCreatePharmacy ? <div className="clinical-prescription-form">
-          <Select label="Catalog medication" value={medicationId} onChange={(event) => { const id = event.target.value; setMedicationId(id); if (id) setMedicineName(medications.find((row) => String(row.id) === id)?.brandName || ''); }} options={[{ value: '', label: 'Free-text medicine' }, ...medications.map((row) => ({ value: row.id, label: `${row.brandName} · ${row.medicineCode}` }))]} />
+          <Select label="Catalog medication" value={medicationId} onChange={(event) => { const id = event.target.value; setMedicationId(id); if (id) setMedicineName(medications.find((row) => String(row.id) === id)?.brandName || ''); }} options={[{ value: '', label: 'Select medicine' }, ...medications.map((row) => ({ value: row.id, label: `${row.brandName} · ${row.medicineCode}` }))]} />
           <Input label="Medicine" value={medicineName} onChange={(event) => setMedicineName(event.target.value)} disabled={!!medicationId} placeholder="e.g. Paracetamol 500 mg" />
           <Input label="Dosage" value={dosage} onChange={(event) => setDosage(event.target.value)} placeholder="1 tablet" />
           <Input label="Frequency" value={frequency} onChange={(event) => setFrequency(event.target.value)} placeholder="After food, twice daily" />

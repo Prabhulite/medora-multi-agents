@@ -13,6 +13,7 @@ import { useAuth } from '../auth/AuthContext';
 import { prescriptionsApi } from '../clinical/prescriptions.api';
 import type { Prescription } from '../../types';
 import { pharmacyApi, type DispenseRecord, type DispenseStockPayload, type InventoryBatch, type InventoryMedicationCandidate, type InventorySummary, type PharmacyPatientCandidate, type ReceiveStockPayload, type StockMovement } from './pharmacy.api';
+import { PendingPrescriptions } from './PendingPrescriptions';
 import './PharmacyInventoryPage.css';
 
 const currency = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
@@ -56,6 +57,7 @@ export function PharmacyInventoryPage() {
   const [notice, setNotice] = useState('');
   const [modal, setModal] = useState<'receive' | 'dispense' | 'history' | 'adjust' | 'movements' | 'hold' | 'dispose' | null>(null);
   const [selectedBatch, setSelectedBatch] = useState<InventoryBatch | null>(null);
+  const [selectedPrescription, setSelectedPrescription] = useState<{ patientId: number; prescriptionId: number } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -131,6 +133,7 @@ export function PharmacyInventoryPage() {
     <PageHeader title="Pharmacy inventory" subtitle="Monitor medicine availability, expiry risk, and stock movements." actions={<div className="pharmacy-actions"><Button variant="secondary" size="sm" onClick={() => setModal('history')}>Dispense history</Button>{canDispense && <Button variant="secondary" size="sm" onClick={() => setModal('dispense')}>Dispense stock</Button>}{canReceive && <Button size="sm" onClick={() => setModal('receive')}>Receive stock</Button>}</div>} />
     {error ? <Alert tone="error">{error}</Alert> : null}
     {notice ? <Alert tone="success">{notice}</Alert> : null}
+    <PendingPrescriptions refreshKey={refreshKey} canDispense={canDispense} onDispense={(row) => { setSelectedPrescription({ patientId: row.patientId, prescriptionId: row.id }); setModal('dispense'); }} />
     <div className="pharmacy-kpis" aria-label="Pharmacy inventory summary">
       <article><span>Units on hand</span><strong>{summary.units.toLocaleString('en-IN')}</strong><small>Across {summary.batches} batches</small></article>
       <article className="pharmacy-kpi--green"><span>Active batches</span><strong>{summary.batches}</strong><small>Tracked inventory lots</small></article>
@@ -144,7 +147,7 @@ export function PharmacyInventoryPage() {
       <Table columns={columns} rows={inventory} rowKey={(row) => row.id} loading={loading} onRefresh={() => void load()} serverPagination={{ page, pageSize, total, search, onPageChange: setPage, onPageSizeChange: (size) => { setPage(1); setPageSize(size); }, onSearchChange: (value) => { setPage(1); setSearch(value); } }} searchPlaceholder="Search medicine, batch, or location" emptyMessage={alertFilter ? 'No batches match this stock alert.' : 'No inventory batches found. Receive stock to start tracking medicines.'} />
     </section>
     {modal === 'receive' && canReceive ? <ReceiveStockForm saving={saving} onClose={() => setModal(null)} onSubmit={(payload) => void saveReceipt(payload)} /> : null}
-    {modal === 'dispense' && canDispense ? <DispenseStockForm saving={saving} onClose={() => setModal(null)} onSubmit={(payload) => void saveDispense(payload)} /> : null}
+    {modal === 'dispense' && canDispense ? <DispenseStockForm initial={selectedPrescription} saving={saving} onClose={() => { setModal(null); setSelectedPrescription(null); }} onSubmit={(payload) => void saveDispense(payload)} /> : null}
     {modal === 'history' ? <DispenseHistory onClose={() => setModal(null)} /> : null}
     {modal === 'adjust' && selectedBatch && canAdjust ? <AdjustStockForm batch={selectedBatch} saving={saving} error={error} onClose={() => setModal(null)} onSubmit={(count, reason) => void saveAdjustment(count, reason)} /> : null}
     {modal === 'hold' && selectedBatch && canAdjust ? <BatchHoldForm batch={selectedBatch} saving={saving} error={error} onClose={() => setModal(null)} onSubmit={(reason) => void saveHold(reason)} /> : null}
@@ -214,7 +217,7 @@ function PharmacyPatientPicker({ patientId, onSelect, optional = false }: { pati
   return <div className="pharmacy-patient-picker"><Input label={optional ? 'Patient (optional)' : 'Search patient by name or MRD'} value={query} onChange={(event) => { setQuery(event.target.value); onSelect(''); }} placeholder="Search name or MRD (2+ characters)" />{matches.length > 0 && <Select label="Matching patients" value={patientId} onChange={(event) => { const patient = matches.find((row) => String(row.id) === event.target.value); onSelect(event.target.value); if (patient) setQuery(`${patient.fullName} (${patient.mrdNumber})`); }} options={[{ value: '', label: 'Select a patient' }, ...matches.map((row) => ({ value: row.id, label: `${row.fullName} · ${row.mrdNumber}` }))]} />}{patientId && <small>Selected patient ID: {patientId}</small>}{error && <Alert tone="error">{error}</Alert>}</div>;
 }
 
-function DispenseStockForm({ saving, onClose, onSubmit }: { saving: boolean; onClose: () => void; onSubmit: (payload: DispenseStockPayload) => void }) {
+function DispenseStockForm({ initial, saving, onClose, onSubmit }: { initial: { patientId: number; prescriptionId: number } | null; saving: boolean; onClose: () => void; onSubmit: (payload: DispenseStockPayload) => void }) {
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [lookupError, setLookupError] = useState('');
   const [medicationQuery, setMedicationQuery] = useState('');
@@ -222,7 +225,7 @@ function DispenseStockForm({ saving, onClose, onSubmit }: { saving: boolean; onC
   const [inventory, setInventory] = useState<InventoryBatch[]>([]);
   const [batchesLoading, setBatchesLoading] = useState(false);
   const [medicationId, setMedicationId] = useState('');
-  const [form, setForm] = useState({ batchId: '', quantity: '', patientId: '', prescriptionId: '', reference: '', fefoOverrideReason: '' });
+  const [form, setForm] = useState({ batchId: '', quantity: '', patientId: initial ? String(initial.patientId) : '', prescriptionId: initial ? String(initial.prescriptionId) : '', reference: '', fefoOverrideReason: '' });
   useEffect(() => {
     if (!form.patientId || !Number.isInteger(Number(form.patientId)) || Number(form.patientId) < 1) { setPrescriptions([]); return; }
     let active = true;

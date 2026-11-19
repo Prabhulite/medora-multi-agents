@@ -75,6 +75,19 @@ try {
   token = (await ok('POST', '/api/auth/login', { username: 'integration_admin', password: 'Temporary!Pass123' })).token;
   assert.ok(token);
   const adminToken = token;
+  const trialVaccine = await ok('POST', '/api/vaccination/vaccines', { code: 'IT-VACCINE', name: 'Integration vaccine' }, 201);
+  assert.equal((await request('POST', '/api/vaccination/vaccines', { code: 'IT-VACCINE', name: 'Duplicate' })).status, 409);
+  const immunization = await ok('POST', '/api/vaccination/records', { patientId: 1, vaccineId: trialVaccine.id, doseNumber: 1, administeredOn: '2026-01-15', lotNumber: 'IT-LOT' }, 201);
+  assert.equal((await ok('GET', '/api/vaccination/patients/1/records'))[0].id, immunization.id);
+  assert.equal((await ok('GET', '/api/vaccination/report?from=2026-01-01&to=2026-01-31')).some((row: { id: number }) => row.id === immunization.id), true);
+  assert.equal((await request('POST', '/api/vaccination/records', { patientId: 1, vaccineId: trialVaccine.id, doseNumber: 1, administeredOn: '2026-01-15' })).status, 409);
+  const glucose = await ok('POST', '/api/glucose-monitoring/patients/1/readings', { valueMgDl: 110, context: 'fasting', measuredAt: '2026-01-15T08:00:00.000Z' }, 201);
+  assert.equal((await ok('GET', '/api/glucose-monitoring/patients/1/readings'))[0].id, glucose.id);
+  assert.equal((await request('POST', '/api/glucose-monitoring/patients/1/readings', { valueMgDl: 0, context: 'fasting', measuredAt: '2026-01-15T08:00:00.000Z' })).status, 422);
+  const trialAsset = await ok('POST', '/api/fixed-assets', { code: 'IT-ASSET-1', name: 'Integration monitor', category: 'Equipment', purchaseDate: '2025-01-01', purchaseCost: 1000, salvageValue: 100 }, 201);
+  await ok('POST', `/api/fixed-assets/${trialAsset.id}/maintenance`, { performedOn: '2025-02-01', description: 'Inspection', cost: 20 }, 201);
+  assert.equal((await ok('GET', `/api/fixed-assets/${trialAsset.id}`)).maintenance.length, 1);
+  assert.equal((await request('PATCH', `/api/fixed-assets/${trialAsset.id}`, { status: 'disposed' })).status, 422);
   let driverToken = '';
   token = '';
   assert.equal((await request('GET', '/api/fhir/r4/Patient/1')).status, 401);
@@ -139,6 +152,14 @@ try {
   assert.ok(Array.isArray(doctorWorkspace.todayAppointments));
   assert.equal(doctorWorkspace.recentPatients.some((row: { visitNumber: string; patient: { mrdNumber: string } }) => row.visitNumber === 'IT-DOCTOR-WORKSPACE-VISIT' && row.patient.mrdNumber === 'IT-MRD-001'), true);
   token = adminToken;
+  const doctorPrintRx = await ok('POST', '/api/pharmacy/prescriptions', { patientId: 1, medicationId: 1, medicineName: 'Integration Medicine', dosage: '1 tablet', frequency: 'Twice daily', durationDays: 5, quantityPrescribed: 10 }, 201);
+  await dataSource.query('UPDATE prescriptions SET created_by_id = ? WHERE id = ?', [3, doctorPrintRx.id]);
+  const printableRx = (await ok('GET', '/api/pharmacy/patients/1/prescriptions')).find((row: { id: number }) => row.id === doctorPrintRx.id);
+  assert.equal(printableRx.prescriberName, 'Integration Surgeon One');
+  assert.equal(printableRx.prescriberRegistration, 'IT-REG-1');
+  assert.equal(printableRx.medicationId, 1);
+  assert.equal(printableRx.quantityPrescribed, 10);
+  await dataSource.query('DELETE FROM prescriptions WHERE id = ?', [doctorPrintRx.id]);
   await dataSource.query("DELETE FROM patient_visits WHERE visit_number = 'IT-DOCTOR-WORKSPACE-VISIT'");
 
   await dataSource.query("INSERT INTO radiology_modalities (modality_code,modality_name) VALUES ('IT-RAD','Integration imaging')");
@@ -496,8 +517,9 @@ try {
   assert.equal((await request('PATCH', `/api/clinical/encounters/${encounter.id}`, { expectedRevision: 1 })).status, 422);
   assert.equal((await request('PATCH', `/api/clinical/encounters/${encounter.id}`, { expectedRevision: 0, assessment: 'Invalid' })).status, 422);
   assert.equal((await request('PATCH', `/api/clinical/encounters/${encounter.id}`, { expectedRevision: 1, patientId: 2 })).status, 422);
-  const editedEncounter = await ok('PATCH', `/api/clinical/encounters/${encounter.id}`, { expectedRevision: 1, complaints: 'Private draft text', vitals: { pulse: 80 }, diagnosisTermId: newerDiagnosis.id, diagnosisName: 'Ignored name' });
+  const editedEncounter = await ok('PATCH', `/api/clinical/encounters/${encounter.id}`, { expectedRevision: 1, complaints: 'Private draft text', vitals: { pulse: 80, bloodPressure: '120/80', bloodGlucose: '110', respiratoryRate: 16 }, diagnosisTermId: newerDiagnosis.id, diagnosisName: 'Ignored name' });
   assert.equal(editedEncounter.revision, 2);
+  assert.equal(editedEncounter.vitals.bloodGlucose, '110');
   assert.equal(editedEncounter.diagnosisName, 'Revised integration diagnosis');
   assert.equal((await request('PATCH', `/api/clinical/encounters/${encounter.id}`, { expectedRevision: 1, plan: 'Stale' })).status, 409);
   const uncodedEncounter = await ok('PATCH', `/api/clinical/encounters/${encounter.id}`, { expectedRevision: 2, diagnosisTermId: null, diagnosisName: 'Free text diagnosis' });
@@ -597,6 +619,14 @@ try {
   assert.deepEqual(Object.keys(transfer.transferredBy).sort(), ['fullName', 'id']);
   await ok('POST', `/api/inpatient/admissions/${admission.id}/observations`, { pulseBpm: 80 }, 201);
   assert.deepEqual(Object.keys((await ok('GET', `/api/inpatient/admissions/${admission.id}/observations`))[0].recordedBy).sort(), ['fullName', 'id']);
+  const intakeTime = new Date().toISOString();
+  assert.equal((await request('POST', `/api/intake-output/admissions/${admission.id}/intake-output`, { kind: 'intake', category: 'Oral fluids', amountMl: 0, observedAt: intakeTime })).status, 422);
+  const intake = await ok('POST', `/api/intake-output/admissions/${admission.id}/intake-output`, { kind: 'intake', category: 'Oral fluids', amountMl: 250, observedAt: intakeTime }, 201);
+  assert.equal(Number(intake.amountMl), 250);
+  await ok('POST', `/api/intake-output/admissions/${admission.id}/intake-output`, { kind: 'output', category: 'Urine', amountMl: 100, observedAt: intakeTime }, 201);
+  const intakeOutput = await ok('GET', `/api/intake-output/admissions/${admission.id}/intake-output`);
+  assert.equal(intakeOutput.filter((row: { kind: string }) => row.kind === 'intake').reduce((sum: number, row: { amountMl: string }) => sum + Number(row.amountMl), 0), 250);
+  assert.equal(intakeOutput.filter((row: { kind: string }) => row.kind === 'output').reduce((sum: number, row: { amountMl: string }) => sum + Number(row.amountMl), 0), 100);
   token = radiologyViewerToken;
   assert.equal((await request('GET', `/api/inpatient/admissions/${admission.id}/handoffs`)).status, 403);
   assert.equal((await request('GET', `/api/inpatient/admissions/${admission.id}`)).status, 403);
@@ -829,9 +859,17 @@ try {
   assert.equal((await request('POST', '/api/pharmacy/inventory/dispense', { batchId: stock.id, patientId: 1, prescriptionId: prescription.id, quantity: 1 })).status, 409);
   assert.equal((await request('POST', '/api/pharmacy/inventory/dispense', { batchId: stock.id, patientId: 1, quantity: 1 })).status, 409);
   await ok('DELETE', `/api/clinical/patients/1/allergies/${laterAllergy.id}`);
+  const pendingBefore = await ok('GET', '/api/pharmacy/prescriptions/pending-dispense');
+  assert.equal(pendingBefore.find((row: { id: number }) => row.id === prescription.id).remainingQuantity, prescription.quantityPrescribed);
+  token = radiologyViewerToken;
+  assert.equal((await request('GET', '/api/pharmacy/prescriptions/pending-dispense')).status, 403);
+  token = adminToken;
   await ok('POST', '/api/pharmacy/inventory/dispense', { batchId: stock.id, patientId: 1, prescriptionId: prescription.id, quantity: 4, notes: 'Sensitive issue note' });
+  const pendingPartial = await ok('GET', '/api/pharmacy/prescriptions/pending-dispense');
+  assert.equal(pendingPartial.find((row: { id: number }) => row.id === prescription.id).remainingQuantity, prescription.quantityPrescribed - 4);
   assert.equal((await request('POST', '/api/pharmacy/inventory/dispense', { batchId: stock.id, patientId: 1, prescriptionId: prescription.id, quantity: 3 })).status, 422);
   await ok('POST', '/api/pharmacy/inventory/dispense', { batchId: stock.id, patientId: 1, prescriptionId: prescription.id, quantity: 2 });
+  assert.equal((await ok('GET', '/api/pharmacy/prescriptions/pending-dispense')).some((row: { id: number }) => row.id === prescription.id), false);
   const concurrentPrescription = await ok('POST', '/api/pharmacy/prescriptions', { patientId: 1, medicationId: 1, medicineName: 'Integration Medicine', dosage: '5 mg', quantityPrescribed: 1 }, 201);
   const concurrentDispenses = await Promise.all([1, 2].map(() => request('POST', '/api/pharmacy/inventory/dispense', { batchId: stock.id, patientId: 1, prescriptionId: concurrentPrescription.id, quantity: 1 })));
   assert.deepEqual(concurrentDispenses.map((response) => response.status).sort(), [200, 422]);
@@ -1486,6 +1524,19 @@ try {
   await dataSource.query(`INSERT INTO laboratory_orders (order_number,patient_id,test_id,test_code_snapshot,test_name_snapshot,status) VALUES ${labFixtures.map(() => '(?,?,?,?,?,?)').join(',')}`, labFixtures.flat());
   const radiologyFixtures = Array.from({ length: 11 }, (_, index) => [`IT-OPS-RAD-${index}`, 1, 1, 'ordered']);
   await dataSource.query(`INSERT INTO radiology_orders (order_number,patient_id,modality_id,status) VALUES ${radiologyFixtures.map(() => '(?,?,?,?)').join(',')}`, radiologyFixtures.flat());
+  await dataSource.query("INSERT INTO service_categories (code,name,is_active) VALUES ('VSRI-TRIAL','VSRI Trial Consultation',1)");
+  const [trialCategory] = await dataSource.query("SELECT id FROM service_categories WHERE code = 'VSRI-TRIAL'");
+  const trialService = await ok('POST', '/api/services', {
+    serviceName: 'VSRI Trial OP Consultation', categoryId: trialCategory.id, departmentId: 1,
+    serviceType: 'OP', billingApplicable: 'OP', defaultPrice: 300, allowDiscount: false,
+    effectiveFrom: '2026-01-01',
+  }, 201);
+  const activeServices = await ok('GET', '/api/services/active');
+  assert.ok(activeServices.some((row: { id: number; defaultPrice: string }) => row.id === trialService.id && Number(row.defaultPrice) === 300));
+  const activity = await ok('GET', '/api/operations/activity?from=2027-03-01&to=2027-03-31');
+  assert.ok(Array.isArray(activity.consultations));
+  assert.ok(Array.isArray(activity.pharmacy));
+  assert.equal((await request('GET', '/api/operations/activity?from=2027-03-31&to=2027-03-01')).status, 422);
   const operations = await ok('GET', '/api/operations/dashboard?date=2027-03-01');
   assert.equal(operations.kpis.appointmentsToday, 13);
   assert.equal(operations.kpis.appointmentsWaiting, 13);

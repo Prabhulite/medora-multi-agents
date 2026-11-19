@@ -6,8 +6,6 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Loader } from '../../components/ui/Loader';
 import { Modal } from '../../components/ui/Modal';
-import { PageHeader } from '../../components/ui/PageHeader';
-import { PatientAvatar } from '../../components/ui/PatientAvatar';
 import {
   AlertCircleIcon,
   CheckCircleIcon,
@@ -23,15 +21,24 @@ import { useAuth } from '../auth/AuthContext';
 import { patientsApi } from './patients.api';
 import './PatientsPage.css';
 
+const displayPatientId = (number: string) => number.replace(/-/g, '/');
+
 function formatDob(value: string | null | undefined) {
   if (!value) return '—';
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString(undefined, {
-    day: '2-digit',
+  return date.toLocaleDateString('en-US', {
+    day: 'numeric',
     month: 'short',
     year: 'numeric',
   });
+}
+
+function formatLatestVisit(value: string | null | undefined) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return `${date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })} ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
 }
 
 function genderLabel(gender: Patient['gender']) {
@@ -192,20 +199,17 @@ export function PatientsPage() {
         key: 'patient',
         header: 'Patient',
         render: (row: Patient) => (
-          <div className="patient-cell">
-            <PatientAvatar photo={row.photoData} name={row.fullName || 'Patient'} size={40} />
-            <div>
-              <div className="ui-table__cell-title">{row.fullName}</div>
-              <button
-                type="button"
-                className="patient-mrd-link"
-                onClick={() => navigate(`/patients/${row.id}`)}
-                title="Open patient dashboard"
-              >
-                {row.mrdNumber}
-              </button>
-            </div>
-          </div>
+          <span className="ui-table__cell-title patient-cell">{row.fullName}</span>
+        ),
+      },
+      {
+        key: 'patientId',
+        header: 'Patient ID',
+        width: '130px',
+        render: (row: Patient) => (
+          <button type="button" className="patient-mrd-link" onClick={() => navigate(`/patients/${row.id}`)} title="Open patient dashboard">
+            {displayPatientId(row.mrdNumber)}
+          </button>
         ),
       },
       {
@@ -219,79 +223,35 @@ export function PatientsPage() {
         key: 'dobAge',
         header: 'DOB / Age',
         render: (row: Patient) => (
-          <div>
-            <div className="ui-table__cell-title">{formatDob(row.dateOfBirth)}</div>
-            <div className="ui-table__cell-sub">
-              {row.ageYears != null
-                ? `${row.ageYears}${row.ageIsApproximate ? '~' : ''} yrs`
-                : '—'}
-            </div>
-          </div>
-        ),
-      },
-      {
-        key: 'genderBlood',
-        header: 'Gender / Blood Group',
-        render: (row: Patient) => (
-          <span className="ui-table__cell-title">
-            {genderLabel(row.gender)} · {row.bloodGroup || '—'}
+          <span className="ui-table__cell-title patient-dob-age">
+            {formatDob(row.dateOfBirth)} / {row.ageYears != null ? `${row.ageYears}${row.ageIsApproximate ? '~' : ''} yrs` : '—'}
           </span>
         ),
       },
       {
-        key: 'address',
-        header: 'Address',
-        render: (row: Patient) => {
-          const locality = [row.city, row.district, row.state].filter(Boolean).join(', ');
-          return (
-            <div className="patient-address-cell">
-              <div className="ui-table__cell-title">{row.addressLine || '—'}</div>
-              {locality ? <div className="ui-table__cell-sub">{locality}</div> : null}
-            </div>
-          );
-        },
+        key: 'gender',
+        header: 'Gender',
+        render: (row: Patient) => <span className="ui-table__cell-title">{genderLabel(row.gender)}</span>,
       },
       {
-        key: 'registeredBy',
-        header: 'Registered By',
-        render: (row: Patient) => (
-          <div>
-            <div className="ui-table__cell-title">{row.createdByName || '—'}</div>
-            <div className="ui-table__cell-sub">
-              {row.registrationAt
-                ? new Date(row.registrationAt).toLocaleString()
-                : row.createdAt
-                  ? new Date(row.createdAt).toLocaleString()
-                  : ''}
-            </div>
-          </div>
-        ),
+        key: 'bloodGroup',
+        header: 'Blood',
+        width: '70px',
+        render: (row: Patient) => <span className="ui-table__cell-title">{row.bloodGroup || '—'}</span>,
       },
       {
         key: 'visit',
         header: 'Latest Visit',
         render: (row: Patient) => (
           <span className="ui-table__cell-title">
-            {row.latestVisitAt ? new Date(row.latestVisitAt).toLocaleString() : '—'}
+            {formatLatestVisit(row.latestVisitAt)}
           </span>
         ),
       },
       {
         key: 'status',
         header: 'Status',
-        render: (row: Patient) => (
-          <Badge
-            tone={row.isActive ? 'success' : 'danger'}
-            icon={row.isActive ? <CheckCircleIcon /> : <AlertCircleIcon />}
-          >
-            {row.isActive ? 'Active' : 'Inactive'}
-          </Badge>
-        ),
-      },
-      {
-        key: 'actions',
-        header: 'Actions',
-        width: '88px',
+        width: '135px',
         render: (row: Patient) => {
           const items = [
             ...(canView
@@ -308,7 +268,7 @@ export function PatientsPage() {
               ? [
                   {
                     key: 'edit',
-                    label: 'Edit',
+                    label: 'Edit / Complete registration',
                     icon: <EditIcon />,
                     onClick: () => navigate(`/patients/${row.id}/edit`),
                   },
@@ -329,7 +289,12 @@ export function PatientsPage() {
               ? [{ key: 'merge', label: 'Merge into another patient', icon: <ViewIcon />, onClick: () => { setMergeSource(row); setMergeError(''); } }]
               : []),
           ];
-          return items.length ? <ActionMenu items={items} /> : null;
+          return <div className="patient-status-actions">
+            <Badge tone={row.isActive ? 'success' : 'danger'} icon={row.isActive ? <CheckCircleIcon /> : <AlertCircleIcon />}>
+              {row.isActive ? 'Active' : 'Inactive'}
+            </Badge>
+            {items.length ? <ActionMenu items={items} /> : null}
+          </div>;
         },
       },
     ],
@@ -338,30 +303,31 @@ export function PatientsPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Patient Registration"
-        subtitle="Register patients, generate lifetime MRD numbers, and maintain visit identity."
-        actions={
-          <>
-            {canManageSources ? <Button size="sm" variant="secondary" onClick={() => navigate('/patients/registration-sources')}>Registration Sources</Button> : null}
-            {canCreate ? <Button size="sm" onClick={() => navigate('/patients/new')}>Register Patient</Button> : null}
-          </>
-        }
-      />
       {error ? <Alert tone="error">{error}</Alert> : null}
-      <form className="patient-mrd-lookup" onSubmit={(event) => void onMrdLookup(event)}>
-        <label htmlFor="patient-mrd-lookup">Find current chart by MRD, including merged numbers</label>
-        <div className="patient-mrd-lookup__controls">
-          <input id="patient-mrd-lookup" value={mrdLookup} onChange={(event) => { setMrdLookup(event.target.value); setMrdMatches(null); }} placeholder="Enter an MRD number" />
-          <Button type="submit" size="sm" disabled={mrdLookupLoading || !mrdLookup.trim()}>{mrdLookupLoading ? 'Searching...' : 'Find chart'}</Button>
+      <div className="patient-page-toolbar">
+        <h2 className="patient-page-toolbar__title">Patient Data</h2>
+        <div className="patient-page-actions">
+          {canCreate && hasPermission(user, 'visits.checkin') ? (
+            <Button size="sm" variant="secondary" onClick={() => navigate('/checkin/new?mode=register')}>OP Registration</Button>
+          ) : null}
+          {canManageSources ? <Button size="sm" variant="secondary" onClick={() => navigate('/patients/registration-sources')}>Registration Sources</Button> : null}
+          {canCreate ? <Button size="sm" onClick={() => navigate('/patients/new')}>Register Patient</Button> : null}
         </div>
-        {mrdMatches ? <div className="patient-mrd-lookup__results" aria-live="polite">
-          {mrdMatches.length === 0 ? 'No matching chart found.' : mrdMatches.map((match) => (
-            <button key={match.id} type="button" onClick={() => navigate(`/patients/${match.id}`)}>{match.fullName} · {match.mrdNumber}</button>
-          ))}
-        </div> : null}
-      </form>
+      </div>
       <Table
+        compactIndex
+        pageSizeInFooter
+        toolbarLeft={<form className="patient-mrd-lookup" onSubmit={(event) => void onMrdLookup(event)}>
+          <div className="patient-mrd-lookup__controls">
+            <input id="patient-mrd-lookup" aria-label="Find chart by Patient ID" value={mrdLookup} onChange={(event) => { setMrdLookup(event.target.value); setMrdMatches(null); }} placeholder="Enter Patient ID" />
+            <Button type="submit" size="sm" disabled={mrdLookupLoading || !mrdLookup.trim()}>{mrdLookupLoading ? 'Searching...' : 'Find chart'}</Button>
+          </div>
+          {mrdMatches ? <div className="patient-mrd-lookup__results" aria-live="polite">
+            {mrdMatches.length === 0 ? 'No matching chart found.' : mrdMatches.map((match) => (
+              <button key={match.id} type="button" onClick={() => navigate(`/patients/${match.id}`)}>{match.fullName} · {displayPatientId(match.mrdNumber)}</button>
+            ))}
+          </div> : null}
+        </form>}
         columns={columns}
         rows={rows}
         rowKey={(row) => row.id}
@@ -369,7 +335,7 @@ export function PatientsPage() {
         onRefresh={() => void load()}
         searchPlaceholder="Search MRD, name, mobile, visit..."
         searchText={(row) =>
-          `${row.fullName} ${row.mrdNumber} ${row.mobileNumber || ''} ${row.latestVisitNumber || ''} ${row.latestOpNumber || ''} ${row.bloodGroup || ''} ${row.createdByName || ''} ${row.gender} ${row.dateOfBirth || ''} ${row.addressLine || ''} ${row.city || ''} ${row.district || ''} ${row.state || ''}`
+          `${row.fullName} ${row.mrdNumber} ${displayPatientId(row.mrdNumber)} ${row.mobileNumber || ''} ${row.latestVisitNumber || ''} ${row.latestOpNumber || ''} ${row.bloodGroup || ''} ${row.createdByName || ''} ${row.gender} ${row.dateOfBirth || ''} ${row.addressLine || ''} ${row.city || ''} ${row.district || ''} ${row.state || ''}`
         }
       />
 

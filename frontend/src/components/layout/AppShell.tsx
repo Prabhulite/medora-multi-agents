@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import medoraLogo from '../../assets/medora/medora-horizontal.png';
+import medoraHorizontalLogo from '../../assets/medora/medora-horizontal.png';
 import { useAuth } from '../../features/auth/AuthContext';
 import { getMenuIcon } from '../../features/menus/menuIcons';
 import { menusApi } from '../../features/menus/menus.api';
@@ -17,6 +17,60 @@ function isRouteActive(pathname: string, route: string) {
   return pathname === route || pathname.startsWith(`${route}/`);
 }
 
+const clinicalNavigation = [
+  { route: '/patients', label: 'Patients' },
+  { route: '/vaccination', label: 'Vaccination' },
+  { route: '/inpatient', label: 'Inpatient & Beds' },
+  { route: '/checkin', label: 'OPD Queue' },
+  { route: '/emergency', label: 'Emergency (ER)' },
+  { route: '/nursing', label: 'Nursing Station' },
+  { route: '/surgery', label: 'Operation Theatre' },
+  { route: '/laboratory', label: 'Laboratory (LIS)' },
+  { route: '/radiology', label: 'Radiology (RIS)' },
+  { route: '/pharmacy', label: 'Pharmacy POS' },
+  { route: '/my-practice', label: 'Clinic' },
+  { route: '/appointments', label: 'Appointments' },
+  { route: '/calendar', label: 'Calendar' },
+  { route: '/prescriptions', label: 'Prescriptions' },
+  { route: '/chat', label: 'Chat' },
+] as const;
+
+const clinicalRoutes = new Set<string>(clinicalNavigation.map((item) => item.route));
+
+const managementNavigation = [
+  { route: '/billing', label: 'Hospital Cashier', permission: 'billing.view' },
+  { route: '/pharmacy', label: 'Inventory Mgmt', permission: 'pharmacy.inventory.view' },
+  { route: '/suppliers', label: 'Suppliers', permission: 'pharmacy.procurement.view' },
+  { route: '/expenses', label: 'Activities & Expenses', permission: 'expenses.view' },
+  { route: '/fixed-assets', label: 'Fixed Assets', permission: 'fixed_assets.view' },
+  { route: '/automation', label: 'Automation', permission: '' },
+  { route: '/reports', label: 'Reports', permission: 'operations.view' },
+] as const;
+const managementRoutes = new Set<string>(managementNavigation.map((item) => item.route));
+
+const clinicalIconPaths: Record<string, string> = {
+  '/vaccination': 'M12 2v20M2 12h20',
+  '/patients': 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m14-17a4 4 0 0 1 0 8m6 9v-2a4 4 0 0 0-3-3.87M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z',
+  '/inpatient': 'M3 3v18m0-6h18v6m0-6V9a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v6m0-3h14',
+  '/nursing': 'M20 8a4 4 0 0 0-8-1 4 4 0 0 0-8 1c0 5 8 11 8 11s8-6 8-11ZM4 12h4l2-3 3 6 2-3h5',
+  '/checkin': 'M3 11h4l9-5v12l-9-5H3v-2Zm13-3a5 5 0 0 1 0 8M7 13l2 7h3',
+  '/emergency': 'M12 3v2m0 14v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4M9 16v-4a3 3 0 0 1 6 0v4m-8 0h10M8 20h8',
+  '/surgery': 'M4 20 20 4M7 4l13 13M4 4l4 4m8 8 4 4M3 17l4 4m10-18 4 4',
+  '/laboratory': 'M9 3h6m-5 0v7l-6 10h16l-6-10V3M7 16h10',
+  '/radiology': 'M7 3H5a2 2 0 0 0-2 2v2m14-4h2a2 2 0 0 1 2 2v2M3 17v2a2 2 0 0 0 2 2h2m14-4v2a2 2 0 0 1-2 2h-2',
+  '/pharmacy': 'M4 7h16l-1 13H5L4 7Zm-1-4h18M9 11h6m-3-3v6',
+  '/my-practice': 'M3 20V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v15M3 20h18M12 7v8m-4-4h8',
+  '/doctors': 'M3 20V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v15M3 20h18M12 7v8m-4-4h8',
+  '/appointments': 'M7 2v4m10-4v4M3 10h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm4 9h2m3 0h2m-7 3h2',
+  '/calendar': 'M7 2v4m10-4v4M3 10h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm4 5h12',
+  '/prescriptions': 'M7 3h10l4 4v14H3V3h4Zm2 6h6m-6 4h8m-8 4h5',
+  '/chat': 'M21 11.5a8.5 8.5 0 0 1-8.5 8.5 9 9 0 0 1-4-.9L3 21l1.9-5.5a9 9 0 0 1-.9-4A8.5 8.5 0 0 1 12.5 3h.5a8.5 8.5 0 0 1 8 8v.5Z',
+};
+
+function ClinicalIcon({ route }: { route: string }) {
+  return <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={clinicalIconPaths[route]} /></svg>;
+}
+
 export function AppShell() {
   const { user, logout, refreshProfile } = useAuth();
   const location = useLocation();
@@ -25,6 +79,11 @@ export function AppShell() {
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [navMenus, setNavMenus] = useState<MenuItem[]>([]);
+  const pageTitle = location.pathname === '/' ? 'Dashboard' :
+    [...clinicalNavigation].find((item) => isRouteActive(location.pathname, item.route))?.label ??
+    [...managementNavigation].find((item) => isRouteActive(location.pathname, item.route))?.label ??
+    (location.pathname === '/support-tickets' ? 'Raise Ticket' : undefined) ??
+    navMenus.find((item) => isRouteActive(location.pathname, item.route))?.label ?? 'Medora';
   const [openGroups, setOpenGroups] = useState<Record<number, boolean>>({});
   const [menuSearch, setMenuSearch] = useState('');
   const [unreadNotifications, setUnreadNotifications] = useState(0);
@@ -63,6 +122,7 @@ export function AppShell() {
   const childrenByParent = useMemo(() => {
     const map = new Map<number, MenuItem[]>();
     for (const menu of navMenus) {
+      if (clinicalRoutes.has(menu.route) || managementRoutes.has(menu.route)) continue;
       if (!menu.parentId) continue;
       const list = map.get(menu.parentId) || [];
       list.push(menu);
@@ -72,7 +132,7 @@ export function AppShell() {
   }, [navMenus]);
 
   const rootMenus = useMemo(() => {
-    const roots = navMenus.filter((menu) => !menu.parentId);
+    const roots = navMenus.filter((menu) => !menu.parentId && !clinicalRoutes.has(menu.route) && !managementRoutes.has(menu.route));
     if (!searchQuery) return roots;
 
     return roots.filter((parent) => {
@@ -81,6 +141,17 @@ export function AppShell() {
       return children.some((child) => child.label.toLowerCase().includes(searchQuery));
     });
   }, [childrenByParent, navMenus, searchQuery]);
+
+  const clinicalMenus = useMemo(() => clinicalNavigation.flatMap(({ route, label }) => {
+    const destination = route === '/my-practice' && user?.isSuperAdmin ? '/doctors' : route;
+    const menu = navMenus.find((item) => item.route === destination || (route === '/calendar' && item.route === '/appointments') || (route === '/nursing' && item.route === '/inpatient') || (route === '/prescriptions' && item.route === '/patients'));
+    if (route === '/chat' && user && (!searchQuery || label.toLowerCase().includes(searchQuery))) return [{ id: -1, route, label, icon: 'menus' } as MenuItem];
+    return menu && (!searchQuery || label.toLowerCase().includes(searchQuery) || menu.label.toLowerCase().includes(searchQuery))
+      ? [{ ...menu, route: destination, label }]
+      : [];
+  }), [navMenus, searchQuery, user]);
+
+  const managementMenus = managementNavigation.filter(({ label, permission }) => (permission === '' || hasPermission(user, permission)) && (!searchQuery || label.toLowerCase().includes(searchQuery)));
 
   const visibleChildrenByParent = useMemo(() => {
     if (!searchQuery) return childrenByParent;
@@ -122,12 +193,12 @@ export function AppShell() {
 
   return (
     <div
-      className={`app-shell ${sidebarExpanded ? 'is-sidebar-expanded' : 'is-sidebar-collapsed'}`}
+      className={`app-shell ${sidebarExpanded ? 'is-sidebar-expanded' : 'is-sidebar-collapsed'} ${location.pathname.startsWith('/patients') ? 'is-patients-page' : ''}`}
     >
       <aside className="app-shell__sidebar">
         <div className="app-shell__sidebar-top">
           <div className="app-shell__sidebar-mark" title="Medora">
-            <img src="/assets/logos/medora-icon.png" alt="" />
+            <img src={medoraHorizontalLogo} alt="" />
           </div>
           {sidebarExpanded ? (
             <label className="app-shell__menu-search">
@@ -166,7 +237,12 @@ export function AppShell() {
         </div>
 
         <nav className="app-shell__nav" aria-label="Main">
-          {rootMenus.map((item) => {
+          {(!searchQuery || 'main'.includes(searchQuery)) && <span className="app-shell__nav-heading">Main</span>}
+          {rootMenus.filter((item) => item.route === '/').map((item) => <NavLink key={item.id} to={item.route} end title={item.label} className={({ isActive }) => `app-shell__nav-link ${isActive ? 'is-active' : ''}`}><span className="app-shell__nav-icon">{getMenuIcon(item.icon)}</span><span className="app-shell__nav-label">{item.label}</span></NavLink>)}
+          {clinicalMenus.length > 0 && <><span className="app-shell__nav-heading">Clinical</span>{clinicalMenus.map((item) => <NavLink key={item.route} to={item.route} title={item.label} className={({ isActive }) => `app-shell__nav-link ${isActive ? 'is-active' : ''}`}><span className="app-shell__nav-icon"><ClinicalIcon route={item.route} /></span><span className="app-shell__nav-label">{item.label}</span></NavLink>)}</>}
+          {(rootMenus.some((item) => item.route !== '/') || managementMenus.length > 0) && <span className="app-shell__nav-heading">Management</span>}
+          {managementMenus.map((item) => <NavLink key={item.route} to={item.route} title={item.label} className={({ isActive }) => `app-shell__nav-link ${isActive ? 'is-active' : ''}`}><span className="app-shell__nav-icon">{getMenuIcon(item.route === '/billing' ? 'menus' : item.route === '/reports' ? 'dashboard' : item.route === '/suppliers' ? 'front_office' : 'hospital')}</span><span className="app-shell__nav-label">{item.label}</span></NavLink>)}
+          {rootMenus.filter((item) => item.route !== '/').map((item) => {
             const children = visibleChildrenByParent.get(item.id) || [];
             if (!children.length) {
               return (
@@ -202,7 +278,7 @@ export function AppShell() {
                   <span className="app-shell__nav-icon">{getMenuIcon(item.icon)}</span>
                   <span className="app-shell__nav-label">{item.label}</span>
                   <span className="app-shell__nav-caret" aria-hidden="true">
-                    ▾
+                    â–¾
                   </span>
                 </button>
 
@@ -226,37 +302,12 @@ export function AppShell() {
               </div>
             );
           })}
-          {searchQuery && !rootMenus.length ? (
+          {searchQuery && !rootMenus.length && !clinicalMenus.length && !managementMenus.length ? (
             <p className="app-shell__menu-empty">No menu found</p>
           ) : null}
+          {user && (!searchQuery || 'raise ticket'.includes(searchQuery)) && <><span className="app-shell__nav-heading">Account</span><NavLink to="/support-tickets" className={({ isActive }) => `app-shell__nav-link ${isActive ? 'is-active' : ''}`}><span className="app-shell__nav-icon">{getMenuIcon('menus')}</span><span className="app-shell__nav-label">Raise Ticket</span></NavLink></>}
         </nav>
 
-        <div className="app-shell__sidebar-footer">
-          {sidebarExpanded ? (
-            <div className="app-shell__user-meta">
-              <strong title={user?.fullName}>{user?.fullName}</strong>
-              <span title={user?.roleCodes.join(', ') || 'User'}>
-                {user?.roleCodes.join(', ') || 'User'}
-              </span>
-            </div>
-          ) : null}
-          <NavLink to="/account/security" className="app-shell__logout-btn" title="Account security" aria-label="Account security">{sidebarExpanded ? 'Account security' : '🔒'}</NavLink>
-          <button
-            type="button"
-            className="app-shell__logout-btn"
-            onClick={() => setLogoutConfirmOpen(true)}
-            title="Logout"
-            aria-label="Logout"
-          >
-            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-              <path
-                fill="currentColor"
-                d="M16 17v-3H9v-4h7V7l5 5-5 5zM14 2a2 2 0 0 1 2 2v2h-2V4H5v16h9v-2h2v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9z"
-              />
-            </svg>
-            {sidebarExpanded ? <span>Logout</span> : null}
-          </button>
-        </div>
       </aside>
 
       <div className="app-shell__main">
@@ -279,16 +330,19 @@ export function AppShell() {
                 />
               </svg>
             </button>
-            <img src={medoraLogo} alt="Medora" className="app-shell__header-logo" />
+            <strong className="app-shell__page-title">{pageTitle}</strong>
           </div>
           <div className="app-shell__header-right">
             {canSearchPatients ? (
               <PatientSearchField
                 required={false}
-                label="Patient"
+                label=""
                 onSelect={(patient) => navigate(`/patients/${patient.id}`)}
               />
             ) : null}
+            <NavLink to="/notifications" className="app-shell__notification-btn" aria-label="Messages and notifications" title="Messages and notifications">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5 9 9 0 0 1-4-.9L3 21l1.9-5.5a9 9 0 0 1-.9-4A8.5 8.5 0 0 1 12.5 3h.5a8.5 8.5 0 0 1 8 8v.5Z" /></svg>
+            </NavLink>
             <NavLink
               to="/notifications"
               className="app-shell__notification-btn"
@@ -323,6 +377,15 @@ export function AppShell() {
                 </span>
               ) : null}
             </NavLink>
+            <details className="app-shell__account-menu">
+              <summary className="app-shell__avatar" title={user?.fullName || 'Account menu'} aria-label="Account menu">{(user?.fullName || 'M').split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()}</summary>
+              <div className="app-shell__account-popover">
+                <strong>{user?.fullName}</strong>
+                <span>{user?.roleCodes.join(', ') || 'User'}</span>
+                <NavLink to="/account/security">Account security</NavLink>
+                <button type="button" onClick={() => setLogoutConfirmOpen(true)}>Logout</button>
+              </div>
+            </details>
           </div>
         </header>
 
@@ -330,7 +393,7 @@ export function AppShell() {
           <Suspense
             fallback={
               <div className="app-shell__loading">
-                <PageLoader label="Loading page…" />
+                <PageLoader label="Loading pageâ€¦" />
               </div>
             }
           >

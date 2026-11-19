@@ -3,7 +3,7 @@ import { IsNull } from 'typeorm';
 import { Admission, AdmissionHomeMedicationReview, Bed, BedTransfer, Department, DischargeHomeMedicationReview, DischargeMedicationReview, Doctor, HomeMedication, MedicationAdministration, NursingCarePlan, NursingCarePlanReview, NursingHandoff, NursingHandoffAssignment, NursingHandoffEscalation, NursingObservation, Patient, PatientAuditLog, Prescription, Ward, Medication, User, UserNotification } from '../../../database/entities/index.js';
 import { assertNoRecordedAllergy } from '../../clinical/services/allergy-check.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
-import { nextSequenceNumber } from '../../patients/services/number-sequence.service.js';
+import { nextMonthlyNumber } from '../../patients/services/number-sequence.service.js';
 import type { CreateAdmissionInput } from '../validators/inpatient.validators.js';
 import type { z } from 'zod';
 import { admissionMedicationReviewSchema, closeCarePlanSchema, continueCarePlanSchema, createCarePlanSchema, createNursingHandoffSchema, dischargeSummarySchema, escalateNursingHandoffSchema, medicationAdministrationSchema, nursingObservationSchema, reassignNursingHandoffSchema, transferBedSchema } from '../validators/inpatient.validators.js';
@@ -385,7 +385,7 @@ export const inpatientService = {
       if (bed.status !== 'available') throw new ConflictError('Bed is not available');
       if (input.doctorId && !(await manager.getRepository(Doctor).findOne({ where: { id: input.doctorId, isActive: true } }))) throw new ValidationError('Doctor is invalid or inactive');
       if (input.departmentId && !(await manager.getRepository(Department).findOne({ where: { id: input.departmentId, isActive: true } }))) throw new ValidationError('Department is invalid or inactive');
-      const admission = manager.getRepository(Admission).create({ admissionNumber: await nextSequenceNumber(manager, 'ADM', 'ADM', 6), patientId: input.patientId, bedId: input.bedId, doctorId: input.doctorId ?? null, departmentId: input.departmentId ?? null, admittedAt: new Date(), status: 'admitted', reason: input.reason ?? null, notes: input.notes ?? null, createdById: userId });
+      const admission = manager.getRepository(Admission).create({ admissionNumber: await nextMonthlyNumber(manager, 'IP'), patientId: input.patientId, bedId: input.bedId, doctorId: input.doctorId ?? null, departmentId: input.departmentId ?? null, admittedAt: new Date(), status: 'admitted', reason: input.reason ?? null, createdById: userId });
       bed.status = 'occupied'; await manager.getRepository(Bed).save(bed);
       const saved = await manager.getRepository(Admission).save(admission);
       await manager.getRepository(PatientAuditLog).save({ patientId: patient.id, action: 'inpatient_admitted', changedById: userId, changeSummary: `Patient admitted: ${saved.admissionNumber}`, beforeData: null, afterData: JSON.stringify({ admissionId: saved.id, bedId: saved.bedId }) });

@@ -9,6 +9,12 @@
 .pharmacy-kpi--amber { border-top: 3px solid var(--color-warning) !important; }
 .pharmacy-kpi--red { border-top: 3px solid var(--color-error) !important; }
 .pharmacy-section { overflow: hidden; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); }
+.pharmacy-prescription-queue { margin-bottom: 18px; }
+.pharmacy-prescription-queue__rows { max-height: 330px; overflow: auto; padding: 0 20px 14px; }
+.pharmacy-prescription-queue__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 4px; border-top: 1px solid var(--color-border); }
+.pharmacy-prescription-queue__row strong, .pharmacy-prescription-queue__row span { display: block; }
+.pharmacy-prescription-queue__row span, .pharmacy-prescription-queue__empty { color: var(--color-text-secondary); font-size: 13px; }
+.pharmacy-prescription-queue__empty { padding: 0 24px 18px; }
 .pharmacy-section__heading { padding: 22px 24px 0; }
 .pharmacy-section__heading h2 { margin-top: 5px; font-size: 20px; }
 .pharmacy-section__heading p { margin: 6px 0 18px; color: var(--color-text-secondary); }

@@ -3,6 +3,7 @@ import { createApp } from './app.js';
 import { env } from './config/env.js';
 import { initializeDataSource } from './config/data-source.js';
 import { sendOverdueHandoffReminders } from './modules/inpatient/services/handoff-reminder.service.js';
+import { runInternalReminders } from './modules/automation/automation.runner.js';
 
 async function bootstrap() {
   await initializeDataSource();
@@ -22,6 +23,12 @@ async function bootstrap() {
     };
     void remind();
     setInterval(() => { void remind(); }, 60_000).unref();
+    const runAutomation = async () => {
+      try { await runInternalReminders(); }
+      catch (error) { console.error('Internal reminder run failed:', error); }
+    };
+    void runAutomation();
+    setInterval(() => { void runAutomation(); }, 60 * 60_000).unref();
   });
 }
 

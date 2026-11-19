@@ -1,0 +1,12 @@
+.vaccination-page { padding: 24px; max-width: 1400px; margin: auto; }
+.vaccination-page section { background: #fff; border: 1px solid #dce5e8; border-radius: 12px; padding: 20px; margin: 20px 0; }
+.vaccination-page h1, .vaccination-page h2 { margin-top: 0; }
+.vaccination-form { display: flex; flex-wrap: wrap; gap: 14px; align-items: end; }
+.vaccination-form label { display: flex; flex-direction: column; gap: 5px; min-width: 160px; flex: 1; }
+.vaccination-form input, .vaccination-form select { padding: 9px; border: 1px solid #bccbd0; border-radius: 6px; }
+.vaccination-form button { padding: 10px 16px; border: 0; border-radius: 6px; background: #116b72; color: white; cursor: pointer; }
+.vaccination-form button:disabled { opacity: .55; cursor: default; }
+.vaccination-error { color: #a52323; }
+.vaccination-table-wrap { overflow-x: auto; margin-top: 16px; }
+.vaccination-table-wrap table { border-collapse: collapse; width: 100%; }
+.vaccination-table-wrap th, .vaccination-table-wrap td { padding: 10px; border-bottom: 1px solid #e1e9ec; text-align: left; }

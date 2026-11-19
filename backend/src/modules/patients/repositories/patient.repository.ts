@@ -13,7 +13,7 @@ import {
   type PatientCategory,
   type PatientGender,
 } from '../../../database/entities/index.js';
-import { nextSequenceNumber } from '../services/number-sequence.service.js';
+import { nextMonthlyNumber, nextSequenceNumber } from '../services/number-sequence.service.js';
 import { ConflictError } from '../../../shared/errors/AppError.js';
 
 export interface PatientListView {
@@ -296,10 +296,11 @@ export const patientRepository = {
     }
 
     if (input.mrdNumber) {
+      const mrd = `%${input.mrdNumber.replace(/\//g, '-')}%`;
       qb.andWhere(
         new Brackets((where) => where
-          .where('patient.mrd_number LIKE :mrd', { mrd: `%${input.mrdNumber}%` })
-          .orWhere('EXISTS (SELECT 1 FROM patients merged WHERE merged.merged_into_patient_id = patient.id AND merged.mrd_number LIKE :mrd)', { mrd: `%${input.mrdNumber}%` })),
+          .where('patient.mrd_number LIKE :mrd', { mrd })
+          .orWhere('EXISTS (SELECT 1 FROM patients merged WHERE merged.merged_into_patient_id = patient.id AND merged.mrd_number LIKE :mrd)', { mrd })),
       );
     }
     if (input.mobileNumber) {
@@ -317,7 +318,7 @@ export const patientRepository = {
       );
     }
     if (input.q) {
-      const q = `%${input.q}%`;
+      const q = `%${input.q.replace(/\//g, '-')}%`;
       qb.andWhere(
         new Brackets((where) => {
           where
@@ -446,7 +447,7 @@ export const patientRepository = {
       alternateMobile: string | null;
       email: string | null;
     };
-    address: {
+    address?: {
       addressLine1: string;
       addressLine2: string | null;
       country: string;
@@ -474,7 +475,7 @@ export const patientRepository = {
     } | null;
   }): Promise<PatientDetailView> {
     return AppDataSource.transaction(async (manager) => {
-      const mrdNumber = await nextSequenceNumber(manager, 'MRD', 'MRD', 6);
+      const mrdNumber = await nextSequenceNumber(manager, 'MRD', 'MRD', 4);
       const now = new Date();
       const ageYears =
         input.dateOfBirth && !input.ageIsApproximate
@@ -519,7 +520,7 @@ export const patientRepository = {
         }),
       );
 
-      await manager.save(
+      if (input.address) await manager.save(
         manager.create(PatientAddress, {
           patientId: saved.id,
           addressLine1: input.address.addressLine1,
@@ -564,7 +565,7 @@ export const patientRepository = {
 
       if (input.createVisit) {
         const visitNumber = await nextSequenceNumber(manager, 'VIS', 'VIS', 6);
-        const opNumber = await nextSequenceNumber(manager, 'OP', 'OP', 6);
+        const opNumber = await nextMonthlyNumber(manager, 'OP');
         await manager.save(
           manager.create(PatientVisit, {
             patientId: saved.id,

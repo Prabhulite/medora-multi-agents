@@ -139,7 +139,7 @@ export const patientService = {
         alternateMobile: input.contact.alternateMobile ?? null,
         email: input.contact.email ?? null,
       },
-      address: {
+      address: input.address ? {
         addressLine1: input.address.addressLine1.trim(),
         addressLine2: input.address.addressLine2 ?? null,
         country: input.address.country.trim(),
@@ -147,7 +147,7 @@ export const patientService = {
         district: input.address.district.trim(),
         city: input.address.city.trim(),
         pincode: input.address.pincode.trim(),
-      },
+      } : undefined,
       identification:
         normalizeIdentification(input.identification, { requireDocumentPayload: true }) ?? null,
       emergencyContact: input.emergencyContact

@@ -9,6 +9,12 @@ export interface PharmacySupplier {
   email: string | null;
   isActive: boolean;
 }
+export interface SupplierInvoice {
+  id: number; supplierId: number; supplierName: string; purchaseOrderId: number | null; orderNumber: string | null;
+  invoiceNumber: string; invoiceDate: string; dueDate: string | null; amount: number; paidAmount: number; balance: number; notes: string | null;
+}
+export interface CreateSupplierInvoicePayload { supplierId: number; purchaseOrderId?: number | null; invoiceNumber: string; invoiceDate: string; dueDate?: string | null; amount: number; notes?: string | null; }
+export interface CreateSupplierPaymentPayload { amount: number; paidOn: string; method: 'cash' | 'bank_transfer' | 'card' | 'cheque' | 'upi' | 'other'; reference?: string | null; }
 
 export interface PurchaseOrderItem {
   id?: number;
@@ -74,6 +80,12 @@ function mapOrder(row: any): PharmacyPurchaseOrder {
 }
 
 export const pharmacyPurchasingApi = {
+  async listSupplierInvoices(): Promise<SupplierInvoice[]> {
+    const response = await api.get<Envelope<any[]> | any[]>('/pharmacy/supplier-invoices');
+    return (unwrap(response.data) || []).map((row: any) => ({ ...row, id: Number(row.id), supplierId: Number(row.supplierId), purchaseOrderId: row.purchaseOrderId == null ? null : Number(row.purchaseOrderId), amount: Number(row.amount), paidAmount: Number(row.paidAmount), balance: Number(row.balance) }));
+  },
+  async createSupplierInvoice(payload: CreateSupplierInvoicePayload): Promise<void> { await api.post('/pharmacy/supplier-invoices', payload); },
+  async createSupplierPayment(id: number, payload: CreateSupplierPaymentPayload): Promise<void> { await api.post(`/pharmacy/supplier-invoices/${id}/payments`, payload); },
   async listSuppliers(): Promise<PharmacySupplier[]> {
     const response = await api.get<Envelope<any[]> | any[]>('/pharmacy/suppliers');
     const rows = unwrap(response.data) || [];
