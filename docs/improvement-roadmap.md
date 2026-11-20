@@ -1,71 +1,37 @@
-# HMS Improvement Roadmap
+# Medora HMS phased roadmap
 
-This roadmap is based on static inspection. It is a proposal for approval, not an authorization to change application code or schema.
+**Basis:** Static repository audit, 20 November 2026. Proposal only; no code, schema or production changes are authorized by this document.
 
-## Phase 0 — Verification gate (Critical)
+## Phase 0 — Establish baseline
 
-| Task | Owner | Complexity | Acceptance evidence |
-|---|---|---:|---|
-| Establish/confirm Git remote, default branch, clean working tree, and branch/worktree policy | Architect | Small | `git status`, remote, and branch policy recorded |
-| Run backend/frontend builds and existing smoke/integration/browser checks in a disposable environment | QA | Medium | Logs attached; failures triaged |
-| Apply all migrations to clean MySQL and inspect constraints/indexes | Database | Medium | Migration status and schema snapshot |
-| Review auth, RBAC, audit, secrets, CORS, cookies, exports, and PII handling | Security | Medium | Threat/risk checklist with findings |
+Record deployment, database version, current roles and real hospital workflows. In an isolated synthetic-data environment, run builds, clean migrations, representative upgrade, integration and browser smoke checks, backup restore, and role-specific walkthroughs. Build a route → permission → role → UI action → audit-event matrix.
 
-## Phase 1 — Stabilize shared foundations (Critical/High)
+**Exit:** Reproducible results, migration/restore evidence, defect list and named risk owners.
 
-1. Define consistent API error, pagination, filtering, and authorization contracts.
-2. Add a repeatable test runner with unit, integration, and browser smoke entry points, preserving existing custom checks.
-3. Build a permission coverage matrix from backend routes, frontend routes, seed permissions, and roles.
-4. Add observability baseline: structured request IDs, safe error logging, latency/error metrics, and alert ownership.
-5. Standardize loading, empty, error, confirmation, accessibility, and responsive states across shared UI patterns.
+## Phase 1 — Secure shared foundations
 
-## Phase 2 — Complete core patient journey (Critical)
+Resolve high-impact auth/RBAC gaps; decide whether login should return a JWT in JSON. Define patient-document storage/access/retention and export policy. Standardize validation, errors, filtering/pagination, financial write idempotency and audit behavior. Add automated permission and state-transition checks to CI. Establish safe logs, request IDs, alerts and backup monitoring.
 
-Vertical slice order: registration → appointment/check-in → clinical encounter → lab/radiology orders → pharmacy → billing/payment → discharge/continuity. Each slice requires API validation, permission tests, migration review if needed, UI acceptance, synthetic-data tests, and regression evidence.
+**Depends on:** Phase 0 findings. **Exit:** Approved permission matrix, security review and critical regression gates.
 
-## Phase 3 — Harden high-risk clinical and financial modules (Critical/High)
+## Phase 2 — Complete the outpatient journey
 
-- Nursing handoff, medication administration, admission/discharge, and emergency: workflow state integrity and auditability.
-- Laboratory and radiology: result verification, addenda, critical-result escalation, immutable released archives, and report access.
-- Billing/insurance/cashier: transactional integrity, duplicate-payment prevention, closeout/reconciliation, refund authorization, and report correctness.
-- Pharmacy/inventory: batch expiry, FEFO overrides, stock reconciliation, procurement approvals, and traceability.
+Deliver small vertical slices: identity/deduplication → OP registration and appointment → doctor queue/encounter/vitals/history → lab/radiology order/result review → prescription and print → pharmacy fulfillment → bill/payment/receipt. Check linkage to the same patient and encounter, cancellation/revision audit, tablet usability and each staff role's permitted actions.
 
-## Phase 4 — Complete operational and portal capabilities (Medium/Low)
+**Depends on:** Phase 1 contracts/permissions/audit plus seeded doctors, departments, services, medicines and reviewed prices. **Exit:** Front desk, doctor, diagnostics, pharmacy and cashier complete success and failure journeys with synthetic patients.
 
-- Staff/HR foundations and payroll only after requirements and ownership are defined.
-- Patient portal with explicit consent, identity proofing, delegated access, and minimum-necessary data exposure.
-- Medical certificate/discharge document workflows.
-- Analytics/report catalog, export governance, and performance tuning based on measured queries.
+## Phase 3 — Validate inpatient and high-risk operations
 
-## Dependency graph
+Verify admission/bed transfer, nursing handoff and medication administration, discharge, emergency escalation, theatre and blood-bank traceability. Test lab/radiology verification, critical results, released reports and addenda. Reconcile pharmacy batches/expiry/procurement, billing refunds, cashier closeout, deposits, receivables and insurance claims.
 
-```text
-Auth/RBAC + audit + API contracts
-              │
-              ├── Patient/doctor/master data
-              │        │
-              │        ├── Appointments/check-in/encounters
-              │        │        ├── Lab/radiology/pharmacy
-              │        │        └── Admission/nursing/surgery/emergency
-              │        └── Billing/insurance
-              │
-              └── Reports/analytics/portals/notifications
-```
+**Depends on:** Stable patient/encounter identity, audit and transaction standards. **Exit:** Clinical and finance owners approve workflow and reconciliation evidence.
 
-## Priority rubric
+## Phase 4 — Decide actual missing scope
 
-- **Critical:** patient safety, identity/access, data integrity, financial correctness, or core care continuity.
-- **High:** operational workflow completeness, diagnostics, inventory, reporting, and doctor experience.
-- **Medium:** portal and HR capabilities that depend on policy and identity decisions.
-- **Low:** payroll and non-core convenience features until requirements are confirmed.
+With client requirements, assess patient portal, medical certificates, multi-site operation, HR/payroll and named external integrations. For each, record owner, policy, vendor/interface, data boundary, acceptance criteria and migration impact before implementation.
 
-## Definition of done for every approved task
+**Depends on:** Stable core journeys and explicit client scope. **Exit:** Only requested modules proceed to delivery.
 
-- Scope is one independently reviewable vertical slice.
-- Existing APIs/workflows remain compatible unless explicitly approved.
-- Synthetic patient data only in development/test fixtures.
-- Backend validation, authorization, audit behavior, and failure paths are covered.
-- UI is responsive and accessible for loading, empty, error, and success states.
-- Migration is additive/reversible where possible, reviewed, backed up, and tested on a clean database.
-- Relevant automated checks pass; changed files, DB changes, tests, and remaining risks are reported.
-- Human approval is obtained before production or sensitive-data changes.
+## Release gate for every phase
+
+Use synthetic data in development. Review API permissions, validation, audit, migration and restore plans. Pass automated checks and human walkthroughs of success, duplicate, cancellation, error and recovery paths. Record deployment and rollback owners, known limits and hospital acceptance before go-live.
