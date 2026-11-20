@@ -2,6 +2,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import medoraHorizontalLogo from '../../assets/medora/medora-horizontal.png';
 import { useAuth } from '../../features/auth/AuthContext';
+import { ChatSidebar } from '../../features/chat/ChatSidebar';
 import { getMenuIcon } from '../../features/menus/menuIcons';
 import { menusApi } from '../../features/menus/menus.api';
 import { notificationsApi } from '../../features/notifications/notifications.api';
@@ -77,6 +78,7 @@ export function AppShell() {
   const navigate = useNavigate();
   const canSearchPatients = hasPermission(user, 'patients.view');
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
+  const [chatOpen, setChatOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [navMenus, setNavMenus] = useState<MenuItem[]>([]);
   const pageTitle = location.pathname === '/' ? 'Dashboard' :
@@ -340,9 +342,9 @@ export function AppShell() {
                 onSelect={(patient) => navigate(`/patients/${patient.id}`)}
               />
             ) : null}
-            <NavLink to="/notifications" className="app-shell__notification-btn" aria-label="Messages and notifications" title="Messages and notifications">
+            <button type="button" onClick={() => setChatOpen(true)} className="app-shell__notification-btn" aria-label="Staff chat" title="Staff chat">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5 9 9 0 0 1-4-.9L3 21l1.9-5.5a9 9 0 0 1-.9-4A8.5 8.5 0 0 1 12.5 3h.5a8.5 8.5 0 0 1 8 8v.5Z" /></svg>
-            </NavLink>
+            </button>
             <NavLink
               to="/notifications"
               className="app-shell__notification-btn"
@@ -412,6 +414,7 @@ export function AppShell() {
         onCancel={() => setLogoutConfirmOpen(false)}
         onConfirm={confirmLogout}
       />
+      <ChatSidebar open={chatOpen} onClose={() => setChatOpen(false)} />
     </div>
   );
 }

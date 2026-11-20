@@ -1,0 +1,4 @@
+.portal-access-message { max-width: 540px; margin: 64px auto; padding: 32px; border: 1px solid #dbe8de; border-radius: 12px; background: #fff; }
+.portal-access-message h1 { margin: 0 0 12px; font-size: 22px; }
+.portal-access-message p { margin: 0 0 20px; line-height: 1.5; color: #526a5e; }
+.portal-access-message a { display: inline-block; padding: 10px 16px; border-radius: 8px; background: #006b3f; color: #fff; text-decoration: none; }

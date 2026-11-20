@@ -13,7 +13,7 @@ import { hasPermission } from '../../lib/permissions';
 import { useAuth } from '../auth/AuthContext';
 import { patientsApi } from '../patients/patients.api';
 import { doctorsApi } from '../doctors/doctors.api';
-import type { Doctor, Patient } from '../../types';
+import type { Patient } from '../../types';
 import { inpatientApi, type Admission, type Bed, type BedTransfer, type CreateAdmissionPayload, type DischargeMedicationReview, type DischargePayload, type DueCarePlanPage, type NursingObservation, type NursingObservationPayload, type PendingNursingHandoffPage, type Ward } from './inpatient.api';
 import './InpatientDashboardPage.css';
 import { MedicationAdministrationPanel } from './MedicationAdministrationPanel';
@@ -225,9 +225,9 @@ function AdmissionForm({ wards, beds, saving, onClose, onSubmit }: AdmissionForm
   const [form, setForm] = useState({ patientId: '', wardId: wards[0]?.id ? String(wards[0].id) : '', bedId: '', doctorId: '', diagnosis: '', notes: '' });
   const [patientQuery, setPatientQuery] = useState('');
   const [patientResults, setPatientResults] = useState<Patient[]>([]);
-  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [doctors, setDoctors] = useState<{ id: number; name: string; isActive: boolean }[]>([]);
   const [lookupError, setLookupError] = useState('');
-  useEffect(() => { doctorsApi.list().then(setDoctors).catch((err) => setLookupError(getErrorMessage(err, 'Unable to load doctors'))); }, []);
+  useEffect(() => { doctorsApi.consultants().then(setDoctors).catch((err) => setLookupError(getErrorMessage(err, 'Unable to load doctors'))); }, []);
   useEffect(() => {
     if (patientQuery.trim().length < 2 || form.patientId) { setPatientResults([]); return; }
     let active = true;

@@ -205,3 +205,4 @@
   font-size: 13px;
   font-weight: 500;
 }
+.patient-visit-filters{display:flex;align-items:end;gap:10px;flex-wrap:wrap;margin:0 0 10px;color:#35554a;font-size:12px}.patient-visit-filters>span{align-self:center;font-weight:600}.patient-visit-filters .medora-date-picker{width:170px}.patient-visit-filters .ui-field__label,.patient-visit-filters__department{font-size:11px;font-weight:600}.patient-visit-filters .medora-date-picker__trigger,.patient-visit-filters__department select{height:34px;border:1px solid #cbdcd1;border-radius:8px;background:#fff;font-size:12px}.patient-visit-filters__department{display:flex;flex-direction:column;gap:4px}.patient-visit-filters__department select{min-width:180px;padding:0 9px;color:#173a31}.patient-visit-filters__clear{height:34px;padding:0 8px;border:0;background:transparent;color:#00673d;font:inherit;font-weight:600;cursor:pointer}

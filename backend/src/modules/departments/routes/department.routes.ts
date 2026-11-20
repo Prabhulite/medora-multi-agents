@@ -27,6 +27,8 @@ router.get(
     'services.view',
     'services.create',
     'services.update',
+    'patients.create',
+    'visits.checkin',
   ),
   asyncHandler(departmentController.listActive),
 );

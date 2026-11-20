@@ -4,8 +4,11 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "vite --mode admin",
+    "dev:doctor": "vite --mode doctor",
+    "build": "tsc -b && vite build --mode admin && vite build --mode doctor",
+    "build:admin": "tsc -b && vite build --mode admin",
+    "build:doctor": "tsc -b && vite build --mode doctor",
     "preview": "vite preview"
   },
   "dependencies": {

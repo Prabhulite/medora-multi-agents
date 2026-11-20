@@ -43,7 +43,7 @@ function genderLabel(gender: Patient['gender'] | null | undefined) {
   return '—';
 }
 
-export function AppointmentFormPage() {
+export function AppointmentFormPage({ modal = false, onClose, onSaved, initialPatientId, initialDate }: { modal?: boolean; onClose?: () => void; onSaved?: () => void; initialPatientId?: number; initialDate?: string } = {}) {
   const navigate = useNavigate();
   const params = useParams();
   const rescheduleId = params.id ? Number(params.id) : null;
@@ -61,7 +61,7 @@ export function AppointmentFormPage() {
   const [activeResultIndex, setActiveResultIndex] = useState(0);
   const [patient, setPatient] = useState<Patient | null>(null);
 
-  const [appointmentDate, setAppointmentDate] = useState(todayIso());
+  const [appointmentDate, setAppointmentDate] = useState(initialDate || todayIso());
   const [departmentId, setDepartmentId] = useState('');
   const [doctorId, setDoctorId] = useState('');
   const [appointmentTime, setAppointmentTime] = useState('');
@@ -88,6 +88,14 @@ export function AppointmentFormPage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!initialPatientId || isReschedule) return;
+    let active = true;
+    patientsApi.getById(initialPatientId).then((row) => { if (active) { setPatient(row); setMrdQuery(row.mrdNumber); } })
+      .catch((err) => { if (active) setError(getErrorMessage(err, 'Unable to load patient')); });
+    return () => { active = false; };
+  }, [initialPatientId, isReschedule]);
 
   useEffect(() => {
     if (!isReschedule || !rescheduleId) return;
@@ -363,7 +371,8 @@ export function AppointmentFormPage() {
           }
         }
       }
-      navigate('/appointments');
+      if (modal) onSaved?.();
+      else navigate('/appointments');
     } catch (err) {
       setError(getErrorMessage(err, 'Unable to save appointment'));
     } finally {
@@ -376,7 +385,7 @@ export function AppointmentFormPage() {
   }
 
   return (
-    <div className="patient-form-page">
+    <div className={`patient-form-page ${modal ? 'appointment-form-modal-content' : ''}`}>
       <div className="patient-form-header">
         <div>
           <h1>{isReschedule ? 'Reschedule Appointment' : 'Book Appointment'}</h1>
@@ -385,7 +394,7 @@ export function AppointmentFormPage() {
             number is generated automatically.
           </p>
         </div>
-        <Button variant="back" size="sm" onClick={() => navigate('/appointments')}>
+        <Button variant="back" size="sm" onClick={() => modal ? onClose?.() : navigate('/appointments')}>
           Back
         </Button>
       </div>
@@ -618,7 +627,7 @@ export function AppointmentFormPage() {
       </section>
 
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-        <Button type="button" variant="secondary" onClick={() => navigate('/appointments')}>
+        <Button type="button" variant="secondary" onClick={() => modal ? onClose?.() : navigate('/appointments')}>
           Cancel
         </Button>
         <Button type="button" onClick={() => void save()} disabled={saving}>

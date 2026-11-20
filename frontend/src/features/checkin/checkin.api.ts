@@ -7,6 +7,10 @@ import type {
 } from '../../types';
 
 export const checkinApi = {
+  consultants: async () => {
+    const { data } = await api.get<ApiResponse<{ id: number; name: string; departmentId: number; isActive: boolean }[]>>('/doctors/consultants');
+    return data.data;
+  },
   list: async (params?: {
     date?: string;
     fromDate?: string;

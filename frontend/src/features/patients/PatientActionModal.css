@@ -1,0 +1,16 @@
+.patient-action-backdrop { position: fixed; inset: 0; z-index: 1200; display: grid; place-items: center; padding: 16px; background: rgb(12 27 18 / 50%); }
+.patient-action-modal { display: flex; flex-direction: column; width: min(720px, 100%); max-height: calc(100vh - 32px); overflow: hidden; border: 1px solid #d5e4da; border-radius: 16px; background: #fff; box-shadow: 0 24px 70px rgb(0 0 0 / 18%); }
+.patient-action-modal--wide { width: min(1120px, 100%); }
+.patient-action-modal > header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 18px 22px; border-bottom: 1px solid #d5e4da; }
+.patient-action-modal h2 { margin: 0; color: #122c24; font-size: 20px; }
+.patient-action-modal header p { margin: 3px 0 0; color: #607d74; font-size: 13px; }
+.patient-action-modal header button { border: 0; background: transparent; color: #607d74; font-size: 25px; cursor: pointer; }
+.patient-action-modal__body { display: grid; align-content: start; gap: 16px; overflow: auto; padding: 20px 22px; }
+.patient-action-modal > footer, .patient-action-modal form > footer { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 22px; border-top: 1px solid #d5e4da; }
+.patient-action-list { display: grid; gap: 8px; }
+.patient-action-list article { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; padding: 12px; border: 1px solid #e1e9e3; border-radius: 9px; }
+.patient-action-list article > div { display: grid; gap: 3px; }
+.patient-action-list small { color: #607d74; }
+.patient-action-upload { display: grid; gap: 8px; padding: 14px; border: 1px dashed #9ac8a9; border-radius: 10px; color: #176540; cursor: pointer; }
+.patient-action-modal .pd-card { margin: 0; }
+@media (max-width: 600px) { .patient-action-backdrop { padding: 4px; } .patient-action-modal { max-height: calc(100vh - 8px); } .patient-action-modal__body { padding: 12px; } }

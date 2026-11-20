@@ -13,15 +13,16 @@ import './DoctorWorkspacePage.css';
 
 function patientMeta(patient: { mrdNumber: string; ageYears: number | null; gender: string }) { return [patient.mrdNumber, patient.ageYears === null ? null : `${patient.ageYears} yrs`, patient.gender].filter(Boolean).join(' · '); }
 
-export function DoctorWorkspacePage() {
+export function DoctorWorkspacePage({ doctorPortal = false }: { doctorPortal?: boolean }) {
   const { user } = useAuth(); const navigate = useNavigate();
   const [workspace, setWorkspace] = useState<DoctorWorkspace | null>(null); const [error, setError] = useState('');
   const canOpenChart = hasPermission(user, 'patients.view');
   useEffect(() => { doctorWorkspaceApi.getMine().then(setWorkspace).catch((err) => setError(getErrorMessage(err, 'Unable to load your practice workspace'))); }, []);
   if (error) return <Alert tone="error">{error}</Alert>;
   if (!workspace) return <PageLoader label="Loading your practice…" />;
-  const openChart = (id: number, visitId?: number) => navigate(visitId ? `/patients/${id}?visitId=${visitId}` : `/patients/${id}`);
-  const openPrescription = (id: number, visitId?: number) => navigate(`/patients/${id}?tab=Rx${visitId ? `&visitId=${visitId}` : ''}`);
+  const patientBase = doctorPortal ? '/doctor/patients' : '/patients';
+  const openChart = (id: number, visitId?: number) => navigate(visitId ? `${patientBase}/${id}?visitId=${visitId}` : `${patientBase}/${id}`);
+  const openPrescription = (id: number, visitId?: number) => navigate(`${patientBase}/${id}?tab=Rx${visitId ? `&visitId=${visitId}` : ''}`);
   return <div className="doctor-workspace">
     <PageHeader title="My Practice" subtitle={`${workspace.doctor.name}${workspace.doctor.specialization ? ` · ${workspace.doctor.specialization}` : ''}`} />
     {!canOpenChart ? <Alert tone="warning">Your account can see this schedule, but needs patient-record access before charts can be opened.</Alert> : null}

@@ -4,6 +4,7 @@ import { ActionMenu } from '../../components/ui/ActionMenu';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { DatePicker } from '../../components/ui/DatePicker';
 import { Loader } from '../../components/ui/Loader';
 import { Modal } from '../../components/ui/Modal';
 import {
@@ -16,8 +17,9 @@ import {
 import { Table } from '../../components/ui/Table';
 import { getErrorMessage } from '../../lib/api';
 import { hasPermission } from '../../lib/permissions';
-import type { Patient, PatientAuditLog } from '../../types';
+import type { Department, Patient, PatientAuditLog } from '../../types';
 import { useAuth } from '../auth/AuthContext';
+import { departmentsApi } from '../departments/departments.api';
 import { patientsApi } from './patients.api';
 import './PatientsPage.css';
 
@@ -52,6 +54,9 @@ export function PatientsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [rows, setRows] = useState<Patient[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [visitDate, setVisitDate] = useState('');
+  const [departmentId, setDepartmentId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [receipt, setReceipt] = useState<Patient | null>(null);
@@ -92,6 +97,7 @@ export function PatientsPage() {
 
   useEffect(() => {
     void load();
+    void departmentsApi.listActive().then(setDepartments).catch((err) => setError(getErrorMessage(err, 'Failed to load departments')));
     const raw = sessionStorage.getItem('medora.patient.registration.receipt');
     if (raw) {
       try {
@@ -102,6 +108,17 @@ export function PatientsPage() {
       sessionStorage.removeItem('medora.patient.registration.receipt');
     }
   }, []);
+
+  const filteredRows = useMemo(() => rows.filter((row) => {
+    if (visitDate) {
+      if (!row.latestVisitAt) return false;
+      const visit = new Date(row.latestVisitAt);
+      const localDate = `${visit.getFullYear()}-${String(visit.getMonth() + 1).padStart(2, '0')}-${String(visit.getDate()).padStart(2, '0')}`;
+      if (localDate !== visitDate) return false;
+    }
+    if (departmentId && row.latestVisitDepartmentId !== Number(departmentId)) return false;
+    return true;
+  }), [rows, visitDate, departmentId]);
 
   const onDeactivate = async (row: Patient) => {
     if (!window.confirm(`Deactivate patient "${row.fullName}" (${row.mrdNumber})?`)) return;
@@ -314,6 +331,17 @@ export function PatientsPage() {
           {canCreate ? <Button size="sm" onClick={() => navigate('/patients/new')}>Register Patient</Button> : null}
         </div>
       </div>
+      <div className="patient-visit-filters" aria-label="Filter patients by latest visit">
+        <span>Latest visit</span>
+        <DatePicker label="Date" value={visitDate} onChange={setVisitDate} fieldKey="patient-visit-date" />
+        <label className="patient-visit-filters__department">Department
+          <select value={departmentId} onChange={(event) => setDepartmentId(event.target.value)}>
+            <option value="">All departments</option>
+            {departments.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
+          </select>
+        </label>
+        {(visitDate || departmentId) && <button type="button" className="patient-visit-filters__clear" onClick={() => { setVisitDate(''); setDepartmentId(''); }}>Clear filters</button>}
+      </div>
       <Table
         compactIndex
         pageSizeInFooter
@@ -329,7 +357,7 @@ export function PatientsPage() {
           </div> : null}
         </form>}
         columns={columns}
-        rows={rows}
+        rows={filteredRows}
         rowKey={(row) => row.id}
         loading={loading}
         onRefresh={() => void load()}

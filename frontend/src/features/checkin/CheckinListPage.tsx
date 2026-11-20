@@ -10,12 +10,12 @@ import { Select } from '../../components/ui/Select';
 import { Table } from '../../components/ui/Table';
 import { getErrorMessage } from '../../lib/api';
 import { hasPermission } from '../../lib/permissions';
-import type { Doctor, OpCheckinVisit } from '../../types';
+import type { OpCheckinVisit } from '../../types';
 import { useAuth } from '../auth/AuthContext';
 import { billingApi, type BillingInvoice } from '../billing/billing.api';
 import { PatientBillPanel } from '../billing/PatientBillPanel';
 import '../billing/BillingDashboardPage.css';
-import { doctorsApi } from '../doctors/doctors.api';
+import { doctorsApi, type ConsultantOption } from '../doctors/doctors.api';
 import { checkinApi } from './checkin.api';
 import './CheckinPage.css';
 
@@ -53,7 +53,7 @@ export function CheckinListPage() {
   const location = useLocation();
   const { user } = useAuth();
   const [rows, setRows] = useState<OpCheckinVisit[]>([]);
-  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [doctors, setDoctors] = useState<ConsultantOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [fromDate, setFromDate] = useState(todayIso());
@@ -120,7 +120,7 @@ export function CheckinListPage() {
 
   useEffect(() => {
     doctorsApi
-      .list()
+      .consultants()
       .then(setDoctors)
       .catch(() => setDoctors([]));
   }, []);

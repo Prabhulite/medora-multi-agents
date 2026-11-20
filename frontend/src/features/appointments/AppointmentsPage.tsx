@@ -14,6 +14,7 @@ import type { Appointment, AppointmentStatus } from '../../types';
 import { useAuth } from '../auth/AuthContext';
 import { appointmentsApi } from './appointments.api';
 import { AppointmentCalendar } from './AppointmentCalendar';
+import { AppointmentFormPage } from './AppointmentFormPage';
 import './AppointmentsPage.css';
 
 const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
@@ -154,6 +155,7 @@ export function AppointmentsPage() {
   const location = useLocation();
   const [view, setView] = useState<'list' | 'calendar'>(location.pathname === '/calendar' ? 'calendar' : 'list');
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [bookModalOpen, setBookModalOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{
     title: string;
     message: string;
@@ -396,7 +398,7 @@ export function AppointmentsPage() {
         subtitle="Book doctor slots, check in patients, and generate OP visits."
         actions={
           canCreate ? (
-            <Button size="sm" onClick={() => navigate('/appointments/new')}>
+            <Button size="sm" onClick={() => setBookModalOpen(true)}>
               Book Appointment
             </Button>
           ) : null
@@ -404,6 +406,8 @@ export function AppointmentsPage() {
       />
 
       {error ? <Alert tone="error">{error}</Alert> : null}
+
+      {bookModalOpen ? <div className="appointment-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setBookModalOpen(false); }}><section className="appointment-modal" role="dialog" aria-modal="true" aria-label="Book appointment"><AppointmentFormPage modal initialPatientId={linkedPatientId} onClose={() => setBookModalOpen(false)} onSaved={() => { setBookModalOpen(false); void load(); }} /></section></div> : null}
 
       <div className="appointment-filters">
         <Input

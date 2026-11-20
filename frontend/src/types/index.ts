@@ -467,6 +467,7 @@ export interface Patient {
   latestVisitNumber: string | null;
   latestOpNumber: string | null;
   latestVisitAt: string | null;
+  latestVisitDepartmentId: number | null;
   mergedIntoPatientId: number | null;
   createdById: number | null;
   createdByName: string | null;

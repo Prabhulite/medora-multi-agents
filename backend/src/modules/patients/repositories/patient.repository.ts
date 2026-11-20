@@ -37,6 +37,7 @@ export interface PatientListView {
   latestVisitNumber: string | null;
   latestOpNumber: string | null;
   latestVisitAt: Date | null;
+  latestVisitDepartmentId: number | null;
   mergedIntoPatientId: number | null;
   createdById: number | null;
   createdByName: string | null;
@@ -143,6 +144,7 @@ function toListView(patient: Patient): PatientListView {
     latestVisitNumber: latestVisit?.visitNumber ?? null,
     latestOpNumber: latestVisit?.opNumber ?? null,
     latestVisitAt: latestVisit?.visitAt ?? null,
+    latestVisitDepartmentId: latestVisit?.departmentId ?? null,
     mergedIntoPatientId: patient.mergedIntoPatientId,
     createdById: patient.createdById,
     createdByName: patient.createdBy?.fullName ?? null,

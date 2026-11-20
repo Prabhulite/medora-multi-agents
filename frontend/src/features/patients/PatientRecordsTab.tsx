@@ -23,13 +23,14 @@ function asDate(value?: string | null) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
-export function PatientRecordsTab({ patient, mode, previewPrescriptionId }: { patient: Patient; mode: PatientRecordsMode; previewPrescriptionId?: number | null }) {
+export function PatientRecordsTab({ patient, mode, previewPrescriptionIds = [] }: { patient: Patient; mode: PatientRecordsMode; previewPrescriptionIds?: number[] }) {
   const { user } = useAuth();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [preview, setPreview] = useState<Prescription | null>(null);
-  const printItems = preview ? rows.map((row) => row.prescription).filter((item): item is Prescription => !!item && (preview.encounterId ? item.encounterId === preview.encounterId && item.prescriberName === preview.prescriberName : item.id === preview.id)) : [];
+  const [previewGroupIds, setPreviewGroupIds] = useState<number[]>([]);
+  const printItems = preview ? rows.map((row) => row.prescription).filter((item): item is Prescription => !!item && (previewGroupIds.length ? previewGroupIds.includes(item.id) : preview.encounterId ? item.encounterId === preview.encounterId && item.prescriberName === preview.prescriberName : item.id === preview.id)) : [];
 
   const permitted = mode === 'Visit' ? hasPermission(user, 'patients.view')
     : mode === 'Bills' ? hasPermission(user, 'billing.view')
@@ -56,7 +57,7 @@ export function PatientRecordsTab({ patient, mode, previewPrescriptionId }: { pa
         ...imaging.map((row): Row => ({ key: `radiology-${row.id}`, title: `Imaging: ${row.studyName}`, detail: row.orderNumber, at: row.orderedAt, status: row.status })),
       ].sort((a, b) => new Date(b.at || 0).getTime() - new Date(a.at || 0).getTime());
     };
-    load().then((result) => { if (active) { setRows(result); if (mode === 'Rx' && previewPrescriptionId) setPreview(result.find((row) => row.prescription?.id === previewPrescriptionId)?.prescription ?? null); } }).catch((err) => { if (active) setError(getErrorMessage(err, `Unable to load ${mode.toLowerCase()} records`)); }).finally(() => { if (active) setLoading(false); });
+    load().then((result) => { if (active) { setRows(result); if (mode === 'Rx' && previewPrescriptionIds.length) { setPreviewGroupIds(previewPrescriptionIds); setPreview(result.find((row) => row.prescription?.id === previewPrescriptionIds[0])?.prescription ?? null); } } }).catch((err) => { if (active) setError(getErrorMessage(err, `Unable to load ${mode.toLowerCase()} records`)); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [patient, mode, permitted, user]);
 
@@ -66,7 +67,7 @@ export function PatientRecordsTab({ patient, mode, previewPrescriptionId }: { pa
       {rows.map((row) => <div className="pd-visit-row" key={row.key}>
         <div><div className="ui-table__cell-title">{row.title}</div><div className="ui-table__cell-sub">{[row.detail, row.status].filter(Boolean).join(' · ')}</div></div>
         <strong>{asDate(row.at)}</strong>
-        {row.prescription ? <Button variant="secondary" onClick={() => setPreview(row.prescription!)}>Preview prescription</Button> : null}
+        {row.prescription ? <Button variant="secondary" onClick={() => { setPreviewGroupIds([]); setPreview(row.prescription!); }}>Preview prescription</Button> : null}
       </div>)}
     </div> : <p className="pd-empty">No {mode.toLowerCase()} records found for this patient.</p>}
     {permitted && mode === 'Rx' && preview?.patientId === patient.id ? createPortal(

@@ -20,7 +20,7 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
 
   if (!loading && user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={import.meta.env.MODE === 'doctor' ? '/doctor' : '/'} replace />;
   }
 
   const onSubmit = async (event: FormEvent) => {

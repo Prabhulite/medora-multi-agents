@@ -21,7 +21,8 @@ async function waitForPort() {
 
 try {
   const port = await waitForPort();
-  const tab = await fetch(`http://127.0.0.1:${port}/json/new?http://localhost:5173/login`, { method: 'PUT' }).then((response) => response.json()) as { webSocketDebuggerUrl: string };
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5164';
+  const tab = await fetch(`http://127.0.0.1:${port}/json/new?${frontendUrl}/login`, { method: 'PUT' }).then((response) => response.json()) as { webSocketDebuggerUrl: string };
   const socket = new WebSocket(tab.webSocketDebuggerUrl);
   await new Promise<void>((resolve, reject) => { socket.onopen = () => resolve(); socket.onerror = () => reject(new Error('Chrome debugging socket failed')); });
   let sequence = 0;
@@ -56,7 +57,7 @@ try {
     loginResult = await evaluate(`fetch('/api/auth/login', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(${JSON.stringify(credentials)}) }).then(response => ({ status: response.status, retryAfter: Number(response.headers.get('Retry-After') || 0) }))`);
   }
   assert.equal(loginResult.status, 200, `Browser login returned ${loginResult.status}`);
-  const cookies = await send('Network.getCookies', { urls: ['http://localhost:5173'] });
+  const cookies = await send('Network.getCookies', { urls: [frontendUrl] });
   assert.ok(cookies.cookies.some((cookie: { name: string }) => cookie.name === 'medora_session'), 'Browser session cookie was not set');
   await send('Page.reload', { ignoreCache: true });
   let sessionRestored = false;

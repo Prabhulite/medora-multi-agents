@@ -5,9 +5,9 @@ dotenv.config();
 
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  PORT: z.coerce.number().default(4000),
-  APP_URL: z.string().url().default('http://localhost:4000'),
-  FRONTEND_URL: z.string().url().default('http://localhost:5173'),
+  PORT: z.coerce.number().default(5163),
+  APP_URL: z.string().url().default('http://localhost:5163'),
+  FRONTEND_URL: z.string().url().default('http://localhost:5164'),
   DB_HOST: z.string().min(1),
   DB_PORT: z.coerce.number().default(3306),
   DB_USER: z.string().min(1),

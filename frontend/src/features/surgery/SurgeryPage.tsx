@@ -7,9 +7,9 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Select } from '../../components/ui/Select';
 import { Table, type TableColumn } from '../../components/ui/Table';
 import { getErrorMessage } from '../../lib/api';
-import { doctorsApi } from '../doctors/doctors.api';
+import { doctorsApi, type ConsultantOption } from '../doctors/doctors.api';
 import { patientsApi } from '../patients/patients.api';
-import type { Doctor, Patient } from '../../types';
+import type { Patient } from '../../types';
 import { surgeryApi, type OperatingRoom, type ScheduleSurgeryPayload, type SurgeryAction, type SurgeryCase } from './surgery.api';
 import './SurgeryPage.css';
 
@@ -18,7 +18,7 @@ const statusTone = (status: SurgeryCase['status']): 'info' | 'warning' | 'succes
 
 export function SurgeryPage() {
   const [rooms, setRooms] = useState<OperatingRoom[]>([]);
-  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [doctors, setDoctors] = useState<ConsultantOption[]>([]);
   const [cases, setCases] = useState<SurgeryCase[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -26,7 +26,7 @@ export function SurgeryPage() {
   const [notice, setNotice] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [actionTarget, setActionTarget] = useState<{ row: SurgeryCase; action: 'complete' | 'cancel' } | null>(null);
-  const load = async () => { setLoading(true); setError(''); try { const [roomRows, doctorRows, caseRows] = await Promise.all([surgeryApi.rooms(), doctorsApi.list(), surgeryApi.cases()]); setRooms(roomRows); setDoctors(doctorRows.filter((row) => row.isActive)); setCases(caseRows); } catch (err) { setError(getErrorMessage(err, 'Unable to load theatre schedule')); } finally { setLoading(false); } };
+  const load = async () => { setLoading(true); setError(''); try { const [roomRows, doctorRows, caseRows] = await Promise.all([surgeryApi.rooms(), doctorsApi.consultants(), surgeryApi.cases()]); setRooms(roomRows); setDoctors(doctorRows.filter((row) => row.isActive)); setCases(caseRows); } catch (err) { setError(getErrorMessage(err, 'Unable to load theatre schedule')); } finally { setLoading(false); } };
   useEffect(() => { void load(); }, []);
   const perform = async (row: SurgeryCase, payload: SurgeryAction) => { setSaving(true); setError(''); setNotice(''); try { await surgeryApi.action(row.id, payload); setActionTarget(null); setNotice('Surgery case updated.'); await load(); } catch (err) { setError(getErrorMessage(err, 'Unable to update surgery case')); } finally { setSaving(false); } };
   const columns = useMemo<TableColumn<SurgeryCase>[]>(() => [
@@ -42,7 +42,7 @@ export function SurgeryPage() {
   return <div className="surgery-page"><PageHeader title="Operating Theatre" subtitle="Schedule procedures and track theatre cases." actions={<Button onClick={() => setShowForm(true)}>Schedule surgery</Button>} />{error && <Alert tone="error">{error}</Alert>}{notice && <Alert tone="success">{notice}</Alert>}<div className="surgery-summary"><span>Scheduled <strong>{cases.filter((row) => row.status === 'scheduled').length}</strong></span><span>In progress <strong>{cases.filter((row) => row.status === 'in_progress').length}</strong></span><span>Rooms <strong>{rooms.length}</strong></span></div><Table columns={columns} rows={cases} rowKey={(row) => row.id} loading={loading} searchText={(row) => `${row.caseNumber} ${nameOf(row)} ${row.patient?.mrdNumber || ''} ${row.procedure} ${row.room?.name} ${row.surgeon?.name}`} searchPlaceholder="Search cases" emptyMessage="No surgery cases scheduled." />{showForm && <ScheduleForm rooms={rooms} doctors={doctors} saving={saving} error={error} onClose={() => setShowForm(false)} onSubmit={(payload) => void save(payload)} />}{actionTarget && <ActionForm target={actionTarget} saving={saving} error={error} onClose={() => setActionTarget(null)} onSubmit={(payload) => void perform(actionTarget.row, payload)} />}</div>;
 }
 
-function ScheduleForm({ rooms, doctors, saving, error, onClose, onSubmit }: { rooms: OperatingRoom[]; doctors: Doctor[]; saving: boolean; error: string; onClose: () => void; onSubmit: (payload: ScheduleSurgeryPayload) => void }) {
+function ScheduleForm({ rooms, doctors, saving, error, onClose, onSubmit }: { rooms: OperatingRoom[]; doctors: ConsultantOption[]; saving: boolean; error: string; onClose: () => void; onSubmit: (payload: ScheduleSurgeryPayload) => void }) {
   const [query, setQuery] = useState(''); const [patientId, setPatientId] = useState(''); const [matches, setMatches] = useState<Patient[]>([]);
   const [surgeonId, setSurgeonId] = useState(''); const [roomId, setRoomId] = useState(''); const [procedure, setProcedure] = useState(''); const [start, setStart] = useState(''); const [end, setEnd] = useState('');
   useEffect(() => { if (query.trim().length < 2 || patientId) { setMatches([]); return; } let active = true; const timer = window.setTimeout(() => { patientsApi.search({ q: query.trim() }).then((rows) => { if (active) setMatches(rows.slice(0, 20)); }); }, 250); return () => { active = false; window.clearTimeout(timer); }; }, [query, patientId]);

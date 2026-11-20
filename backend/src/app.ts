@@ -16,6 +16,7 @@ import doctorRoutes from './modules/doctors/routes/doctor.routes.js';
 import hospitalProfileRoutes from './modules/hospital-profile/routes/hospital-profile.routes.js';
 import menuRoutes from './modules/menus/routes/menu.routes.js';
 import patientRoutes from './modules/patients/routes/patient.routes.js';
+import patientDocumentRoutes from './modules/patients/routes/patient-document.routes.js';
 import prescriptionRoutes from './modules/pharmacy/routes/prescription.routes.js';
 import inventoryRoutes from './modules/pharmacy/routes/inventory.routes.js';
 import procurementRoutes from './modules/pharmacy/routes/procurement.routes.js';
@@ -90,6 +91,7 @@ export function createApp() {
   app.use('/api/specializations', specializationRoutes);
   app.use('/api/doctors', doctorRoutes);
   app.use('/api/patients', patientRoutes);
+  app.use('/api/patients', patientDocumentRoutes);
   app.use('/api/appointments', appointmentRoutes);
   app.use('/api/visits', visitRoutes);
   app.use('/api/clinical', clinicalRoutes);

@@ -1,0 +1,8 @@
+{
+  "name": "medora-doctor-frontend",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix ../frontend run dev:doctor",
+    "build": "npm --prefix ../frontend run build:doctor"
+  }
+}

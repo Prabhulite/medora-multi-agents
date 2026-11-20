@@ -1,0 +1,78 @@
+.rx-composer__medicine {
+  min-width: 0;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid #d6e6dc;
+  border-radius: 12px;
+  background: #fbfdfb;
+}
+
+.rx-sheet { border: 1px solid #d7e2dd; border-radius: 18px; background: #fff; padding: 0 0 20px; overflow: hidden; }
+.rx-sheet > .ui-field, .rx-sheet > .ui-alert, .rx-sheet > .ui-btn { margin-left: 20px; margin-right: 20px; }
+.rx-sheet__head { display: flex; justify-content: space-between; align-items: center; gap: 12px; border-bottom: 1px solid #d7e2dd; padding: 20px; }
+.rx-sheet__head h3 { font-size: 22px; color: #122c24; }
+.rx-sheet__head p { margin-top: 4px; }
+.rx-sheet__head > span { color: #607d74; font-size: 12px; }
+.rx-sheet__identity { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px; }
+.rx-sheet__identity > div { display: grid; gap: 5px; padding: 12px 14px; border: 1px solid #c8d7d1; border-radius: 12px; background: #fbfdfc; }
+.rx-sheet__identity span { color: #607d74; font-size: 11px; text-transform: uppercase; font-weight: 700; }
+.rx-sheet__identity strong { color: #17352d; font-size: 14px; }
+.rx-sheet__medicines { margin: 8px 20px 0; border: 1px solid #d7e2dd; border-radius: 16px; overflow: hidden; }
+.rx-sheet__medicines h4 { padding: 12px 15px; margin: 0; color: #17352d; }
+.rx-sheet__columns, .rx-sheet__row { display: grid; grid-template-columns: minmax(175px,1.4fr) minmax(140px,.9fr) minmax(220px,1.7fr) minmax(105px,.65fr) 75px; gap: 10px; }
+.rx-sheet__columns { padding: 11px 15px; background: #f4f8f6; border-top: 1px solid #e3ece7; color: #39574d; text-transform: uppercase; font-size: 11px; font-weight: 700; }
+.rx-sheet__row { margin: 0; padding: 16px 15px; border: 0; border-top: 1px solid #e3ece7; }
+.rx-sheet__row > div { min-width: 0; }
+.rx-sheet__row .ui-field { margin-bottom: 8px; }
+.rx-sheet__row-note { grid-column: 1 / -1; }
+.rx-sheet__remove { padding-top: 23px; }
+.rx-sheet__mobile-label { display: none; }
+.rx-sheet__footer { display: flex; justify-content: flex-end; border-top: 1px solid #e3ece7; margin: 4px 20px 0; padding-top: 16px; }
+.rx-sheet .rx-composer__timing { margin: 0; }
+.rx-sheet .rx-composer__timing > div { grid-template-columns: 1fr 1fr; gap: 4px; }
+.rx-sheet .rx-composer__timing label { padding: 6px; font-size: 11px; }
+
+.rx-composer__medicine legend {
+  padding: 0 5px;
+  color: #075c35;
+  font-weight: 650;
+}
+
+.rx-composer__timing {
+  margin: 12px 0;
+}
+
+.rx-composer__timing > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.rx-composer__timing label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px;
+  border: 1px solid #d6e6dc;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+}
+
+@media (max-width: 760px) {
+  .rx-composer__timing > div { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 1100px) {
+  .rx-sheet__columns { display: none; }
+  .rx-sheet__row { grid-template-columns: 1fr 1fr; }
+  .rx-sheet__mobile-label { display: block; font-weight: 700; color: #075c35; }
+  .rx-sheet__remove { padding-top: 0; }
+}
+
+@media (max-width: 480px) {
+  .rx-composer__timing > div { grid-template-columns: 1fr; }
+  .rx-sheet__identity, .rx-sheet__row { grid-template-columns: 1fr; }
+  .rx-sheet__head > span { display: none; }
+}

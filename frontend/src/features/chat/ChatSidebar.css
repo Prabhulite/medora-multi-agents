@@ -1,0 +1,9 @@
+.chat-sidebar__backdrop { position: fixed; inset: 0; z-index: 1300; background: rgb(13 28 20 / 35%); }
+.chat-sidebar { position: absolute; right: 0; top: 0; bottom: 0; width: min(490px, 100vw); display: flex; flex-direction: column; background: #fff; box-shadow: -12px 0 40px rgb(0 0 0 / 15%); }
+.chat-sidebar > header { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid #dbe8de; }
+.chat-sidebar > header button { border: 0; border-radius: 6px; background: #eef5f0; padding: 6px 12px; font-size: 22px; cursor: pointer; }
+.chat-sidebar .staff-chat { min-height: 0; flex: 1; display: grid; grid-template-columns: 1fr; grid-template-rows: minmax(100px, 28%) minmax(0, 1fr); border: 0; border-radius: 0; }
+.chat-sidebar .staff-chat__people { border-right: 0; border-bottom: 1px solid #dbe8de; padding: 12px; overflow: auto; }
+.chat-sidebar .staff-chat__people h1 { display: none; }
+.chat-sidebar .staff-chat__thread { min-height: 0; padding: 12px; }
+.chat-sidebar .staff-chat__messages { min-height: 0; }

@@ -1,7 +1,13 @@
 import { api } from '../../lib/api';
 import type { ApiResponse, Doctor, UpsertDoctorPayload } from '../../types';
 
+export type ConsultantOption = { id: number; doctorCode: string; name: string; departmentId: number; isActive: boolean };
+
 export const doctorsApi = {
+  consultants: async () => {
+    const { data } = await api.get<ApiResponse<ConsultantOption[]>>('/doctors/consultants');
+    return data.data;
+  },
   list: async () => {
     const { data } = await api.get<ApiResponse<Doctor[]>>('/doctors');
     return data.data;

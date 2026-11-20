@@ -50,16 +50,17 @@ npm run install:all
 npm run db:setup
 ```
 
-### Run both apps
+### Run the API and both frontends
 
 ```bash
 npm run dev
 ```
 
-- API: `http://localhost:4000`
-- UI: `http://localhost:5173`
+- API: `http://localhost:5163`
+- Admin: `http://localhost:5164`
+- Doctor: `http://127.0.0.1:5165/doctor`
 
-Optional single-app scripts: `npm run dev:backend`, `npm run dev:frontend`
+Optional single-app scripts: `npm run dev:backend`, `npm run dev:frontend`, `npm run dev:doctor`. The different local hostnames keep the admin and doctor login cookies separate.
 
 ## Verification
 

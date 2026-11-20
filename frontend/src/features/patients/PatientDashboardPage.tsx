@@ -23,6 +23,10 @@ import { PatientRecordsTab } from './PatientRecordsTab';
 import { PatientMrdTab } from './PatientMrdTab';
 import { GlucoseMonitoringPanel } from '../glucose-monitoring/GlucoseMonitoringPanel';
 import { PatientVaccinationPanel } from '../vaccination/PatientVaccinationPanel';
+import { PatientDocumentsModal } from './PatientDocumentsModal';
+import { PatientPaymentModal } from './PatientPaymentModal';
+import { PatientPrescriptionModal } from './PatientPrescriptionModal';
+import { PatientSlotsModal } from './PatientSlotsModal';
 import './PatientDashboardPage.css';
 
 const TABS = [
@@ -92,10 +96,11 @@ export function PatientDashboardPage() {
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>(searchParams.get('tab') === 'Rx' ? 'Rx' : 'Dashboard');
   useEffect(() => { if (searchParams.get('tab') === 'Rx') setActiveTab('Rx'); }, [searchParams]);
   const [prescriptionRevision, setPrescriptionRevision] = useState(0);
-  const [newPrescriptionId, setNewPrescriptionId] = useState<number | null>(null);
+  const [newPrescriptionIds, setNewPrescriptionIds] = useState<number[]>([]);
   const [allergyRevision, setAllergyRevision] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
+  const [actionModal, setActionModal] = useState<'documents' | 'payment' | 'prescriptions' | 'slots' | null>(null);
 
   const canUpdate = hasPermission(user, 'patients.update');
   const canExport = hasPermission(user, 'patients.export');
@@ -170,7 +175,7 @@ export function PatientDashboardPage() {
     return (
       <div className="pd-page">
         <Alert tone="error">{error || 'Patient not found'}</Alert>
-        <Button variant="back" size="sm" onClick={() => navigate('/patients')}>
+        <Button variant="back" size="sm" onClick={() => navigate(window.location.pathname.startsWith('/doctor/') ? '/doctor' : '/patients')}>
           Back to Patients
         </Button>
       </div>
@@ -185,6 +190,10 @@ export function PatientDashboardPage() {
           <p>Patient master overview for clinical and front-office reference.</p>
         </div>
         <div className="pd-topbar__actions">
+          <Button variant="secondary" size="sm" onClick={() => setActionModal('documents')}>Documents</Button>
+          {(hasPermission(user, 'pharmacy.view') || hasPermission(user, 'pharmacy.create')) && <Button variant="secondary" size="sm" onClick={() => setActionModal('prescriptions')}>Prescriptions</Button>}
+          {hasPermission(user, 'appointments.view') && <Button variant="secondary" size="sm" onClick={() => setActionModal('slots')}>Appointments</Button>}
+          {hasPermission(user, 'billing.view') && hasPermission(user, 'billing.update') && <Button variant="secondary" size="sm" onClick={() => setActionModal('payment')}>Payment</Button>}
           {canPrintClinicalSummary ? <Button variant="secondary" size="sm" onClick={printClinicalSummary}>Print clinical summary</Button> : null}
           {canExport ? <Button variant="secondary" size="sm" loading={exporting} onClick={() => void downloadFhir()}>Export FHIR R4</Button> : null}
           {canUpdate ? (
@@ -192,13 +201,17 @@ export function PatientDashboardPage() {
               Edit Patient
             </Button>
           ) : null}
-          <Button variant="back" size="sm" onClick={() => navigate('/patients')}>
+          <Button variant="back" size="sm" onClick={() => navigate(window.location.pathname.startsWith('/doctor/') ? '/doctor' : '/patients')}>
             Back
           </Button>
         </div>
       </div>
 
       {exportError ? <Alert tone="error">{exportError}</Alert> : null}
+      {actionModal === 'documents' && <PatientDocumentsModal patientId={patient.id} patientName={patient.fullName} canManage={canUpdate || hasPermission(user, 'clinical.create')} onClose={() => setActionModal(null)} />}
+      {actionModal === 'payment' && <PatientPaymentModal patientId={patient.id} patientName={patient.fullName} onClose={() => setActionModal(null)} />}
+      {actionModal === 'prescriptions' && <PatientPrescriptionModal patient={patient} visitId={activeVisitId} onClose={() => setActionModal(null)} />}
+      {actionModal === 'slots' && <PatientSlotsModal patientId={patient.id} patientName={patient.fullName} canBook={hasPermission(user, 'appointments.create')} onClose={() => setActionModal(null)} />}
 
       <nav className="pd-tabs" aria-label="Patient sections">
         {TABS.map((tab) => (
@@ -239,10 +252,10 @@ export function PatientDashboardPage() {
           {activeTab === 'Rx' && hasPermission(user, 'clinical.view') && hasPermission(user, 'pharmacy.create') ? (
             <details className="pd-card" open>
               <summary>Create prescription</summary>
-              <PrescriptionComposer patientId={patient.id} visitId={activeVisitId} onSaved={(id) => { setPrescriptionRevision((value) => value + 1); setNewPrescriptionId(id); }} />
+              <PrescriptionComposer patientId={patient.id} patientName={patient.fullName} visitId={activeVisitId} onSaved={(ids) => { setPrescriptionRevision((value) => value + 1); setNewPrescriptionIds(ids); }} />
             </details>
           ) : null}
-          <PatientRecordsTab key={activeTab === 'Rx' ? prescriptionRevision : activeTab} patient={patient} mode={activeTab} previewPrescriptionId={activeTab === 'Rx' ? newPrescriptionId : null} />
+          <PatientRecordsTab key={activeTab === 'Rx' ? prescriptionRevision : activeTab} patient={patient} mode={activeTab} previewPrescriptionIds={activeTab === 'Rx' ? newPrescriptionIds : []} />
         </>
       ) : (
         <>

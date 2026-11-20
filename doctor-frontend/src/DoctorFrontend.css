@@ -1,0 +1,38 @@
+.doctor-frontend { display: grid; grid-template-columns: 230px minmax(0, 1fr); min-height: 100vh; background: #f5f9f6; color: #173d2b; }
+.doctor-frontend__nav { display: flex; flex-direction: column; min-height: 100vh; background: #fff; border-right: 1px solid #dbe8de; }
+.doctor-frontend__brand { display: flex; align-items: center; justify-content: space-between; min-height: 76px; padding: 3px 12px; border-bottom: 1px solid #dbe8de; }
+.doctor-frontend__brand img { width: 150px; max-height: 70px; object-fit: contain; }
+.doctor-frontend__nav-scroll { overflow-y: auto; padding: 8px 12px; }
+.doctor-frontend__nav p { margin: 16px 0 7px; padding-left: 12px; font-size: 11px; letter-spacing: .1em; color: #688276; }
+.doctor-frontend__nav a, .doctor-frontend__nav-scroll button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px; border: 0; border-radius: 8px; background: transparent; text-align: left; color: inherit; text-decoration: none; font: inherit; cursor: pointer; }
+.doctor-frontend__nav a.active, .doctor-frontend__nav a:hover, .doctor-frontend__nav-scroll button:hover { background: #d8efe1; }
+.doctor-frontend__body { min-width: 0; }
+.doctor-frontend__header { display: flex; align-items: center; justify-content: space-between; gap: 20px; min-height: 76px; padding: 10px 24px; background: white; border-bottom: 1px solid #dbe8de; }
+.doctor-frontend__heading, .doctor-frontend__header-actions { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.doctor-frontend__heading h1 { margin: 0; font-size: 22px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.doctor-frontend__header-actions .patient-search-field { min-width: 0; }
+.doctor-frontend__icon-btn, .doctor-frontend__avatar { position: relative; flex: none; display: grid; place-items: center; width: 42px; height: 42px; border: 1px solid #bfd0c8; border-radius: 50%; background: #fff; color: #173d2b; text-decoration: none; cursor: pointer; }
+.doctor-frontend__icon-btn:hover { background: #eef5f1; }
+.doctor-frontend__avatar { background: #1d7d4f; color: #fff; font-size: 13px; font-weight: 650; }
+.doctor-frontend__badge { position: absolute; right: -5px; top: -5px; min-width: 19px; padding: 2px 4px; border-radius: 12px; background: #ef4444; color: #fff; font-size: 10px; text-align: center; }
+.doctor-frontend__profile { position: relative; }
+.doctor-frontend__profile-menu { position: absolute; right: 0; top: 48px; z-index: 40; display: grid; gap: 6px; min-width: 205px; padding: 12px; border: 1px solid #dbe8de; border-radius: 10px; background: white; box-shadow: 0 12px 25px rgb(0 0 0 / 12%); }
+.doctor-frontend__profile-menu small { color: #688276; }
+.doctor-frontend__profile-menu a, .doctor-frontend__profile-menu button { padding: 8px; border: 0; border-radius: 6px; background: #f5f9f6; color: #173d2b; font: inherit; text-align: left; text-decoration: none; cursor: pointer; }
+.doctor-frontend main { padding: 24px; }
+.doctor-access-denied { max-width: 520px; margin: 56px auto; padding: 32px; border: 1px solid #dbe8de; border-radius: 12px; background: #fff; }
+.doctor-access-denied h1 { margin: 0 0 12px; font-size: 22px; }
+.doctor-access-denied p { margin: 0 0 20px; line-height: 1.5; color: #526a5e; }
+.doctor-access-denied button { padding: 10px 16px; border: 0; border-radius: 8px; background: #006b3f; color: #fff; font: inherit; cursor: pointer; }
+.doctor-frontend__menu-toggle, .doctor-frontend__mobile-close, .doctor-frontend__scrim { display: none; }
+@media (max-width: 700px) {
+  .doctor-frontend { grid-template-columns: 1fr; }
+  .doctor-frontend__nav { position: fixed; inset: 0 auto 0 0; z-index: 70; width: min(230px, 84vw); transform: translateX(-100%); transition: transform .2s ease; }
+  .doctor-frontend__nav.is-open { transform: translateX(0); }
+  .doctor-frontend__scrim { display: block; position: fixed; inset: 0; z-index: 69; width: 100%; border: 0; background: rgb(13 28 20 / 40%); }
+  .doctor-frontend__menu-toggle, .doctor-frontend__mobile-close { display: grid; place-items: center; border: 0; background: transparent; color: inherit; cursor: pointer; }
+  .doctor-frontend__mobile-close { font-size: 22px; }
+  .doctor-frontend__header { padding: 10px 12px; }
+  .doctor-frontend__header-actions .patient-search-field { display: none; }
+  .doctor-frontend main { padding: 12px; }
+}

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { DatePicker } from '../../components/ui/DatePicker';
 import { PageLoader } from '../../components/ui/Loader';
 import { Modal } from '../../components/ui/Modal';
 import { Select } from '../../components/ui/Select';
@@ -152,7 +153,7 @@ export function PatientFormPage() {
       setLoading(true);
       setError('');
       try {
-        const [doctors, sources] = await Promise.all([doctorsApi.list(), patientsApi.registrationSources()]);
+        const [doctors, sources] = await Promise.all([doctorsApi.consultants(), patientsApi.registrationSources()]);
         setRegistrationSources(sources);
         setDoctorOptions([
           { label: 'Select referral doctor', value: '' },
@@ -551,13 +552,12 @@ export function PatientFormPage() {
               { label: 'Other', value: 'other' },
             ]}
           />
-          <Input
+          <DatePicker
             label="Date of Birth *"
-            type="date"
             value={dateOfBirth}
             fieldKey="dateOfBirth"
             error={errors.dateOfBirth}
-            onChange={(event) => onDobChange(event.target.value)}
+            onChange={onDobChange}
           />
           <Input
             label={ageIsApproximate || !dateOfBirth ? 'Age (Approx) *' : 'Age *'}

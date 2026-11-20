@@ -1,7 +1,7 @@
 import type { AuthUser } from '../types';
 
 function isAdminUser(user: AuthUser): boolean {
-  return Boolean(user.isSuperAdmin) || (user.roleCodes ?? []).includes('super_admin');
+  return Boolean(user.isSuperAdmin);
 }
 
 export function hasPermission(user: AuthUser | null | undefined, permission: string): boolean {

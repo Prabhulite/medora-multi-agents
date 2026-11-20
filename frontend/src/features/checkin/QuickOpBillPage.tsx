@@ -5,11 +5,11 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { getErrorMessage } from '../../lib/api';
-import type { Doctor, OpCheckinVisit, Patient, ServiceMaster } from '../../types';
+import type { OpCheckinVisit, Patient, ServiceMaster } from '../../types';
 import { billingApi, type BillingInvoice } from '../billing/billing.api';
 import { PatientBillPanel } from '../billing/PatientBillPanel';
 import '../billing/BillingDashboardPage.css';
-import { doctorsApi } from '../doctors/doctors.api';
+import { doctorsApi, type ConsultantOption } from '../doctors/doctors.api';
 import { patientsApi } from '../patients/patients.api';
 import { servicesApi } from '../services/services.api';
 import { checkinApi } from './checkin.api';
@@ -110,7 +110,7 @@ export function QuickOpBillPage() {
     stateVisit && String(stateVisit.id) === visitId ? stateVisit : null,
   );
   const [patient, setPatient] = useState<Patient | null>(null);
-  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [doctors, setDoctors] = useState<ConsultantOption[]>([]);
   const [services, setServices] = useState<ServiceMaster[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -164,7 +164,7 @@ export function QuickOpBillPage() {
         );
         const [patientRow, doctorRows, serviceRows] = await Promise.all([
           patientsApi.getById(visitRow.patientId),
-          doctorsApi.list(),
+          doctorsApi.consultants(),
           servicesApi.listActive(),
         ]);
         if (!active) return;

@@ -11,19 +11,14 @@ export const api = axios.create({
   },
 });
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('medora_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+// Authentication is carried by the HTTP-only medora_session cookie. Remove
+// tokens left by older builds so a previous account cannot override it.
+if (typeof window !== 'undefined') window.localStorage.removeItem('medora_token');
 
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('medora_token');
       if (!window.location.pathname.startsWith('/login')) {
         window.location.href = '/login';
       }

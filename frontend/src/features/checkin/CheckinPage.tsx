@@ -3,13 +3,12 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { PageHeader } from '../../components/ui/PageHeader';
 import { Select } from '../../components/ui/Select';
 import { getErrorMessage } from '../../lib/api';
 import { hasPermission } from '../../lib/permissions';
-import type { Doctor, OpCheckinAppointmentOption, Patient, PatientGender } from '../../types';
+import type { Department, OpCheckinAppointmentOption, Patient, PatientGender } from '../../types';
 import { useAuth } from '../auth/AuthContext';
-import { doctorsApi } from '../doctors/doctors.api';
+import { departmentsApi } from '../departments/departments.api';
 import { patientsApi } from '../patients/patients.api';
 import { checkinApi } from './checkin.api';
 import './CheckinPage.css';
@@ -40,7 +39,9 @@ export function CheckinPage() {
   const [registrationOpen, setShowRegistration] = useState(searchParams.get('mode') === 'register');
   const showRegistration = canRegister && registrationOpen;
   const [registering, setRegistering] = useState(false);
-  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [doctors, setDoctors] = useState<{ id: number; name: string; departmentId: number; isActive: boolean }[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [registrationDepartmentId, setRegistrationDepartmentId] = useState('');
   const [appointments, setAppointments] = useState<OpCheckinAppointmentOption[]>([]);
 
   const [mrdQuery, setMrdQuery] = useState('');
@@ -68,10 +69,10 @@ export function CheckinPage() {
     () => [
       { value: '', label: 'Select a consultant' },
       ...doctors
-        .filter((row) => row.isActive)
+        .filter((row) => row.isActive && (!registrationDepartmentId || row.departmentId === Number(registrationDepartmentId)))
         .map((row) => ({ value: String(row.id), label: row.name })),
     ],
-    [doctors],
+    [doctors, registrationDepartmentId],
   );
 
   const appointmentOptions = useMemo(
@@ -87,8 +88,8 @@ export function CheckinPage() {
 
   useEffect(() => {
     let active = true;
-    doctorsApi
-      .list()
+    checkinApi
+      .consultants()
       .then((rows) => {
         if (active) setDoctors(rows);
       })
@@ -99,6 +100,15 @@ export function CheckinPage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!canRegister) return;
+    let active = true;
+    void departmentsApi.listActive()
+      .then((rows) => { if (active) setDepartments(rows); })
+      .catch((err) => { if (active) setError(getErrorMessage(err, 'Failed to load departments')); });
+    return () => { active = false; };
+  }, [canRegister]);
 
   useEffect(() => {
     const query = mrdQuery.trim();
@@ -162,6 +172,7 @@ export function CheckinPage() {
 
   const selectPatient = (row: Patient) => {
     setPatient(row);
+    setRegistrationDepartmentId('');
     setMrdQuery(row.mrdNumber);
     setReferredBy(row.referredBy || '');
     setSearchOpen(false);
@@ -176,6 +187,8 @@ export function CheckinPage() {
     const firstName = String(fields.get('firstName') ?? '').trim();
     const lastName = String(fields.get('lastName') ?? '').trim();
     const mobileNumber = String(fields.get('mobile') ?? '').trim();
+    const departmentId = String(fields.get('departmentId') ?? '');
+    const reasonForVisit = String(fields.get('reasonForVisit') ?? '').trim();
     setError('');
     if (!firstName || !/^[0-9+\-\s()]{8,20}$/.test(mobileNumber)) {
       setError('Enter a first name and a valid mobile number.');
@@ -201,6 +214,9 @@ export function CheckinPage() {
         createVisit: false,
       });
       selectPatient(created);
+      setRegistrationDepartmentId(departmentId);
+      setDoctorId('');
+      if (reasonForVisit) setPurposeOfVisit(reasonForVisit);
       setShowRegistration(false);
     } catch (err) {
       setError(getErrorMessage(err, 'Unable to register patient'));
@@ -276,27 +292,24 @@ export function CheckinPage() {
 
   return (
     <div className="checkin-page">
-      <PageHeader
-        title="New Check-in"
-        subtitle="Register walk-in or appointment patients for today's OP visit."
-        actions={
-          <Button variant="secondary" size="sm" onClick={() => navigate('/checkin')}>
-            Back to List
-          </Button>
-        }
-      />
-
-      {error ? <Alert tone="error">{error}</Alert> : null}
-      {success ? <Alert tone="success">{success}</Alert> : null}
-
-      {canRegister ? (
-        <section className="checkin-card">
+      <div className="checkin-page__toolbar">
+        {canRegister ? (
           <Button type="button" size="sm" variant="secondary" disabled={registering || saving}
             aria-expanded={showRegistration} onClick={() => setShowRegistration((open) => !open)}>
             {showRegistration ? 'Close registration' : 'Register new OP patient'}
           </Button>
-          {showRegistration ? (
-            <form className="checkin-form__grid" onSubmit={(event) => void registerPatient(event)}>
+        ) : null}
+        <Button variant="secondary" size="sm" onClick={() => navigate('/checkin')}>
+          Back to List
+        </Button>
+      </div>
+
+      {error ? <Alert tone="error">{error}</Alert> : null}
+      {success ? <Alert tone="success">{success}</Alert> : null}
+
+      {showRegistration ? (
+        <section className="checkin-card checkin-card--registration">
+            <form className="checkin-registration-form" onSubmit={(event) => void registerPatient(event)}>
               <Input label="First name" name="firstName" required maxLength={80} />
               <Input label="Last name" name="lastName" maxLength={80} />
               <Input label="Mobile number" name="mobile" type="tel" required maxLength={20} />
@@ -308,9 +321,10 @@ export function CheckinPage() {
                 { value: 'other', label: 'Other' },
               ]} />
               <Input label="Approximate age (years)" name="age" type="number" min={0} max={150} step={1} required />
-              <div><Button type="submit" size="sm" disabled={registering}>{registering ? 'Registering…' : 'Register and select'}</Button></div>
+              <Select label="Department" name="departmentId" value={registrationDepartmentId} onChange={(event) => { setRegistrationDepartmentId(event.target.value); setDoctorId(''); }} options={[{ value: '', label: 'Select department' }, ...departments.map((row) => ({ value: row.id, label: row.name }))]} />
+              <Input label="Reason for visit" name="reasonForVisit" maxLength={255} placeholder="Briefly describe the concern" />
+              <div className="checkin-registration-form__actions"><Button type="submit" size="sm" disabled={registering}>{registering ? 'Registering…' : 'Register and select'}</Button></div>
             </form>
-          ) : null}
         </section>
       ) : null}
 
